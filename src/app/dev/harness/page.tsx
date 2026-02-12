@@ -40,7 +40,7 @@ export default function Harness() {
       },
     };
 
-    addLog("Mock grist installé. Ouvre /widgets/emile dans un nouvel onglet.");
+    addLog("Mock grist installé. Ouvre /emile dans un nouvel onglet.");
   }, []);
 
   return (
@@ -51,7 +51,7 @@ export default function Harness() {
       </p>
 
       <p>
-        Ouvre ensuite : <a href="../widgets/an-pc">/widgets/an-pc</a>
+        Ouvre ensuite : <a href="../emile">/emile</a>
       </p>
 
       <div className="fr-callout fr-mt-3w">
