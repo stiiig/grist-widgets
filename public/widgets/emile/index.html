@@ -17,6 +17,7 @@
     .grow { flex: 1; min-width: 220px; }
     .muted { color: var(--text-mention-grey); }
     .pill { display:inline-flex; align-items:center; padding: 2px 10px; border-radius: 999px; background: var(--background-alt-grey); font-size: 0.8rem; }
+    .main { border:1px solid var(--border-default-grey); border-radius: 10px; padding: 8px; }
     .fr-error-text[hidden]{ display:none !important; }
     .field-row { margin-bottom: 6px; }
 
@@ -186,11 +187,17 @@
       display: inline-flex; align-items: center; justify-content: center; font-size: 0.9rem;
     }
 
+    /* DSFR Menu lateral dans le widget */
+    .fr-sidemenu { border: 1px solid var(--border-default-grey); border-radius: 10px; padding: 8px; }
+    .fr-sidemenu__title { padding-left: 0; }
+    .fr-sidemenu__link { width: 100%; }
+
     /* DSFR layout & composants */
     .toolbar { display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
     .toolbar .grow { flex: 1 1 320px; }
     .toolbar .fr-tags-group { margin:0; }
     .toolbar .fr-btns-group { margin:0; }
+    .main section { margin-bottom: 1.5rem; }
 
     /* Tags selection + ID en bleu */
     #selectedPill.fr-tag,
@@ -204,79 +211,14 @@
     #selectedPill.fr-tag[class*="fr-icon-"]::before,
     #candidateIdTag.fr-tag[class*="fr-icon-"]::before { content: none !important; }
 
+    /* Ancrage : eviter que le titre soit masque par la barre sticky */
+    section[id^="sec-"] { scroll-margin-top: 110px; }
+
     /* Accordeons : un peu d'air */
     .fr-accordion__btn { padding-top: .75rem; padding-bottom: .75rem; }
 
     /* Toggle Bool compact */
     .field-row .fr-toggle { margin-top: 0.25rem; }
-
-    /* ===== TABS: onglets horizontaux ===== */
-    .fr-tabs__list {
-      overflow-x: auto;
-      flex-wrap: nowrap;
-      scrollbar-width: thin;
-    }
-    .fr-tabs__tab {
-      white-space: nowrap;
-      font-size: 0.82rem;
-      padding: 0.5rem 0.75rem;
-    }
-
-    /* ===== SUB-SECTION TAGS ===== */
-    .sub-tags {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-bottom: 1rem;
-      padding: 0.5rem 0;
-      border-bottom: 1px solid var(--border-default-grey);
-    }
-    .sub-tag {
-      cursor: pointer;
-      transition: background-color 0.2s, color 0.2s;
-      border: none;
-      font-size: 0.82rem;
-    }
-    .sub-tag--active {
-      background-color: var(--background-action-high-blue-france) !important;
-      color: var(--text-inverted-blue-france) !important;
-    }
-    .sub-tag--empty { opacity: 0.6; }
-
-    /* Zone de contenu sous-section */
-    .sub-content { display: none; }
-    .sub-content--active { display: block; }
-
-    /* Champs lecture seule */
-    .field-readonly .fr-input,
-    .field-readonly .fr-select,
-    .field-readonly .fr-toggle__input {
-      background-color: var(--background-alt-grey);
-      cursor: not-allowed;
-      opacity: 0.7;
-    }
-    .field-readonly .fr-toggle__label { opacity: 0.7; }
-    .field-readonly::after {
-      content: "Lecture seule";
-      display: block;
-      font-size: 0.7rem;
-      color: var(--text-mention-grey);
-      margin-top: 2px;
-      font-style: italic;
-    }
-
-    /* Callout sous-section vide */
-    .sub-empty-callout {
-      margin: 1rem 0;
-    }
-    .sub-empty-callout .fr-callout__text {
-      font-size: 0.85rem;
-    }
-
-    /* Card header dans formRoot */
-    .form-header-card {
-      margin-bottom: 1rem;
-    }
   </style>
 
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
@@ -322,29 +264,138 @@
     </div>
 
     <div style="margin-top:16px;">
-      <div id="emptyState" class="fr-callout">
-        <p class="fr-callout__title">Sélectionne un candidat</p>
-        <p class="fr-callout__text">Utilise la recherche en haut pour afficher et modifier la fiche.</p>
-      </div>
-
-      <div id="formRoot" hidden>
-        <!-- Header card with candidate ID -->
-        <div class="fr-card fr-card--no-arrow form-header-card">
-          <div class="fr-card__body"><div class="fr-card__content">
-            <div class="fr-grid-row fr-grid-row--middle fr-grid-row--gutters">
-              <div class="fr-col"><h2 class="fr-card__title fr-text--lg" style="margin:0;">Dossier</h2></div>
-              <div class="fr-col fr-col--right">
-                <p class="fr-tag fr-tag--sm fr-tag--icon-left fr-icon-hashtag" id="candidateIdTag" hidden style="margin:0;">
-                  ID&nbsp;: <span id="candidateIdValue"></span>
-                </p>
+      <div class="fr-container fr-mt-2w">
+        <div class="fr-grid-row fr-grid-row--gutters">
+          <div class="fr-col-12 fr-col-md-3">
+            <nav class="fr-sidemenu fr-sidemenu--sticky" aria-labelledby="emile-sidemenu-title">
+              <div class="fr-sidemenu__inner">
+                <button class="fr-sidemenu__btn" type="button" aria-controls="emile-sidemenu-wrapper" aria-expanded="false">
+                  Sections
+                </button>
+                <div class="fr-collapse" id="emile-sidemenu-wrapper">
+                  <div class="fr-sidemenu__title fr-text--xs muted" id="emile-sidemenu-title" style="margin:0 0 6px;">
+                    Sections
+                  </div>
+                  <ul class="fr-sidemenu__list">
+                    <li class="fr-sidemenu__item fr-sidemenu__item--active">
+                      <a class="fr-sidemenu__link" href="#sec-perso" aria-current="page">Informations personnelles</a>
+                    </li>
+                    <li class="fr-sidemenu__item">
+                      <a class="fr-sidemenu__link" href="#sec-coord">Coordonnées</a>
+                    </li>
+                    <li class="fr-sidemenu__item">
+                      <a class="fr-sidemenu__link" href="#sec-admin">Situation administrative</a>
+                    </li>
+                    <li class="fr-sidemenu__item">
+                      <a class="fr-sidemenu__link" href="#sec-besoins">Besoins particuliers</a>
+                    </li>
+                    <li class="fr-sidemenu__item">
+                      <a class="fr-sidemenu__link" href="#sec-complements">Compléments</a>
+                    </li>
+                  </ul>
+                </div>
               </div>
-            </div>
-            <p class="fr-card__desc">Informations et documents du candidat.</p>
-          </div></div>
-        </div>
+            </nav>
+          </div>
+          <div class="fr-col-12 fr-col-md-9">
+            <main class="main">
 
-        <!-- Onglets DSFR (générés dynamiquement en JS) -->
-        <div id="tabsContainer"></div>
+              <div id="emptyState" class="fr-callout">
+                <p class="fr-callout__title">Sélectionne un candidat</p>
+                <p class="fr-callout__text">Utilise la recherche en haut pour afficher et modifier la fiche.</p>
+              </div>
+
+              <div id="formRoot" hidden>
+
+                <section id="sec-perso">
+                  <div class="fr-card fr-card--no-arrow">
+                    <div class="fr-card__body">
+                      <div class="fr-card__content">
+                        <div class="fr-grid-row fr-grid-row--middle fr-grid-row--gutters fr-mb-1w">
+                          <div class="fr-col">
+                            <h2 class="fr-card__title fr-text--lg" style="margin:0;">Informations personnelles</h2>
+                          </div>
+                          <div class="fr-col fr-col--right">
+                            <p class="fr-tag fr-tag--sm fr-tag--icon-left fr-icon-hashtag" id="candidateIdTag" hidden style="margin:0;">
+                              ID&nbsp;: <span id="candidateIdValue"></span>
+                            </p>
+                          </div>
+                        </div>
+                        <p class="fr-card__desc fr-mb-2w">Renseignez les informations principales. Les champs obligatoires sont indiqués.</p>
+                        <div class="fr-grid-row fr-grid-row--gutters" id="group-perso"></div>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                <section id="sec-coord">
+                  <div class="fr-card fr-card--no-arrow">
+                    <div class="fr-card__body">
+                      <div class="fr-card__content">
+                        <div class="fr-grid-row fr-grid-row--gutters" id="group-coord" data-group-title="Coordonnées"></div>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                <section id="sec-admin">
+                  <div class="fr-card fr-card--no-arrow">
+                    <div class="fr-card__body">
+                      <div class="fr-card__content">
+                        <div class="fr-grid-row fr-grid-row--gutters" id="group-admin" data-group-title="Situation administrative"></div>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                <section id="sec-besoins">
+                  <div class="fr-accordions-group">
+                    <section class="fr-accordion">
+                      <h2 class="fr-accordion__title">
+                        <button class="fr-accordion__btn" type="button" aria-expanded="false" aria-controls="sec-besoins-panel">
+                          Besoins particuliers
+                        </button>
+                      </h2>
+                      <div class="fr-collapse" id="sec-besoins-panel">
+                        <div class="fr-card fr-card--no-arrow fr-mt-1w">
+                          <div class="fr-card__body">
+                            <div class="fr-card__content">
+                              <p class="fr-text--sm fr-mb-2w">Renseignez les informations de cette section.</p>
+                              <div class="fr-grid-row fr-grid-row--gutters" id="group-besoins"></div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </section>
+                  </div>
+                </section>
+
+                <section id="sec-complements">
+                  <div class="fr-accordions-group">
+                    <section class="fr-accordion">
+                      <h2 class="fr-accordion__title">
+                        <button class="fr-accordion__btn" type="button" aria-expanded="false" aria-controls="sec-complements-panel">
+                          Compléments
+                        </button>
+                      </h2>
+                      <div class="fr-collapse" id="sec-complements-panel">
+                        <div class="fr-card fr-card--no-arrow fr-mt-1w">
+                          <div class="fr-card__body">
+                            <div class="fr-card__content">
+                              <p class="fr-text--sm fr-mb-2w">Renseignez les informations de cette section.</p>
+                              <div class="fr-grid-row fr-grid-row--gutters" id="group-complements"></div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </section>
+                  </div>
+                </section>
+
+              </div>
+            </main>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -358,77 +409,12 @@
 (() => {
   const TABLE_ID = "CANDIDATS";
 
-  /* ===== 10 onglets avec sous-sections ===== */
-  const TABS = [
-    { id: "administratif", label: "Administratif", icon: "fr-icon-building-line", sections: [
-      { id: "admin-perso",   label: "Informations personnelles", cols: ["Prenom","Nom_de_famille","Date_de_naissance","Age","Genre","Nationalite","Majeur","AIE","Niveau_de_langue","Niveau_etudes_reconnu_en_France","PMR","RQTH"] },
-      { id: "admin-coord",   label: "Coordonnées",               cols: ["Adresse","Email","Tel","Departement_domicile_inscription"] },
-      { id: "admin-sitadmin",label: "Situation administrative",   cols: ["Regularite_situation","Date_validite_titre_sejour","Numero_unique_enregistrement"] },
-      { id: "admin-besoins", label: "Besoins particuliers",       cols: [] },
-      { id: "admin-comp",    label: "Compléments",                cols: ["Motivation_candidat","Autres_initiatives_perso"] },
-    ]},
-    { id: "dls", label: "DLS", icon: "fr-icon-key-line", sections: [
-      { id: "dls-statut",    label: "Statut de la demande",       cols: ["Commentaire_du_statut"] },
-      { id: "dls-pieces",    label: "Pièces administratives",     cols: ["Attestation_MSA_CAF","Document_identite_sejour_candidats","Document_identite_sejour_autres_personnes"] },
-      { id: "dls-revenus",   label: "Justificatifs de revenus",   cols: [] },
-      { id: "dls-comp",      label: "Compléments",                cols: [] },
-    ]},
-    { id: "emploi", label: "Emploi-Formation", icon: "fr-icon-briefcase-line", sections: [
-      { id: "emploi-sit",    label: "Situation actuelle",          cols: [] },
-      { id: "emploi-projet", label: "Projet candidat·e",          cols: [] },
-      { id: "emploi-demarche",label:"Démarches engagées",         cols: [] },
-      { id: "emploi-cv",     label: "CV et attestations",         cols: [] },
-      { id: "emploi-besoins",label: "Besoins particuliers",       cols: ["Situation_face_emploi"] },
-      { id: "emploi-comp",   label: "Compléments",                cols: ["Complement_info_Emploi_Formation"] },
-    ]},
-    { id: "finances", label: "Finances", icon: "fr-icon-money-euro-circle-line", sections: [
-      { id: "fin-sit",       label: "Situation actuelle",          cols: ["Situation_financiere"] },
-      { id: "fin-ft",        label: "France Travail",              cols: [] },
-      { id: "fin-avis",      label: "Avis et attestations",       cols: [] },
-      { id: "fin-comp",      label: "Compléments",                cols: ["Complement_info_Finances"] },
-    ]},
-    { id: "foyer", label: "Foyer", icon: "fr-icon-team-line", sections: [
-      { id: "foyer-compo",   label: "Composition",                cols: [] },
-      { id: "foyer-couple",  label: "Couple / famille",           cols: [] },
-      { id: "foyer-besoins", label: "Besoins particuliers",       cols: ["Besoin_prise_en_charge_enfant_s_","Besoin_accompagner_conjoint_e_vers_emploi_formation"] },
-      { id: "foyer-comp",    label: "Compléments",                cols: [] },
-    ]},
-    { id: "habitat", label: "Habitat", icon: "fr-icon-home-4-line", sections: [
-      { id: "hab-general",   label: "Informations générales",     cols: [] },
-      { id: "hab-etape",     label: "Situation par étape",        cols: ["Situation_hebergement"] },
-      { id: "hab-attquitt",  label: "Attestation, avis et quittances", cols: [] },
-      { id: "hab-coloc",     label: "Colocation",                 cols: [] },
-      { id: "hab-besoins",   label: "Besoins particuliers",       cols: ["Precarite_de_logement","Besoin_mise_a_l_abri"] },
-      { id: "hab-comp",      label: "Compléments",                cols: [] },
-    ]},
-    { id: "lec", label: "Lecture-Écriture-Calcul", icon: "fr-icon-book-2-line", sections: [
-      { id: "lec-general",   label: "Informations générales",     cols: [] },
-      { id: "lec-francais",  label: "Maîtrise du français",       cols: ["Niveau_de_langue"] },
-      { id: "lec-calcul",    label: "Calcul",                     cols: [] },
-      { id: "lec-apprenti",  label: "Apprentissages",             cols: [] },
-      { id: "lec-comp",      label: "Compléments",                cols: [] },
-    ]},
-    { id: "mobilite", label: "Mobilité", icon: "fr-icon-car-line", sections: [
-      { id: "mob-vehicules", label: "Véhicules, code et permis",  cols: ["Vehicule","Permis"] },
-      { id: "mob-besoins",   label: "Besoins particuliers",       cols: [] },
-      { id: "mob-comp",      label: "Compléments",                cols: ["Complement_info_Mobilite"] },
-    ]},
-    { id: "numerique", label: "Numérique", icon: "fr-icon-computer-line", sections: [
-      { id: "num-materiel",  label: "Matériel et capacités",      cols: [] },
-      { id: "num-besoins",   label: "Besoins particuliers",       cols: [] },
-      { id: "num-comp",      label: "Compléments",                cols: [] },
-    ]},
-    { id: "sante", label: "Santé", icon: "fr-icon-heart-pulse-line", sections: [
-      { id: "san-sit",       label: "Situation actuelle",          cols: [] },
-      { id: "san-docs",      label: "Documents",                  cols: [] },
-      { id: "san-besoins",   label: "Besoins particuliers",       cols: ["Besoin_divers","Difficultes_diverses"] },
-      { id: "san-comp",      label: "Compléments",                cols: [] },
-    ]},
-  ];
-
-  /** Colonnes qui apparaissent dans 2 sous-sections : readonly dans les sections listées ici */
-  const READONLY_IN = {
-    "Niveau_de_langue": new Set(["lec-francais"]),
+  const GROUPS = {
+    perso: new Set(["Prenom","Nom_de_famille","Date_de_naissance","Age","Genre","Nationalite","Majeur","AIE","Niveau_de_langue","Niveau_etudes_reconnu_en_France","PMR","RQTH"]),
+    coord: new Set(["Adresse","Email","Tel","Departement_domicile_inscription"]),
+    admin: new Set(["Regularite_situation","Date_validite_titre_sejour","Numero_unique_enregistrement","Attestation_MSA_CAF","Document_identite_sejour_candidats","Document_identite_sejour_autres_personnes"]),
+    besoins: new Set(["Precarite_de_logement","Situation_hebergement","Situation_financiere","Situation_face_emploi","Besoin_divers","Difficultes_diverses","Besoin_mise_a_l_abri","Besoin_prise_en_charge_enfant_s_","Besoin_accompagner_conjoint_e_vers_emploi_formation"]),
+    complements: new Set(["Motivation_candidat","Autres_initiatives_perso","Complement_info_Emploi_Formation","Complement_info_Finances","Complement_info_Mobilite","Vehicule","Permis","Commentaire_du_statut"]),
   };
 
   /* ===== State ===== */
@@ -442,7 +428,6 @@
   let attachmentsNameById = new Map();
   let gristColIdByRowId = new Map();
   let gristTableIdByParentId = new Map();
-  let tabsBuilt = false;
 
   const $ = (id) => document.getElementById(id);
 
@@ -476,6 +461,7 @@
 
   /**
    * Configure le comportement d'un input dropdown (searchable ou click-to-select).
+   * Remplace le pattern Nationalite copie-colle 3x.
    */
   function setupDropdownBehavior(input, renderFn, isSearchable) {
     if (isSearchable) {
@@ -495,6 +481,8 @@
 
   /**
    * Cree un element dd-item (ligne de dropdown).
+   * @param {{ label:string, extra?:string, hasCheckbox?:boolean, checked?:boolean }} item
+   * @param {Function} onSelect
    */
   function createDropdownItem(item, onSelect) {
     const div = document.createElement("div");
@@ -708,125 +696,6 @@
       }));
     }
     closeAllLists(list);
-  }
-
-  /* ==========================================================================
-   *  TABS & SUB-SECTIONS — Construction dynamique des onglets DSFR
-   * ========================================================================== */
-
-  /**
-   * Construit le squelette HTML fr-tabs à partir de la constante TABS.
-   * Appelé une seule fois au démarrage.
-   */
-  function buildTabs() {
-    const container = $("tabsContainer");
-    container.innerHTML = "";
-
-    const tabsDiv = document.createElement("div");
-    tabsDiv.className = "fr-tabs";
-
-    // --- Tab list (ul) ---
-    const ul = document.createElement("ul");
-    ul.className = "fr-tabs__list";
-    ul.setAttribute("role", "tablist");
-    ul.setAttribute("aria-label", "Sections du dossier");
-
-    for (let i = 0; i < TABS.length; i++) {
-      const tab = TABS[i];
-      const li = document.createElement("li");
-      li.setAttribute("role", "presentation");
-
-      const btn = document.createElement("button");
-      btn.id = `tab-${tab.id}`;
-      btn.className = "fr-tabs__tab";
-      if (tab.icon) btn.classList.add(tab.icon);
-      btn.setAttribute("role", "tab");
-      btn.setAttribute("aria-controls", `panel-${tab.id}`);
-      btn.setAttribute("aria-selected", i === 0 ? "true" : "false");
-      btn.setAttribute("tabindex", i === 0 ? "0" : "-1");
-      btn.textContent = tab.label;
-
-      li.appendChild(btn);
-      ul.appendChild(li);
-    }
-
-    tabsDiv.appendChild(ul);
-
-    // --- Panels ---
-    for (let i = 0; i < TABS.length; i++) {
-      const tab = TABS[i];
-      const panel = document.createElement("div");
-      panel.id = `panel-${tab.id}`;
-      panel.className = `fr-tabs__panel${i === 0 ? " fr-tabs__panel--selected" : ""}`;
-      panel.setAttribute("role", "tabpanel");
-      panel.setAttribute("aria-labelledby", `tab-${tab.id}`);
-      panel.setAttribute("tabindex", "0");
-
-      // Sub-section tags
-      const tagsDiv = document.createElement("div");
-      tagsDiv.className = "sub-tags";
-      tagsDiv.id = `tags-${tab.id}`;
-
-      for (let j = 0; j < tab.sections.length; j++) {
-        const sec = tab.sections[j];
-        const tag = document.createElement("button");
-        tag.type = "button";
-        tag.className = `fr-tag fr-tag--sm sub-tag${j === 0 ? " sub-tag--active" : ""}`;
-        tag.dataset.sectionId = sec.id;
-        tag.dataset.tabId = tab.id;
-        tag.textContent = sec.label;
-
-        tag.addEventListener("click", () => {
-          showSubSection(tab.id, sec.id);
-        });
-
-        tagsDiv.appendChild(tag);
-      }
-
-      panel.appendChild(tagsDiv);
-
-      // Content zones for each sub-section
-      for (let j = 0; j < tab.sections.length; j++) {
-        const sec = tab.sections[j];
-        const content = document.createElement("div");
-        content.className = `sub-content${j === 0 ? " sub-content--active" : ""}`;
-        content.id = `content-${sec.id}`;
-
-        // Fields container (grid)
-        const grid = document.createElement("div");
-        grid.className = "fr-grid-row fr-grid-row--gutters";
-        grid.id = `fields-${sec.id}`;
-        content.appendChild(grid);
-
-        panel.appendChild(content);
-      }
-
-      tabsDiv.appendChild(panel);
-    }
-
-    container.appendChild(tabsDiv);
-    tabsBuilt = true;
-  }
-
-  /**
-   * Affiche une sous-section donnée dans un onglet, masque les autres.
-   */
-  function showSubSection(tabId, sectionId) {
-    // Update tags active state
-    const tagsContainer = $(`tags-${tabId}`);
-    if (tagsContainer) {
-      for (const tag of tagsContainer.querySelectorAll(".sub-tag")) {
-        tag.classList.toggle("sub-tag--active", tag.dataset.sectionId === sectionId);
-      }
-    }
-
-    // Show/hide content zones
-    const panel = $(`panel-${tabId}`);
-    if (panel) {
-      for (const c of panel.querySelectorAll(".sub-content")) {
-        c.classList.toggle("sub-content--active", c.id === `content-${sectionId}`);
-      }
-    }
   }
 
   /* ==========================================================================
@@ -1315,17 +1184,17 @@
     const toggleWrap = document.createElement("div");
     toggleWrap.className = "fr-toggle";
 
-    const tId = `toggle-${col.colId}-${Date.now()}`;
+    const toggleId = `toggle-${col.colId}`;
 
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
-    checkbox.id = tId;
+    checkbox.id = toggleId;
     checkbox.className = "fr-toggle__input";
     checkbox.checked = !!current;
 
     const toggleLabel = document.createElement("label");
     toggleLabel.className = "fr-toggle__label";
-    toggleLabel.setAttribute("for", tId);
+    toggleLabel.setAttribute("for", toggleId);
     toggleLabel.setAttribute("data-fr-checked-label", "Oui");
     toggleLabel.setAttribute("data-fr-unchecked-label", "Non");
     toggleLabel.textContent = col.label;
@@ -1386,42 +1255,36 @@
   }
 
   /* ===== Rendering fields ===== */
-
-  /**
-   * Monte un groupe de colonnes dans un conteneur.
-   * @param {string} containerId - ID du conteneur (ex: "fields-admin-perso")
-   * @param {Array} cols - colonnes à rendre
-   * @param {Set|null} readonlyCols - Set de colIds à rendre en lecture seule
-   */
-  function mountGroup(containerId, cols, readonlyCols) {
-    const root = $(containerId);
-    if (!root) return;
+  function mountGroup(groupId, cols) {
+    const root = $(groupId);
     root.innerHTML = "";
 
-    if (!cols.length) {
-      // Callout pour section vide
-      const callout = document.createElement("div");
-      callout.className = "fr-callout sub-empty-callout";
-      callout.innerHTML = `<p class="fr-callout__text">Aucun champ configuré pour cette section.</p>`;
-      root.appendChild(callout);
-      return;
+    const title = root.dataset && root.dataset.groupTitle ? root.dataset.groupTitle : "";
+    if (title) {
+      const h2 = document.createElement("h2");
+      h2.className = "fr-h3 fr-mb-1w";
+      h2.textContent = title;
+
+      const p = document.createElement("p");
+      p.className = "fr-text--sm fr-mb-2w";
+      p.textContent = "Renseignez les informations de cette section.";
+
+      const titleWrap = document.createElement("div");
+      titleWrap.className = "fr-col-12";
+      titleWrap.appendChild(h2);
+      titleWrap.appendChild(p);
+      root.appendChild(titleWrap);
     }
 
     for (const col of cols) {
       try {
-        const isReadonly = readonlyCols && readonlyCols.has(col.colId);
-        const field = renderField(col, isReadonly);
+        const field = renderField(col);
         field.dataset.colid = col.colId;
-        if (isReadonly) {
-          field.classList.add("field-readonly");
-          // Désactiver les inputs dans ce champ
-          field.dataset.readonly = "true";
-        }
         root.appendChild(field);
       } catch (e) {
         console.error("Render error for", col.colId, e);
         const warn = document.createElement("div");
-        warn.className = "fr-alert fr-alert--warning fr-col-12";
+        warn.className = "fr-alert fr-alert--warning";
         warn.style.marginBottom = "10px";
         warn.innerHTML = `<p class="fr-alert__title">Champ ignoré : ${escapeHtml(col.colId)}</p>
                           <p class="fr-alert__desc">Erreur au rendu. Voir la console.</p>`;
@@ -1430,7 +1293,7 @@
     }
   }
 
-  function renderField(col, isReadonly) {
+  function renderField(col) {
     const wrap = document.createElement("div");
     wrap.className = "fr-col-12 fr-col-md-6 fr-col-lg-4 field-row";
 
@@ -1489,13 +1352,9 @@
     let current = (selectedRecord && col.colId in selectedRecord) ? selectedRecord[col.colId] : null;
 
     function setValueToState(value) {
-      // Les champs readonly ne doivent pas sauvegarder
-      if (isReadonly) return;
       wrap.dataset.value = value == null ? "" : JSON.stringify(value);
     }
-    if (!isReadonly) {
-      setValueToState(current);
-    }
+    setValueToState(current);
 
     function setInvalid(el, message) {
       el.setAttribute("aria-invalid", message ? "true" : "false");
@@ -1505,32 +1364,13 @@
     // Dispatch vers le handler
     const ctx = { col, current, setValueToState, setInvalid, label, err, group, wrap };
     const handler = getHandlerForType(col.type);
-    const result = handler(ctx);
-
-    // Si readonly, désactiver tous les inputs/selects/textareas après le rendu
-    if (isReadonly) {
-      requestAnimationFrame(() => {
-        for (const el of wrap.querySelectorAll("input, select, textarea")) {
-          el.readOnly = true;
-          el.disabled = true;
-          el.tabIndex = -1;
-        }
-        for (const el of wrap.querySelectorAll("button")) {
-          if (!el.classList.contains("hint-btn")) {
-            el.disabled = true;
-          }
-        }
-      });
-    }
-
-    return result;
+    return handler(ctx);
   }
 
   /* ===== Collect & Save ===== */
   function collectPayload() {
     const payload = {};
-    // Collecter uniquement les champs NON readonly
-    const fields = $("formRoot").querySelectorAll("[data-colid]:not([data-readonly='true'])");
+    const fields = $("formRoot").querySelectorAll("[data-colid]");
     for (const f of fields) {
       const colId = f.dataset.colid;
       const raw = f.dataset.value;
@@ -1538,10 +1378,7 @@
       let v = null;
       try { v = raw === "" ? null : JSON.parse(raw); } catch { v = raw; }
       if (v === "") v = null;
-      // Éviter les doublons : ne prendre que la première occurrence
-      if (!(colId in payload)) {
-        payload[colId] = v;
-      }
+      payload[colId] = v;
     }
     return payload;
   }
@@ -1594,80 +1431,34 @@
     setStatus("");
   }
 
-  /**
-   * Remplit tous les conteneurs de champs dans les sous-sections de chaque onglet.
-   * Parcourt TABS -> sections -> cols, filtre les colonnes existantes, et les monte.
-   */
   function renderFormForSelected() {
-    const editableMeta = columnsMeta.filter(isEditable);
-    const metaByColId = new Map();
-    for (const col of editableMeta) {
-      metaByColId.set(col.colId, col);
+    const editable = columnsMeta.filter(isEditable);
+
+    const perso = [];
+    const coord = [];
+    const admin = [];
+    const besoins = [];
+    const complements = [];
+
+    for (const col of editable) {
+      const id = col.colId;
+      if (GROUPS.perso.has(id)) perso.push(col);
+      else if (GROUPS.coord.has(id)) coord.push(col);
+      else if (GROUPS.admin.has(id)) admin.push(col);
+      else if (GROUPS.besoins.has(id)) besoins.push(col);
+      else if (GROUPS.complements.has(id) || id.startsWith("Complement_info_")) complements.push(col);
+      else complements.push(col);
     }
 
-    // Pré-calculer le set de colonnes déjà rendues en tant que primaire
-    // pour savoir quand un champ apparaît comme doublon (readonly)
-    const primarySections = new Map(); // colId -> premier sectionId
-    for (const tab of TABS) {
-      for (const sec of tab.sections) {
-        for (const colId of sec.cols) {
-          if (!primarySections.has(colId)) {
-            primarySections.set(colId, sec.id);
-          }
-        }
-      }
-    }
-
-    for (const tab of TABS) {
-      for (const sec of tab.sections) {
-        const cols = [];
-        const readonlyCols = new Set();
-
-        for (const colId of sec.cols) {
-          const meta = metaByColId.get(colId);
-          if (!meta) continue; // colonne non trouvée dans le schéma
-
-          cols.push(meta);
-
-          // Vérifier si cette colonne est readonly ici
-          const roSections = READONLY_IN[colId];
-          if (roSections && roSections.has(sec.id)) {
-            readonlyCols.add(colId);
-          }
-        }
-
-        mountGroup(`fields-${sec.id}`, cols, readonlyCols);
-      }
-
-      // Mettre à jour les tags vides/non-vides
-      updateTagStates(tab);
-    }
+    mountGroup("group-perso", perso);
+    mountGroup("group-coord", coord);
+    mountGroup("group-admin", admin);
+    mountGroup("group-besoins", besoins);
+    mountGroup("group-complements", complements);
 
     // Re-init DSFR pour les composants dynamiques (toggles, etc.)
     if (window.dsfr && typeof window.dsfr.start === "function") {
       window.dsfr.start();
-    }
-  }
-
-  /**
-   * Met à jour l'apparence des tags : ajoute .sub-tag--empty si la section
-   * n'a aucun champ de données (seulement le callout "aucun champ").
-   */
-  function updateTagStates(tab) {
-    const tagsContainer = $(`tags-${tab.id}`);
-    if (!tagsContainer) return;
-
-    const editableMeta = columnsMeta.filter(isEditable);
-    const metaIds = new Set(editableMeta.map(c => c.colId));
-
-    for (const tagEl of tagsContainer.querySelectorAll(".sub-tag")) {
-      const secId = tagEl.dataset.sectionId;
-      const sec = tab.sections.find(s => s.id === secId);
-      if (!sec) continue;
-
-      // Une section est "vide" si aucune de ses cols n'existe dans le schéma
-      const hasFields = sec.cols.some(colId => metaIds.has(colId));
-      tagEl.classList.toggle("sub-tag--empty", !hasFields && sec.cols.length === 0);
     }
   }
 
@@ -1713,15 +1504,6 @@
     setStatus("Indexation des candidats…");
     tableCache = await docApi.fetchTable(TABLE_ID);
     candidatesIndex = buildCandidateIndexFromTable(tableCache);
-
-    // Construire les onglets (une seule fois)
-    buildTabs();
-
-    // Re-init DSFR pour les onglets dynamiques
-    if (window.dsfr && typeof window.dsfr.start === "function") {
-      window.dsfr.start();
-    }
-
     setStatus("");
 
     const cs = $("candidateSearch");
@@ -1770,6 +1552,32 @@
       }
     });
   }
+
+  /* ===== Sidemenu active state ===== */
+  function syncSidemenuActive() {
+    const nav = document.querySelector(".fr-sidemenu");
+    if (!nav) return;
+    const hash = (location.hash || "#sec-perso").toLowerCase();
+    const items = nav.querySelectorAll(".fr-sidemenu__item");
+    const links = nav.querySelectorAll(".fr-sidemenu__link");
+    items.forEach(it => it.classList.remove("fr-sidemenu__item--active"));
+    links.forEach(a => a.removeAttribute("aria-current"));
+    for (const a of links) {
+      const href = (a.getAttribute("href") || "").toLowerCase();
+      if (href && href === hash) {
+        const li = a.closest(".fr-sidemenu__item");
+        if (li) li.classList.add("fr-sidemenu__item--active");
+        a.setAttribute("aria-current", "page");
+        break;
+      }
+    }
+  }
+
+  window.addEventListener("hashchange", syncSidemenuActive, { passive: true });
+  document.addEventListener("click", (e) => {
+    const a = e.target && e.target.closest ? e.target.closest(".fr-sidemenu__link") : null;
+    if (a) setTimeout(syncSidemenuActive, 0);
+  }, { capture: true });
 
   init().catch(err => {
     console.error(err);
