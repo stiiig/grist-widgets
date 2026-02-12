@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { GristDocAPI, WidgetColumnMap } from "grist-plugin-api";
 
 declare global {
   interface Window {
@@ -9,6 +8,8 @@ declare global {
   }
 }
 
+type WidgetColumnMap = Record<string, any>;
+type GristDocAPI = { applyUserActions: (actions: any[]) => Promise<any> };
 type RowRecord = Record<string, any>;
 
 function getGristDocApi(): GristDocAPI | null {
