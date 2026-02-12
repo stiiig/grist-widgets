@@ -24,7 +24,7 @@ export default function Harness() {
           cb(
             {
               id: 12,
-              Table: "AN_PC",
+              Table: "EMILE",
               Commentaire: "Exemple commentaire",
               Commune: 123,
             },
@@ -40,7 +40,7 @@ export default function Harness() {
       },
     };
 
-    addLog("Mock grist installé. Ouvre /widgets/an-pc dans un nouvel onglet.");
+    addLog("Mock grist installé. Ouvre /widgets/emile dans un nouvel onglet.");
   }, []);
 
   return (
