@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 declare global {
   interface Window {
@@ -39,7 +39,11 @@ export default function WidgetEmile() {
     setStatus("");
   }, []);
 
-  const docApi = useMemo(() => getGristDocApi(), []);
+const [docApi, setDocApi] = useState<GristDocAPI | null>(null);
+
+useEffect(() => {
+  setDocApi(getGristDocApi());
+}, []);
 
   async function updateField(field: string, value: any) {
     if (!docApi || !record?.id) return;
