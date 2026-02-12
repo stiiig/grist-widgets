@@ -14,24 +14,44 @@ export default function Harness() {
   useEffect(() => {
     const addLog = (s: string) => setLog((l) => [s, ...l]);
 
-    // Mock minimal de l’API utilisée
+    // --- Active le mock global ---
+    localStorage.setItem("GRIST_MOCK_ENABLED", "1");
+
+    localStorage.setItem(
+      "GRIST_MOCK_RECORD",
+      JSON.stringify({
+        id: 12,
+        Commentaire: "Exemple commentaire depuis mock",
+        Commune: 123,
+      })
+    );
+
+    localStorage.setItem(
+      "GRIST_MOCK_MAPPING",
+      JSON.stringify({
+        Commentaire: "Commentaire",
+        Commune: "Commune",
+      })
+    );
+
+    addLog("Mock persistant activé via localStorage.");
+
+    // Mock direct dans CET onglet aussi
     window.grist = {
-      ready: ({ requiredAccess }: any) => addLog(`grist.ready(requiredAccess=${requiredAccess})`),
+      ready: ({ requiredAccess }: any) =>
+        addLog(`grist.ready(requiredAccess=${requiredAccess})`),
+
       onRecord: (cb: any) => {
         addLog("grist.onRecord(handler)");
-        // On “pousse” un record fake
-        setTimeout(() => {
-          cb(
-            {
-              id: 12,
-              Table: "EMILE",
-              Commentaire: "Exemple commentaire",
-              Commune: 123,
-            },
-            { Commentaire: "Commentaire", Commune: "Commune" }
-          );
-        }, 100);
+        const record = JSON.parse(
+          localStorage.getItem("GRIST_MOCK_RECORD") || "null"
+        );
+        const mapping = JSON.parse(
+          localStorage.getItem("GRIST_MOCK_MAPPING") || "null"
+        );
+        setTimeout(() => cb(record, mapping), 100);
       },
+
       docApi: {
         applyUserActions: async (actions: any[]) => {
           addLog(`docApi.applyUserActions: ${JSON.stringify(actions)}`);
@@ -39,27 +59,35 @@ export default function Harness() {
         },
       },
     };
-
-    addLog("Mock grist installé. Ouvre /emile dans un nouvel onglet.");
   }, []);
 
   return (
-    <main className="fr-container fr-py-4w">
-      <h1 className="fr-h3">Dev harness (mock Grist)</h1>
-      <p className="fr-text--sm">
-        Ce harness installe <code>window.grist</code> et simule un record.
+    <main style={{ padding: 32 }}>
+      <h1>Dev harness (mock Grist)</h1>
+
+      <p>
+        Le mock est maintenant <strong>persistant</strong> (localStorage).
       </p>
 
       <p>
-        Ouvre ensuite : <a href="../emile">/emile</a>
+        Tu peux ouvrir ton widget ici :
+        <br />
+        <a href="/grist-widgets/emile/">
+          https://stiiig.github.io/grist-widgets/emile/
+        </a>
       </p>
 
-      <div className="fr-callout fr-mt-3w">
-        <p className="fr-callout__title">Logs</p>
-        <pre style={{ overflow: "auto", margin: 0 }}>
-          {log.join("\n")}
-        </pre>
-      </div>
+      <pre
+        style={{
+          background: "#f5f5f5",
+          padding: 16,
+          marginTop: 20,
+          maxHeight: 300,
+          overflow: "auto",
+        }}
+      >
+        {log.join("\n")}
+      </pre>
     </main>
   );
 }

@@ -9,51 +9,71 @@ declare global {
 }
 
 type WidgetColumnMap = Record<string, any>;
-type GristDocAPI = { applyUserActions: (actions: any[]) => Promise<any> };
-type RowRecord = Record<string, any>;
+type GristDocAPI = {
+  applyUserActions: (actions: any[]) => Promise<any>;
+};
 
-function getGristDocApi(): GristDocAPI | null {
-  return window?.grist?.docApi ?? null;
-}
+type RowRecord = Record<string, any>;
 
 export default function WidgetEmile() {
   const [ready, setReady] = useState(false);
   const [record, setRecord] = useState<RowRecord | null>(null);
   const [columns, setColumns] = useState<WidgetColumnMap | null>(null);
+  const [docApi, setDocApi] = useState<GristDocAPI | null>(null);
   const [status, setStatus] = useState<string>("");
 
   useEffect(() => {
-    const grist = window.grist;
-    if (!grist?.ready) {
-      setStatus("grist-plugin-api non détecté (utilise /dev/harness pour simuler).");
-      return;
+    // --- Si on est hors Grist mais mock activé ---
+    if (!window.grist?.ready) {
+      if (
+        typeof window !== "undefined" &&
+        localStorage.getItem("GRIST_MOCK_ENABLED") === "1"
+      ) {
+        const mockRecord = JSON.parse(
+          localStorage.getItem("GRIST_MOCK_RECORD") || "null"
+        );
+        const mockMapping = JSON.parse(
+          localStorage.getItem("GRIST_MOCK_MAPPING") || "null"
+        );
+
+        window.grist = {
+          ready: () => {},
+          onRecord: (cb: any) =>
+            setTimeout(() => cb(mockRecord, mockMapping), 50),
+          docApi: {
+            applyUserActions: async (actions: any[]) => {
+              console.log("MOCK applyUserActions", actions);
+              return [];
+            },
+          },
+        };
+      } else {
+        setStatus(
+          "grist-plugin-api non détecté (utilise /dev/harness pour simuler)."
+        );
+        return;
+      }
     }
 
+    const grist = window.grist;
+
     grist.ready({ requiredAccess: "full" });
+
     grist.onRecord((rec: any, mapping: any) => {
       setRecord(rec ?? null);
       setColumns(mapping ?? null);
       setReady(true);
     });
 
-    setStatus("");
+    setDocApi(grist.docApi);
   }, []);
-
-const [docApi, setDocApi] = useState<GristDocAPI | null>(null);
-
-useEffect(() => {
-  setDocApi(getGristDocApi());
-}, []);
 
   async function updateField(field: string, value: any) {
     if (!docApi || !record?.id) return;
 
-    // record.id est l’ID Grist de la ligne.
-    // Ici on fait simple : UpdateRecord sur la table courante via applyUserActions
-    // (dans ton widget final, tu as déjà ta logique AddRecord/UpdateRecord etc.)
     try {
       await docApi.applyUserActions([
-        ["UpdateRecord", record.__tableId || "EMILE", record.id, { [field]: value }],
+        ["UpdateRecord", "AN_PC", record.id, { [field]: value }],
       ]);
       setStatus("✅ Enregistré");
     } catch (e: any) {
@@ -62,46 +82,40 @@ useEffect(() => {
   }
 
   return (
-    <main className="fr-container fr-py-4w">
-      <h1 className="fr-h3">Widget EMILE (Next)</h1>
+    <main style={{ padding: 32 }}>
+      <h1>Widget Emile</h1>
 
       {!ready && (
-        <div className="fr-alert fr-alert--info fr-mt-2w">
-          <p className="fr-alert__title">En attente de Grist</p>
-          <p>Ouvre ce widget dans Grist, ou utilise le harness de dev.</p>
-          {status ? <p className="fr-mt-1w">{status}</p> : null}
+        <div style={{ marginTop: 20 }}>
+          <strong>En attente de Grist</strong>
+          <p>{status}</p>
         </div>
       )}
 
       {ready && (
         <>
-          <div className="fr-callout fr-mt-2w">
-            <p className="fr-callout__title">Record courant</p>
-            <pre style={{ overflow: "auto", margin: 0 }}>
-              {JSON.stringify({ record, columns }, null, 2)}
-            </pre>
-          </div>
+          <h3>Record courant</h3>
+          <pre
+            style={{
+              background: "#f5f5f5",
+              padding: 16,
+              overflow: "auto",
+            }}
+          >
+            {JSON.stringify({ record, columns }, null, 2)}
+          </pre>
 
-          <div className="fr-mt-3w">
-            <label className="fr-label" htmlFor="commentaire">
-              Commentaire
-            </label>
+          <div style={{ marginTop: 20 }}>
+            <label>Commentaire</label>
+            <br />
             <textarea
-              id="commentaire"
-              className="fr-input"
               rows={3}
               defaultValue={record?.Commentaire ?? ""}
               onBlur={(e) => updateField("Commentaire", e.target.value)}
             />
-            <p className="fr-hint-text">On enregistre au blur (exemple).</p>
           </div>
 
-          {status ? (
-            <div className="fr-alert fr-alert--success fr-mt-2w">
-              <p className="fr-alert__title">Statut</p>
-              <p>{status}</p>
-            </div>
-          ) : null}
+          {status && <p style={{ marginTop: 20 }}>{status}</p>}
         </>
       )}
     </main>
