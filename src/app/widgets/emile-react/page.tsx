@@ -1,5 +1,6 @@
 "use client";
 
+import { SearchDropdown, SearchMultiDropdown, Option } from "@/components/SearchDropdown";
 import { useEffect, useMemo, useState } from "react";
 import { initGristOrMock } from "@/lib/grist/init";
 import {
@@ -266,12 +267,61 @@ function Field(props: {
 
   // ---------------- REF / REFLIST (simplifié) ----------------
   if (isRef || isRefList) {
-    return (
-      <div>
-        <label>{col.label}</label>
-        <div style={{ fontSize: 12, opacity: 0.7 }}>
-          Ref field (UI simplifiée pour l’instant)
+    const [refOptions, setRefOptions] = useState<Option[]>([]);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+      (async () => {
+        setLoading(true);
+        try {
+          const cache = await ensureRefCache(docApi, col, colRowIdMap);
+          const opts: Option[] = (cache?.rows ?? []).map((r) => ({
+            id: r.id,
+            label: r.label,
+            q: r.q,
+          }));
+          setRefOptions(opts);
+        } finally {
+          setLoading(false);
+        }
+      })();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [col.colId]);
+
+    if (isRef) {
+      const valueId = typeof value === "number" ? value : null;
+      return (
+        <div style={{ display: "grid", gap: 6 }}>
+          <label style={{ fontWeight: 600 }}>
+            {col.label} <span style={{ opacity: 0.6, fontWeight: 400 }}>({col.colId})</span>
+          </label>
+
+          <SearchDropdown
+            options={refOptions}
+            valueId={valueId}
+            onChange={(id) => onChange(id)}
+            placeholder={loading ? "Chargement…" : "Rechercher…"}
+            disabled={loading}
+          />
         </div>
+      );
+    }
+
+    // RefList
+    const ids = decodeListCell(value).filter((x) => typeof x === "number") as number[];
+    return (
+      <div style={{ display: "grid", gap: 6 }}>
+        <label style={{ fontWeight: 600 }}>
+          {col.label} <span style={{ opacity: 0.6, fontWeight: 400 }}>({col.colId})</span>
+        </label>
+
+        <SearchMultiDropdown
+          options={refOptions}
+          valueIds={ids}
+          onChange={(nextIds) => onChange(encodeListCell(nextIds))}
+          placeholder={loading ? "Chargement…" : "Rechercher…"}
+          disabled={loading}
+        />
       </div>
     );
   }
