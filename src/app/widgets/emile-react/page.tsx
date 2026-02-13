@@ -223,6 +223,28 @@ function Field(props: {
   const isChoiceList = type === "ChoiceList";
   const isDate = type === "Date";
 
+const choiceOptions = useMemo(() => {
+  const raw = col.widgetOptionsParsed?.choices;
+  const arr = Array.isArray(raw) ? raw : [];
+  return arr.map((label: any, i: number) => ({
+    id: i + 1,
+    label: String(label),
+    q: String(label).toLowerCase(),
+  }));
+}, [col.widgetOptionsParsed]);
+
+const choiceIdByLabel = useMemo(() => {
+  const m = new Map<string, number>();
+  for (const o of choiceOptions) m.set(o.label, o.id);
+  return m;
+}, [choiceOptions]);
+
+const choiceLabelById = useMemo(() => {
+  const m = new Map<number, string>();
+  for (const o of choiceOptions) m.set(o.id, o.label);
+  return m;
+}, [choiceOptions]);
+
   // ---------------- DATE ----------------
   if (isDate) {
     return (
@@ -240,54 +262,55 @@ function Field(props: {
   }
 
   // ---------------- CHOICE ----------------
-  if (isChoice) {
-    const opts = col.widgetOptionsParsed?.choices || [];
-    return (
-      <div>
-        <label>{col.label}</label>
-        <select
-          value={value ?? ""}
-          onChange={(e) => onChange(e.target.value)}
-        >
-          <option value="">—</option>
-          {opts.map((o: any) => (
-            <option key={o} value={o}>
-              {o}
-            </option>
-          ))}
-        </select>
-      </div>
-    );
-  }
+if (isChoice) {
+  const valueStr = value == null ? "" : String(value);
+  const valueId = valueStr ? (choiceIdByLabel.get(valueStr) ?? null) : null;
+
+  return (
+    <div style={{ display: "grid", gap: 6 }}>
+      <label style={{ fontWeight: 600 }}>
+        {col.label} <span style={{ opacity: 0.6, fontWeight: 400 }}>({col.colId})</span>
+      </label>
+
+      <SearchDropdown
+        options={choiceOptions}
+        valueId={valueId}
+        onChange={(id) => onChange(id ? choiceLabelById.get(id) ?? null : null)}
+        placeholder="Rechercher…"
+        disabled={choiceOptions.length === 0}
+      />
+    </div>
+  );
+}
 
   // ---------------- CHOICELIST ----------------
-  if (isChoiceList) {
-    const opts = col.widgetOptionsParsed?.choices || [];
-    const selected = decodeListCell(value);
+if (isChoiceList) {
+  const selectedLabels = decodeListCell(value).filter((x) => typeof x === "string") as string[];
+  const selectedIds = selectedLabels
+    .map((lab) => choiceIdByLabel.get(lab))
+    .filter((x): x is number => typeof x === "number");
 
-    function toggle(opt: string) {
-      const next = selected.includes(opt)
-        ? selected.filter((x: any) => x !== opt)
-        : [...selected, opt];
-      onChange(encodeListCell(next));
-    }
+  return (
+    <div style={{ display: "grid", gap: 6 }}>
+      <label style={{ fontWeight: 600 }}>
+        {col.label} <span style={{ opacity: 0.6, fontWeight: 400 }}>({col.colId})</span>
+      </label>
 
-    return (
-      <div>
-        <label>{col.label}</label>
-        {opts.map((o: any) => (
-          <label key={o} style={{ display: "block" }}>
-            <input
-              type="checkbox"
-              checked={selected.includes(o)}
-              onChange={() => toggle(o)}
-            />
-            {o}
-          </label>
-        ))}
-      </div>
-    );
-  }
+      <SearchMultiDropdown
+        options={choiceOptions}
+        valueIds={selectedIds}
+        onChange={(nextIds) => {
+          const nextLabels = nextIds
+            .map((id) => choiceLabelById.get(id))
+            .filter((s): s is string => !!s);
+          onChange(encodeListCell(nextLabels)); // ["L", ...strings]
+        }}
+        placeholder="Rechercher…"
+        disabled={choiceOptions.length === 0}
+      />
+    </div>
+  );
+}
 
   // ---------------- REF / REFLIST (simplifié) ----------------
   if (isRef || isRefList) {
