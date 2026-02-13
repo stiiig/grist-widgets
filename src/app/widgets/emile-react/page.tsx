@@ -52,6 +52,7 @@ function StatusAlert({ status }: { status: string }) {
 }
 
 export default function Page() {
+  const [activeTab, setActiveTab] = useState<GroupKey>("perso");
   const [mode, setMode] = useState<string>("boot");
   const [docApi, setDocApi] = useState<GristDocAPI | null>(null);
 
@@ -161,6 +162,12 @@ export default function Page() {
     }
   }
 
+const activeFields = useMemo(() => {
+  return GROUPS[activeTab]
+    .map((id) => colById.get(id))
+    .filter((c): c is ColMeta => !!c);
+}, [activeTab, colById]);
+
   // Sections = champs du groupe présents dans la table, dans l’ordre legacy
   const sections = useMemo(() => {
     const res: Array<{ key: GroupKey; fields: ColMeta[] }> = [];
@@ -204,106 +211,59 @@ export default function Page() {
         <StatusAlert status={status} />
       </div>
 
-      <div className="emile-grid" style={{ marginTop: 16 }}>
-        {/* LEFT: candidates */}
-        <aside className="emile-card">
-          <div className="emile-card__inner">
-            <div className="fr-h6" style={{ marginTop: 0 }}>
-              Candidats
-            </div>
-
-            <div style={{ display: "grid", gap: 8, maxHeight: 520, overflow: "auto", paddingRight: 4 }}>
-              {rows.map((r) => {
-                const label = candidateLabel(r);
-                const isSel = r.id === selectedId;
-                return (
-                  <button
-                    key={r.id}
-                    type="button"
-                    onClick={() => setSelectedId(r.id)}
-                    className={`fr-btn fr-btn--tertiary-no-outline`}
-                    style={{
-                      justifyContent: "flex-start",
-                      textAlign: "left",
-                      border: `1px solid ${isSel ? "var(--border-action-high-blue-france)" : "var(--border-default-grey)"}`,
-                      background: isSel ? "var(--background-contrast-grey)" : "white",
-                      borderRadius: 12,
-                      padding: "10px 12px",
-                      whiteSpace: "normal",
-                    }}
-                  >
-                    <span style={{ display: "grid", gap: 2 }}>
-                      <span style={{ fontWeight: 700 }}>{label}</span>
-                      <span className="fr-hint-text">RowId: {r.id}</span>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div style={{ marginTop: 14, borderTop: "1px solid var(--border-default-grey)", paddingTop: 12 }}>
-              <div className="fr-hint-text" style={{ fontWeight: 700, marginBottom: 8 }}>
-                Sections
-              </div>
-              <div style={{ display: "grid", gap: 6 }}>
-                {GROUPS_ORDER.map((g) => (
-                  <a key={g} href={`#${GROUP_ANCHORS[g]}`} className="fr-link">
-                    {GROUP_TITLES[g]}
-                  </a>
-                ))}
-              </div>
-            </div>
-          </div>
-        </aside>
-
-        {/* RIGHT: structured form */}
-        <main className="emile-card">
-          <div className="emile-card__inner">
-            {!selected || !docApi ? (
-              <div className="fr-alert fr-alert--info">
-                <p className="fr-alert__title">En attente</p>
-                <p>Sélectionne un candidat (et ouvre le widget dans Grist).</p>
-              </div>
-            ) : (
-              <>
-                <div style={{ marginBottom: 14 }}>
-                  <div className="fr-h4" style={{ margin: 0 }}>
-                    {headerLabel}
-                  </div>
-                  <div className="fr-hint-text">RowId: {selected.id}</div>
-                </div>
-
-                <div style={{ display: "grid", gap: 14 }}>
-                  {sections.map(({ key, fields }) => (
-                    <section key={key} id={GROUP_ANCHORS[key]} className="emile-section">
-                      <div className="fr-h5" style={{ margin: "0 0 10px 0" }}>
-                        {GROUP_TITLES[key]}
-                      </div>
-
-                      {fields.length === 0 ? (
-                        <div className="fr-hint-text">Aucun champ trouvé pour ce groupe.</div>
-                      ) : (
-                        <div className="emile-form-grid">
-                          {fields.map((c) => (
-                            <Field
-                              key={c.colId}
-                              col={c}
-                              value={draft[c.colId]}
-                              onChange={(v) => setDraft((d) => ({ ...d, [c.colId]: v }))}
-                              docApi={docApi}
-                              colRowIdMap={colRowIdMap}
-                            />
-                          ))}
-                        </div>
-                      )}
-                    </section>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        </main>
+      <div className="emile-card" style={{ marginTop: 16 }}>
+  <div className="emile-card__inner">
+    {!selected || !docApi ? (
+      <div className="fr-alert fr-alert--info">
+        <p className="fr-alert__title">En attente</p>
+        <p>Sélectionne un candidat dans Grist (ligne courante) et ouvre le widget.</p>
       </div>
+    ) : (
+      <>
+        {/* Header candidat */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
+          <div className="fr-h4" style={{ margin: 0 }}>
+            {headerLabel}
+          </div>
+          <div className="fr-tag fr-tag--sm">{String(selected["ID2"] ?? "").trim() || `RowId ${selected.id}`}</div>
+        </div>
+
+        {/* Tabs (texte pour l'instant) */}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+          {GROUPS_ORDER.map((g) => (
+            <button
+              key={g}
+              type="button"
+              className={`fr-tag ${activeTab === g ? "" : "fr-tag--dismiss"}`}
+              onClick={() => setActiveTab(g)}
+              style={{
+                border: activeTab === g ? "1px solid var(--border-action-high-blue-france)" : "1px solid var(--border-default-grey)",
+                background: activeTab === g ? "var(--background-action-low-blue-france)" : "white",
+                cursor: "pointer",
+              }}
+            >
+              {GROUP_TITLES[g]}
+            </button>
+          ))}
+        </div>
+
+        {/* Form (tab active) */}
+        <div className="emile-form-grid">
+          {activeFields.map((c) => (
+            <Field
+              key={c.colId}
+              col={c}
+              value={draft[c.colId]}
+              onChange={(v) => setDraft((d) => ({ ...d, [c.colId]: v }))}
+              docApi={docApi}
+              colRowIdMap={colRowIdMap}
+            />
+          ))}
+        </div>
+      </>
+    )}
+  </div>
+</div>
     </div>
   );
 }
