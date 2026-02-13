@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { initGristOrMock } from "@/lib/grist/init";
+import { postApplyUserActions, postLog } from "@/lib/grist/logChannel";
 
 type WidgetColumnMap = Record<string, any>;
 type GristDocAPI = { applyUserActions: (actions: any[]) => Promise<any> };
@@ -21,11 +22,13 @@ export default function WidgetEmile() {
         setRecord(rec ?? null);
         setColumns(mapping ?? null);
         setReady(true);
-        setStatus(mode === "mock" ? "Mode mock (localStorage)" : "");
+        if (mode === "mock") {
+          setStatus("Mode mock (localStorage)");
+          postLog("emile: running in mock mode");
+        }
       },
       onApplyUserActions: (actions) => {
-        // visible en console quand mock
-        console.log("MOCK applyUserActions", actions);
+        postApplyUserActions(actions);
       },
     });
 
@@ -34,14 +37,27 @@ export default function WidgetEmile() {
       return;
     }
 
-    setDocApi((grist?.docApi as any) ?? null);
+    const raw = (grist?.docApi as any) ?? null;
+
+    if (raw?.applyUserActions) {
+      setDocApi({
+        applyUserActions: async (actions: any[]) => {
+          postApplyUserActions(actions);
+          return raw.applyUserActions(actions);
+        },
+      });
+    } else {
+      setDocApi(null);
+    }
   }, []);
 
   async function updateField(field: string, value: any) {
     if (!docApi || !record?.id) return;
 
     try {
-      await docApi.applyUserActions([["UpdateRecord", "AN_PC", record.id, { [field]: value }]]);
+      await docApi.applyUserActions([
+        ["UpdateRecord", "AN_PC", record.id, { [field]: value }],
+      ]);
       setStatus("✅ Enregistré");
     } catch (e: any) {
       setStatus(`❌ Erreur: ${e?.message ?? String(e)}`);
@@ -62,7 +78,13 @@ export default function WidgetEmile() {
       {ready && (
         <>
           <h3>Record courant</h3>
-          <pre style={{ background: "#f5f5f5", padding: 16, overflow: "auto" }}>
+          <pre
+            style={{
+              background: "#f5f5f5",
+              padding: 16,
+              overflow: "auto",
+            }}
+          >
             {JSON.stringify({ record, columns }, null, 2)}
           </pre>
 
