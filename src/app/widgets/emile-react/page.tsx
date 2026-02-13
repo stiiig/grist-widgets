@@ -5,6 +5,7 @@ import Script from "next/script";
 import { initGristOrMock } from "@/lib/grist/init";
 
 const TABLE_ID = "CANDIDATS"; // à confirmer dans ton doc Grist
+const [gristApiLoaded, setGristApiLoaded] = useState(false);
 
 type CandidateItem = { id: number; label: string; extra: string; q: string };
 type GristDocAPI = {
@@ -63,35 +64,38 @@ export default function EmileReactV1() {
     return list.slice(0, 25);
   }, [search, candidates]);
 
-  useEffect(() => {
-    const { grist, mode } = initGristOrMock({
-      requiredAccess: "full",
-      onRecord: () => {},
-    });
+useEffect(() => {
+  if (!gristApiLoaded) return;
 
-    if (mode === "none") {
-      setStatus("En attente de Grist — ouvre /dev/harness pour activer le mock.");
-      setDebug((d: any) => ({ ...d, mode }));
-      return;
-    }
+  const { grist, mode } = initGristOrMock({
+    requiredAccess: "full",
+    onRecord: () => {},
+  });
 
-    const raw = (grist?.docApi as any) ?? null;
-    setDebug((d: any) => ({
-      ...d,
-      mode,
-      hasDocApi: !!raw,
-      hasFetchTable: !!raw?.fetchTable,
-      hasApply: !!raw?.applyUserActions,
-    }));
+  setDebug((d: any) => ({ ...d, mode }));
 
-    if (!raw?.fetchTable) {
-      setStatus("docApi.fetchTable indisponible → accès widget pas 'full' ou API non dispo.");
-      return;
-    }
+  if (mode === "none") {
+    setStatus("grist-plugin-api chargé mais window.grist absent (rare) — vérifie la console.");
+    return;
+  }
 
-    setDocApi(raw as GristDocAPI);
-    setStatus(mode === "mock" ? "Mode mock (localStorage)" : "");
-  }, []);
+  const raw = (grist?.docApi as any) ?? null;
+  setDebug((d: any) => ({
+    ...d,
+    mode,
+    hasDocApi: !!raw,
+    hasFetchTable: !!raw?.fetchTable,
+    hasApply: !!raw?.applyUserActions,
+  }));
+
+  if (!raw?.fetchTable) {
+    setStatus("docApi.fetchTable indisponible → vérifie requiredAccess='full'.");
+    return;
+  }
+
+  setDocApi(raw as any);
+  setStatus(mode === "mock" ? "Mode mock (localStorage)" : "");
+}, [gristApiLoaded]);
 
   useEffect(() => {
     (async () => {
@@ -145,6 +149,11 @@ export default function EmileReactV1() {
 
   return (
     <main className="container" style={{ padding: 6 }}>
+      <Script
+  src="https://unpkg.com/grist-plugin-api/dist/grist-plugin-api.js"
+  strategy="afterInteractive"
+  onLoad={() => setGristApiLoaded(true)}
+/>
       <Script
         type="module"
         src="https://cdn.jsdelivr.net/npm/@gouvfr/dsfr@1.14/dist/dsfr.module.min.js"
