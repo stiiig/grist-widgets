@@ -17,8 +17,8 @@ import {
   GristDocAPI,
 } from "@/lib/grist/meta";
 import { SearchDropdown, SearchMultiDropdown, Option } from "@/components/SearchDropdown";
-import { GROUPS, GroupKey } from "@/lib/emile/groups";
 import { EMILE_TABS, L1TabKey } from "@/lib/emile/tabs";
+import { FIELD_MAP } from "@/lib/emile/fieldmap";
 
 const TABLE_ID = "CANDIDATS";
 
@@ -124,7 +124,7 @@ export default function Page() {
     })();
   }, [docApi]);
 
-  // DATA (temp: fetchTable — on passera à onRecord après)
+  // DATA (temp: fetchTable — ensuite on passera à onRecord pour le "record courant")
   useEffect(() => {
     if (!docApi) return;
     (async () => {
@@ -174,15 +174,16 @@ export default function Page() {
   const headerLabel = selected ? candidateLabel(selected) : "EMILE";
   const headerId2 = selected ? (selected["ID2"] ?? "").toString().trim() : "";
 
-  /**
-   * TEMP A10: affichage des champs "Administratif" legacy (GROUPS existants).
-   * A10.1: on remplacera ça par une vraie map (tab/subtab -> colonnes).
-   */
-  const adminFields = useMemo(() => {
-    const order: GroupKey[] = ["perso", "coord", "admin", "besoins", "complements"];
-    const colIds = order.flatMap((g) => GROUPS[g]);
-    return colIds.map((id) => colById.get(id)).filter((c): c is ColMeta => !!c);
-  }, [colById]);
+  // A10.1: mapping réel tab/subtab -> colIds (Administratif OK, le reste vide)
+  const activeColIds = useMemo(() => {
+    return FIELD_MAP[activeTab]?.[activeSubtab] ?? [];
+  }, [activeTab, activeSubtab]);
+
+  const activeFields = useMemo(() => {
+    return activeColIds.map((id) => colById.get(id)).filter((c): c is ColMeta => !!c);
+  }, [activeColIds, colById]);
+
+  const isMapped = activeColIds.length > 0;
 
   return (
     <div className="emile-container">
@@ -286,24 +287,30 @@ export default function Page() {
                 })}
               </div>
 
-              {/* TEMP content */}
-              <div className="fr-hint-text" style={{ marginBottom: 10 }}>
-                Onglet: <b>{activeTabObj.label}</b> · Sous-onglet: <b>{activeTabObj.subtabs.find((s) => s.key === activeSubtab)?.label}</b>{" "}
-                · (A10: mapping champs à brancher)
-              </div>
-
-              <div className="emile-form-grid">
-                {adminFields.map((c) => (
-                  <Field
-                    key={c.colId}
-                    col={c}
-                    value={draft[c.colId]}
-                    onChange={(v) => setDraft((d) => ({ ...d, [c.colId]: v }))}
-                    docApi={docApi}
-                    colRowIdMap={colRowIdMap}
-                  />
-                ))}
-              </div>
+              {!isMapped ? (
+                <div className="fr-alert fr-alert--info">
+                  <p className="fr-alert__title">Sous-onglet non mappé</p>
+                  <p>
+                    Pour l’instant, seuls les sous-onglets <b>Administratif</b> sont mappés sur les colonnes Grist.
+                    <br />
+                    Prochaine étape : on mappe <b>{activeTabObj.label}</b> →{" "}
+                    <b>{activeTabObj.subtabs.find((s) => s.key === activeSubtab)?.label}</b>.
+                  </p>
+                </div>
+              ) : (
+                <div className="emile-form-grid">
+                  {activeFields.map((c) => (
+                    <Field
+                      key={c.colId}
+                      col={c}
+                      value={draft[c.colId]}
+                      onChange={(v) => setDraft((d) => ({ ...d, [c.colId]: v }))}
+                      docApi={docApi}
+                      colRowIdMap={colRowIdMap}
+                    />
+                  ))}
+                </div>
+              )}
             </>
           )}
         </div>
@@ -334,7 +341,6 @@ function Field(props: {
 
   const disabled = !isEditable(col);
 
-  // Choice options (id numérique interne -> label string)
   const choiceOptions = useMemo(() => {
     const raw = col.widgetOptionsParsed?.choices;
     const arr = Array.isArray(raw) ? raw : [];
@@ -357,7 +363,6 @@ function Field(props: {
     return m;
   }, [choiceOptions]);
 
-  // DATE
   if (isDate) {
     return (
       <div className="fr-input-group">
@@ -373,7 +378,6 @@ function Field(props: {
     );
   }
 
-  // CHOICE (searchable)
   if (isChoice) {
     const valueStr = value == null ? "" : String(value);
     const valueId = valueStr ? choiceIdByLabel.get(valueStr) ?? null : null;
@@ -392,7 +396,6 @@ function Field(props: {
     );
   }
 
-  // CHOICELIST (searchable multi)
   if (isChoiceList) {
     const selectedLabels = decodeListCell(value).filter((x) => typeof x === "string") as string[];
     const selectedIds = selectedLabels
@@ -416,7 +419,6 @@ function Field(props: {
     );
   }
 
-  // REF / REFLIST (searchable)
   if (isRef || isRefList) {
     const [refOptions, setRefOptions] = useState<Option[]>([]);
     const [loading, setLoading] = useState(false);
@@ -470,7 +472,6 @@ function Field(props: {
     );
   }
 
-  // DEFAULT TEXT
   return (
     <div className="fr-input-group">
       <label className="fr-label">{col.label}</label>
