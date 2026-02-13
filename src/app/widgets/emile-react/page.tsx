@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import * as gristModule from "grist-plugin-api";
 
 const TABLE_ID = "CANDIDATS";
 
@@ -10,11 +9,6 @@ type CandidateItem = {
   label: string;
   extra: string;
   q: string;
-};
-
-type GristDocAPI = {
-  fetchTable: (tableId: string) => Promise<any>;
-  applyUserActions: (actions: any[]) => Promise<any>;
 };
 
 function buildCandidateIndexFromTable(t: any): CandidateItem[] {
@@ -42,63 +36,60 @@ function buildCandidateIndexFromTable(t: any): CandidateItem[] {
 }
 
 export default function EmileReact() {
-  const [status, setStatus] = useState("");
-  const [docApi, setDocApi] = useState<GristDocAPI | null>(null);
+  const [status, setStatus] = useState("Initialisation…");
   const [candidates, setCandidates] = useState<CandidateItem[]>([]);
   const [search, setSearch] = useState("");
   const [debug, setDebug] = useState<any>({});
 
-  // INIT GRIST (bundled)
   useEffect(() => {
-    const grist: any =
-      (gristModule as any).grist ??
-      (gristModule as any).default ??
-      gristModule;
+    // inject grist-plugin-api script dynamically
+    const script = document.createElement("script");
+    script.src = "https://docs.getgrist.com/grist-plugin-api.js";
+    script.async = true;
 
-    if (!grist?.ready) {
-      setDebug({ mode: "none" });
-      setStatus("grist-plugin-api non détecté (bundled)");
-      return;
-    }
+    script.onload = () => {
+      const grist: any = (window as any).grist;
 
-    setDebug({ mode: "grist(bundled)" });
-
-    grist.ready({ requiredAccess: "full" });
-
-    const raw = grist.docApi ?? null;
-
-    if (!raw?.fetchTable) {
-      setStatus("docApi.fetchTable indisponible");
-      return;
-    }
-
-    setDocApi(raw as GristDocAPI);
-    setStatus("Mode grist");
-  }, []);
-
-  // LOAD TABLE
-  useEffect(() => {
-    if (!docApi) return;
-
-    (async () => {
-      try {
-        setStatus(`Chargement ${TABLE_ID}...`);
-        const t = await docApi.fetchTable(TABLE_ID);
-
-        setCandidates(buildCandidateIndexFromTable(t));
-
-        setDebug((d: any) => ({
-          ...d,
-          rows: t?.id?.length ?? 0,
-          keys: Object.keys(t || {}),
-        }));
-
-        setStatus("");
-      } catch (e: any) {
-        setStatus(`Erreur fetchTable: ${e?.message ?? e}`);
+      if (!grist) {
+        setStatus("window.grist absent");
+        setDebug({ mode: "none" });
+        return;
       }
-    })();
-  }, [docApi]);
+
+      setDebug({ mode: "grist" });
+
+      grist.ready({ requiredAccess: "full" });
+
+      const docApi = grist.docApi;
+
+      if (!docApi?.fetchTable) {
+        setStatus("docApi.fetchTable indisponible");
+        return;
+      }
+
+      setStatus("Chargement table…");
+
+      docApi.fetchTable(TABLE_ID)
+        .then((t: any) => {
+          setCandidates(buildCandidateIndexFromTable(t));
+          setDebug((d: any) => ({
+            ...d,
+            rows: t?.id?.length ?? 0,
+            keys: Object.keys(t || {})
+          }));
+          setStatus("");
+        })
+        .catch((e: any) => {
+          setStatus("Erreur fetchTable: " + e?.message);
+        });
+    };
+
+    script.onerror = () => {
+      setStatus("Impossible de charger grist-plugin-api");
+    };
+
+    document.head.appendChild(script);
+  }, []);
 
   const matches = useMemo(() => {
     const q = search.toLowerCase().trim();
