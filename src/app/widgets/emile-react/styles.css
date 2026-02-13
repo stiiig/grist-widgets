@@ -1,0 +1,59 @@
+/* src/app/widgets/emile-react/styles.css */
+
+/* DSFR core */
+@import url("https://cdn.jsdelivr.net/npm/@gouvfr/dsfr@1.12.1/dist/dsfr/dsfr.min.css");
+@import url("https://cdn.jsdelivr.net/npm/@gouvfr/dsfr@1.12.1/dist/utility/utility.min.css");
+
+/* Layout helpers (light) */
+.emile-container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.emile-grid {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 980px) {
+  .emile-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.emile-card {
+  border: 1px solid var(--border-default-grey);
+  border-radius: 0.75rem;
+  background: var(--background-default-grey);
+}
+
+.emile-card__inner {
+  padding: 1rem;
+}
+
+.emile-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 980px) {
+  .emile-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.emile-section + .emile-section {
+  margin-top: 1rem;
+}
+
+.emile-sticky-actions {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--background-default-grey);
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border-default-grey);
+}

@@ -1,5 +1,7 @@
 "use client";
 
+import "./styles.css";
+
 import { useEffect, useMemo, useState } from "react";
 import { initGristOrMock } from "@/lib/grist/init";
 import {
@@ -29,6 +31,26 @@ function candidateLabel(r: Row) {
   return `${name || `#${r.id}`}${id2 ? ` — ${id2}` : ""}`;
 }
 
+function StatusAlert({ status }: { status: string }) {
+  if (!status) return null;
+
+  const isError = status.toLowerCase().includes("erreur") || status.toLowerCase().includes("error");
+  const isSuccess = status.includes("✅") || status.toLowerCase().includes("enregistr");
+
+  const cls = isError
+    ? "fr-alert fr-alert--error"
+    : isSuccess
+    ? "fr-alert fr-alert--success"
+    : "fr-alert fr-alert--info";
+
+  return (
+    <div className={cls} style={{ marginTop: 12 }}>
+      <p className="fr-alert__title">{isError ? "Erreur" : isSuccess ? "Succès" : "Info"}</p>
+      <p>{status.replace("Erreur:", "").trim()}</p>
+    </div>
+  );
+}
+
 export default function Page() {
   const [mode, setMode] = useState<string>("boot");
   const [docApi, setDocApi] = useState<GristDocAPI | null>(null);
@@ -46,29 +68,35 @@ export default function Page() {
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState("");
 
-  // INIT: charge le script grist-plugin-api si besoin (ton instance en a besoin)
+  // INIT: charge grist-plugin-api.js si besoin
   useEffect(() => {
     (async () => {
-      if (typeof window !== "undefined" && !(window as any).grist) {
-        await new Promise<void>((resolve, reject) => {
-          const existing = document.querySelector('script[data-grist-plugin-api="1"]') as HTMLScriptElement | null;
-          if (existing) return resolve();
+      try {
+        if (typeof window !== "undefined" && !(window as any).grist) {
+          await new Promise<void>((resolve, reject) => {
+            const existing = document.querySelector(
+              'script[data-grist-plugin-api="1"]'
+            ) as HTMLScriptElement | null;
+            if (existing) return resolve();
 
-          const s = document.createElement("script");
-          s.src = "https://docs.getgrist.com/grist-plugin-api.js";
-          s.async = true;
-          s.setAttribute("data-grist-plugin-api", "1");
-          s.onload = () => resolve();
-          s.onerror = () => reject(new Error("Impossible de charger grist-plugin-api.js"));
-          document.head.appendChild(s);
-        });
+            const s = document.createElement("script");
+            s.src = "https://docs.getgrist.com/grist-plugin-api.js";
+            s.async = true;
+            s.setAttribute("data-grist-plugin-api", "1");
+            s.onload = () => resolve();
+            s.onerror = () => reject(new Error("Impossible de charger grist-plugin-api.js"));
+            document.head.appendChild(s);
+          });
+        }
+
+        const { mode, docApi } = await initGristOrMock({ requiredAccess: "full" });
+        setMode(mode);
+        setDocApi(docApi);
+
+        if (mode === "none") setStatus("Ouvre ce widget dans Grist (ou /dev/harness).");
+      } catch (e: any) {
+        setStatus(`Erreur: ${e?.message ?? String(e)}`);
       }
-
-      const { mode, docApi } = await initGristOrMock({ requiredAccess: "full" });
-      setMode(mode);
-      setDocApi(docApi);
-
-      if (mode === "none") setStatus("Ouvre ce widget dans Grist (ou /dev/harness).");
     })();
   }, []);
 
@@ -76,9 +104,13 @@ export default function Page() {
   useEffect(() => {
     if (!docApi) return;
     (async () => {
-      const [meta, map] = await Promise.all([loadColumnsMetaFor(docApi, TABLE_ID), buildColRowIdMap(docApi)]);
-      setCols(meta);
-      setColRowIdMap(map);
+      try {
+        const [meta, map] = await Promise.all([loadColumnsMetaFor(docApi, TABLE_ID), buildColRowIdMap(docApi)]);
+        setCols(meta);
+        setColRowIdMap(map);
+      } catch (e: any) {
+        setStatus(`Erreur: ${e?.message ?? String(e)}`);
+      }
     })();
   }, [docApi]);
 
@@ -86,15 +118,19 @@ export default function Page() {
   useEffect(() => {
     if (!docApi) return;
     (async () => {
-      const t = await docApi.fetchTable(TABLE_ID);
-      const out: Row[] = [];
-      for (let i = 0; i < t.id.length; i++) {
-        const r: Row = { id: t.id[i] };
-        for (const k of Object.keys(t)) if (k !== "id") r[k] = t[k][i];
-        out.push(r);
+      try {
+        const t = await docApi.fetchTable(TABLE_ID);
+        const out: Row[] = [];
+        for (let i = 0; i < t.id.length; i++) {
+          const r: Row = { id: t.id[i] };
+          for (const k of Object.keys(t)) if (k !== "id") r[k] = t[k][i];
+          out.push(r);
+        }
+        setRows(out);
+        if (out.length && selectedId == null) setSelectedId(out[0].id);
+      } catch (e: any) {
+        setStatus(`Erreur: ${e?.message ?? String(e)}`);
       }
-      setRows(out);
-      if (out.length && selectedId == null) setSelectedId(out[0].id);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [docApi]);
@@ -125,14 +161,13 @@ export default function Page() {
     }
   }
 
-  // Sections à afficher = champs du groupe présents dans la table + meta dispo
+  // Sections = champs du groupe présents dans la table, dans l’ordre legacy
   const sections = useMemo(() => {
     const res: Array<{ key: GroupKey; fields: ColMeta[] }> = [];
     for (const g of GROUPS_ORDER) {
       const fields = GROUPS[g]
         .map((id) => colById.get(id))
-        .filter((c): c is ColMeta => !!c)
-        .filter((c) => isEditable(c) || true); // on affiche même non-editable si tu veux voir (à ajuster)
+        .filter((c): c is ColMeta => !!c);
       res.push({ key: g, fields });
     }
     return res;
@@ -141,107 +176,132 @@ export default function Page() {
   const headerLabel = selected ? candidateLabel(selected) : "";
 
   return (
-    <div style={{ padding: 16, fontFamily: "system-ui, -apple-system, Segoe UI, Roboto" }}>
-      <div style={{ display: "flex", gap: 12, alignItems: "baseline" }}>
-        <h2 style={{ margin: 0 }}>EMILE React</h2>
-        <small style={{ opacity: 0.7 }}>
-          mode: <code>{mode}</code>
-        </small>
-        <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
-          <button
-            type="button"
-            onClick={save}
-            disabled={!selectedId || !docApi || saving}
-            style={{ padding: "8px 12px", borderRadius: 10, border: "1px solid #ddd", background: "white" }}
-          >
-            {saving ? "Enregistrement…" : "Enregistrer"}
-          </button>
-        </div>
-      </div>
-
-      {status ? <div style={{ marginTop: 10, opacity: 0.8 }}>{status}</div> : null}
-
-      <div style={{ display: "grid", gridTemplateColumns: "340px 1fr", gap: 16, marginTop: 16 }}>
-        {/* LEFT: candidates list */}
-        <aside style={{ border: "1px solid #eee", borderRadius: 12, padding: 12 }}>
-          <div style={{ fontWeight: 700, marginBottom: 10 }}>Candidats</div>
-          <div style={{ display: "grid", gap: 8, maxHeight: 520, overflow: "auto" }}>
-            {rows.map((r) => {
-              const label = candidateLabel(r);
-              const isSel = r.id === selectedId;
-              return (
-                <button
-                  key={r.id}
-                  type="button"
-                  onClick={() => setSelectedId(r.id)}
-                  style={{
-                    textAlign: "left",
-                    padding: "10px 12px",
-                    borderRadius: 12,
-                    border: "1px solid " + (isSel ? "#333" : "#ddd"),
-                    background: isSel ? "#f5f5f5" : "white",
-                    cursor: "pointer",
-                  }}
-                >
-                  <div style={{ fontWeight: 700 }}>{label}</div>
-                  <div style={{ fontSize: 12, opacity: 0.65 }}>id: {r.id}</div>
-                </button>
-              );
-            })}
+    <div className="emile-container">
+      {/* Sticky actions */}
+      <div className="emile-sticky-actions">
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <div style={{ display: "grid" }}>
+            <div className="fr-h3" style={{ margin: 0 }}>
+              EMILE
+            </div>
+            <div className="fr-hint-text">
+              mode: <code>{mode}</code>
+            </div>
           </div>
 
-          {/* mini nav sections */}
-          <div style={{ marginTop: 12, borderTop: "1px solid #eee", paddingTop: 10 }}>
-            <div style={{ fontWeight: 600, marginBottom: 8 }}>Sections</div>
-            <div style={{ display: "grid", gap: 6 }}>
-              {GROUPS_ORDER.map((g) => (
-                <a key={g} href={`#${GROUP_ANCHORS[g]}`} style={{ color: "inherit", textDecoration: "none", opacity: 0.85 }}>
-                  • {GROUP_TITLES[g]}
-                </a>
-              ))}
+          <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
+            <button
+              type="button"
+              className="fr-btn"
+              onClick={save}
+              disabled={!selectedId || !docApi || saving}
+            >
+              {saving ? "Enregistrement…" : "Enregistrer"}
+            </button>
+          </div>
+        </div>
+
+        <StatusAlert status={status} />
+      </div>
+
+      <div className="emile-grid" style={{ marginTop: 16 }}>
+        {/* LEFT: candidates */}
+        <aside className="emile-card">
+          <div className="emile-card__inner">
+            <div className="fr-h6" style={{ marginTop: 0 }}>
+              Candidats
+            </div>
+
+            <div style={{ display: "grid", gap: 8, maxHeight: 520, overflow: "auto", paddingRight: 4 }}>
+              {rows.map((r) => {
+                const label = candidateLabel(r);
+                const isSel = r.id === selectedId;
+                return (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => setSelectedId(r.id)}
+                    className={`fr-btn fr-btn--tertiary-no-outline`}
+                    style={{
+                      justifyContent: "flex-start",
+                      textAlign: "left",
+                      border: `1px solid ${isSel ? "var(--border-action-high-blue-france)" : "var(--border-default-grey)"}`,
+                      background: isSel ? "var(--background-contrast-grey)" : "white",
+                      borderRadius: 12,
+                      padding: "10px 12px",
+                      whiteSpace: "normal",
+                    }}
+                  >
+                    <span style={{ display: "grid", gap: 2 }}>
+                      <span style={{ fontWeight: 700 }}>{label}</span>
+                      <span className="fr-hint-text">RowId: {r.id}</span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div style={{ marginTop: 14, borderTop: "1px solid var(--border-default-grey)", paddingTop: 12 }}>
+              <div className="fr-hint-text" style={{ fontWeight: 700, marginBottom: 8 }}>
+                Sections
+              </div>
+              <div style={{ display: "grid", gap: 6 }}>
+                {GROUPS_ORDER.map((g) => (
+                  <a key={g} href={`#${GROUP_ANCHORS[g]}`} className="fr-link">
+                    {GROUP_TITLES[g]}
+                  </a>
+                ))}
+              </div>
             </div>
           </div>
         </aside>
 
         {/* RIGHT: structured form */}
-        <main style={{ border: "1px solid #eee", borderRadius: 12, padding: 12 }}>
-          {!selected || !docApi ? (
-            <div style={{ opacity: 0.7 }}>Sélectionne un candidat (et ouvre dans Grist).</div>
-          ) : (
-            <>
-              {/* Header candidat */}
-              <div style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 18, fontWeight: 800 }}>{headerLabel}</div>
-                <div style={{ fontSize: 12, opacity: 0.7 }}>RowId: {selected.id}</div>
+        <main className="emile-card">
+          <div className="emile-card__inner">
+            {!selected || !docApi ? (
+              <div className="fr-alert fr-alert--info">
+                <p className="fr-alert__title">En attente</p>
+                <p>Sélectionne un candidat (et ouvre le widget dans Grist).</p>
               </div>
+            ) : (
+              <>
+                <div style={{ marginBottom: 14 }}>
+                  <div className="fr-h4" style={{ margin: 0 }}>
+                    {headerLabel}
+                  </div>
+                  <div className="fr-hint-text">RowId: {selected.id}</div>
+                </div>
 
-              {/* Sections */}
-              <div style={{ display: "grid", gap: 14 }}>
-                {sections.map(({ key, fields }) => (
-                  <section key={key} id={GROUP_ANCHORS[key]} style={{ borderTop: "1px solid #eee", paddingTop: 12 }}>
-                    <h3 style={{ margin: "0 0 10px 0" }}>{GROUP_TITLES[key]}</h3>
-
-                    {fields.length === 0 ? (
-                      <div style={{ opacity: 0.6, fontSize: 13 }}>Aucun champ trouvé pour ce groupe.</div>
-                    ) : (
-                      <div style={{ display: "grid", gap: 12 }}>
-                        {fields.map((c) => (
-                          <Field
-                            key={c.colId}
-                            col={c}
-                            value={draft[c.colId]}
-                            onChange={(v) => setDraft((d) => ({ ...d, [c.colId]: v }))}
-                            docApi={docApi}
-                            colRowIdMap={colRowIdMap}
-                          />
-                        ))}
+                <div style={{ display: "grid", gap: 14 }}>
+                  {sections.map(({ key, fields }) => (
+                    <section key={key} id={GROUP_ANCHORS[key]} className="emile-section">
+                      <div className="fr-h5" style={{ margin: "0 0 10px 0" }}>
+                        {GROUP_TITLES[key]}
                       </div>
-                    )}
-                  </section>
-                ))}
-              </div>
-            </>
-          )}
+
+                      {fields.length === 0 ? (
+                        <div className="fr-hint-text">Aucun champ trouvé pour ce groupe.</div>
+                      ) : (
+                        <div className="emile-form-grid">
+                          {fields.map((c) => (
+                            <Field
+                              key={c.colId}
+                              col={c}
+                              value={draft[c.colId]}
+                              onChange={(v) => setDraft((d) => ({ ...d, [c.colId]: v }))}
+                              docApi={docApi}
+                              colRowIdMap={colRowIdMap}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </section>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         </main>
       </div>
     </div>
@@ -249,7 +309,7 @@ export default function Page() {
 }
 
 /* =======================
-   FieldRenderer (A6)
+   FieldRenderer (A6) — DSFR skin
    ======================= */
 
 function Field(props: {
@@ -267,6 +327,8 @@ function Field(props: {
   const isChoice = type === "Choice";
   const isChoiceList = type === "ChoiceList";
   const isDate = type === "Date";
+
+  const disabled = !isEditable(col);
 
   const choiceOptions = useMemo(() => {
     const raw = col.widgetOptionsParsed?.choices;
@@ -293,14 +355,17 @@ function Field(props: {
   // DATE
   if (isDate) {
     return (
-      <div style={{ display: "grid", gap: 6 }}>
-        <label style={{ fontWeight: 700 }}>{col.label}</label>
+      <div className="fr-input-group">
+        <label className="fr-label">
+          {col.label}
+          <span className="fr-hint-text"> ({col.colId})</span>
+        </label>
         <input
+          className="fr-input"
           type="date"
           value={unixSecondsToISODate(value)}
           onChange={(e) => onChange(isoDateToUnixSeconds(e.target.value))}
-          style={{ padding: 8, borderRadius: 10, border: "1px solid #ddd" }}
-          disabled={!isEditable(col)}
+          disabled={disabled}
         />
       </div>
     );
@@ -312,15 +377,20 @@ function Field(props: {
     const valueId = valueStr ? choiceIdByLabel.get(valueStr) ?? null : null;
 
     return (
-      <div style={{ display: "grid", gap: 6 }}>
-        <label style={{ fontWeight: 700 }}>{col.label}</label>
-        <SearchDropdown
-          options={choiceOptions}
-          valueId={valueId}
-          onChange={(id) => onChange(id ? choiceLabelById.get(id) ?? null : null)}
-          placeholder="Rechercher…"
-          disabled={!isEditable(col) || choiceOptions.length === 0}
-        />
+      <div className="fr-input-group">
+        <label className="fr-label">
+          {col.label}
+          <span className="fr-hint-text"> ({col.colId})</span>
+        </label>
+        <div>
+          <SearchDropdown
+            options={choiceOptions}
+            valueId={valueId}
+            onChange={(id) => onChange(id ? choiceLabelById.get(id) ?? null : null)}
+            placeholder="Rechercher…"
+            disabled={disabled || choiceOptions.length === 0}
+          />
+        </div>
       </div>
     );
   }
@@ -333,18 +403,23 @@ function Field(props: {
       .filter((x): x is number => typeof x === "number");
 
     return (
-      <div style={{ display: "grid", gap: 6 }}>
-        <label style={{ fontWeight: 700 }}>{col.label}</label>
-        <SearchMultiDropdown
-          options={choiceOptions}
-          valueIds={selectedIds}
-          onChange={(nextIds) => {
-            const nextLabels = nextIds.map((id) => choiceLabelById.get(id)).filter((s): s is string => !!s);
-            onChange(encodeListCell(nextLabels));
-          }}
-          placeholder="Rechercher…"
-          disabled={!isEditable(col) || choiceOptions.length === 0}
-        />
+      <div className="fr-input-group">
+        <label className="fr-label">
+          {col.label}
+          <span className="fr-hint-text"> ({col.colId})</span>
+        </label>
+        <div>
+          <SearchMultiDropdown
+            options={choiceOptions}
+            valueIds={selectedIds}
+            onChange={(nextIds) => {
+              const nextLabels = nextIds.map((id) => choiceLabelById.get(id)).filter((s): s is string => !!s);
+              onChange(encodeListCell(nextLabels));
+            }}
+            placeholder="Rechercher…"
+            disabled={disabled || choiceOptions.length === 0}
+          />
+        </div>
       </div>
     );
   }
@@ -371,43 +446,56 @@ function Field(props: {
     if (isRef) {
       const valueId = typeof value === "number" ? value : null;
       return (
-        <div style={{ display: "grid", gap: 6 }}>
-          <label style={{ fontWeight: 700 }}>{col.label}</label>
-          <SearchDropdown
-            options={refOptions}
-            valueId={valueId}
-            onChange={(id) => onChange(id)}
-            placeholder={loading ? "Chargement…" : "Rechercher…"}
-            disabled={!isEditable(col) || loading}
-          />
+        <div className="fr-input-group">
+          <label className="fr-label">
+            {col.label}
+            <span className="fr-hint-text"> ({col.colId})</span>
+          </label>
+          <div>
+            <SearchDropdown
+              options={refOptions}
+              valueId={valueId}
+              onChange={(id) => onChange(id)}
+              placeholder={loading ? "Chargement…" : "Rechercher…"}
+              disabled={disabled || loading}
+            />
+          </div>
         </div>
       );
     }
 
     const ids = decodeListCell(value).filter((x) => typeof x === "number") as number[];
     return (
-      <div style={{ display: "grid", gap: 6 }}>
-        <label style={{ fontWeight: 700 }}>{col.label}</label>
-        <SearchMultiDropdown
-          options={refOptions}
-          valueIds={ids}
-          onChange={(nextIds) => onChange(encodeListCell(nextIds))}
-          placeholder={loading ? "Chargement…" : "Rechercher…"}
-          disabled={!isEditable(col) || loading}
-        />
+      <div className="fr-input-group">
+        <label className="fr-label">
+          {col.label}
+          <span className="fr-hint-text"> ({col.colId})</span>
+        </label>
+        <div>
+          <SearchMultiDropdown
+            options={refOptions}
+            valueIds={ids}
+            onChange={(nextIds) => onChange(encodeListCell(nextIds))}
+            placeholder={loading ? "Chargement…" : "Rechercher…"}
+            disabled={disabled || loading}
+          />
+        </div>
       </div>
     );
   }
 
   // DEFAULT TEXT
   return (
-    <div style={{ display: "grid", gap: 6 }}>
-      <label style={{ fontWeight: 700 }}>{col.label}</label>
+    <div className="fr-input-group">
+      <label className="fr-label">
+        {col.label}
+        <span className="fr-hint-text"> ({col.colId})</span>
+      </label>
       <input
+        className="fr-input"
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value)}
-        style={{ padding: 8, borderRadius: 10, border: "1px solid #ddd" }}
-        disabled={!isEditable(col)}
+        disabled={disabled}
       />
     </div>
   );
