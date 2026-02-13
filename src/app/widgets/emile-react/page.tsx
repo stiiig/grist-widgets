@@ -34,7 +34,6 @@ function candidateLabel(r: Row) {
 
 function StatusAlert({ status }: { status: string }) {
   if (!status) return null;
-
   const isError = status.toLowerCase().includes("erreur") || status.toLowerCase().includes("error");
   const isSuccess = status.includes("✅") || status.toLowerCase().includes("enregistr");
 
@@ -76,6 +75,12 @@ export default function Page() {
     const first = activeTabObj.subtabs?.[0]?.key;
     if (first) setActiveSubtab(first);
   }, [activeTabObj]);
+
+  // Recherche globale (sur toute la tab L1)
+  const [fieldQuery, setFieldQuery] = useState("");
+  useEffect(() => {
+    setFieldQuery("");
+  }, [activeTab]);
 
   // INIT: charge grist-plugin-api.js si besoin (self-hosted)
   useEffect(() => {
@@ -123,7 +128,7 @@ export default function Page() {
     })();
   }, [docApi]);
 
-  // A10.2: record courant via grist.onRecord
+  // Record courant via grist.onRecord
   useEffect(() => {
     if (!docApi) return;
     if (typeof window === "undefined") return;
@@ -158,7 +163,7 @@ export default function Page() {
     try {
       const updates: Record<string, any> = {};
       for (const c of cols) {
-        if (!isEditable(c)) continue; // ✅ skip formula + colonnes système
+        if (!isEditable(c)) continue; // skip formule/système
         updates[c.colId] = draft[c.colId];
       }
       await docApi.applyUserActions([["UpdateRecord", TABLE_ID, selected.id, updates]]);
@@ -173,35 +178,63 @@ export default function Page() {
   const headerLabel = selected ? candidateLabel(selected) : "EMILE";
   const headerId2 = selected ? (selected["ID2"] ?? "").toString().trim() : "";
 
-  // A10.1: mapping tab/subtab -> colIds (Administratif OK, le reste vide)
-  const activeColIds = useMemo(() => {
-    return FIELD_MAP[activeTab]?.[activeSubtab] ?? [];
-  }, [activeTab, activeSubtab]);
+  // ===== Mapping champs =====
+  const subtabColIds = useMemo(() => FIELD_MAP[activeTab]?.[activeSubtab] ?? [], [activeTab, activeSubtab]);
 
-  const activeFields = useMemo(() => {
-    return activeColIds.map((id) => colById.get(id)).filter((c): c is ColMeta => !!c);
-  }, [activeColIds, colById]);
+  const subtabFields = useMemo(() => {
+    return subtabColIds.map((id) => colById.get(id)).filter((c): c is ColMeta => !!c);
+  }, [subtabColIds, colById]);
 
-  const isMapped = activeColIds.length > 0;
+  const tabColIds = useMemo(() => {
+    const subMap = FIELD_MAP[activeTab] ?? {};
+    const ids = Object.values(subMap).flat();
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const id of ids) {
+      if (!seen.has(id)) {
+        seen.add(id);
+        out.push(id);
+      }
+    }
+    return out;
+  }, [activeTab]);
+
+  const tabFields = useMemo(() => {
+    return tabColIds.map((id) => colById.get(id)).filter((c): c is ColMeta => !!c);
+  }, [tabColIds, colById]);
+
+  const isTabMapped = tabColIds.length > 0;
+
+  const filteredFields = useMemo(() => {
+    const q = fieldQuery.trim().toLowerCase();
+    if (!q) return subtabFields;
+
+    // recherche sur TOUTE la tab (L1)
+    return tabFields.filter((c) => {
+      const label = (c.label ?? "").toLowerCase();
+      const id = (c.colId ?? "").toLowerCase();
+      return label.includes(q) || id.includes(q);
+    });
+  }, [fieldQuery, subtabFields, tabFields]);
+
+  const isSearching = fieldQuery.trim().length > 0;
 
   return (
     <div className="emile-container">
-      {/* Sticky actions */}
+      {/* Header sticky (legacy-like) */}
       <div className="emile-sticky-actions">
-        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
           <div style={{ display: "grid" }}>
             <div className="fr-h3" style={{ margin: 0 }}>
               {headerLabel}
             </div>
-            <div className="fr-hint-text">
-              {headerId2 ? <span className="fr-tag fr-tag--sm">{headerId2}</span> : null}{" "}
-              <span style={{ marginLeft: 8 }}>
-                mode: <code>{mode}</code>
-              </span>
+            <div className="fr-hint-text" style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+              {headerId2 ? <span className="fr-tag fr-tag--sm">{headerId2}</span> : null}
+              <span className="fr-tag fr-tag--sm">mode: {mode}</span>
             </div>
           </div>
 
-          <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
+          <div style={{ marginLeft: "auto", display: "flex", gap: 10, alignItems: "center" }}>
             <button type="button" className="fr-btn" onClick={save} disabled={!selected?.id || !docApi || saving}>
               {saving ? "Enregistrement…" : "Enregistrer"}
             </button>
@@ -211,7 +244,6 @@ export default function Page() {
         <StatusAlert status={status} />
       </div>
 
-      {/* Single pane */}
       <div className="emile-card" style={{ marginTop: 16 }}>
         <div className="emile-card__inner">
           {!selected || !docApi ? (
@@ -221,6 +253,22 @@ export default function Page() {
             </div>
           ) : (
             <>
+              {/* Recherche globale (top, legacy-like) */}
+              <div className="fr-input-group" style={{ maxWidth: 560, margin: "0 auto 16px auto" }}>
+                <label className="fr-label">Rechercher un champ</label>
+                <input
+                  className="fr-input"
+                  value={fieldQuery}
+                  onChange={(e) => setFieldQuery(e.target.value)}
+                  placeholder="Ex: nationalité, date, téléphone…"
+                />
+                {!!fieldQuery && (
+                  <p className="fr-hint-text" style={{ marginTop: 6 }}>
+                    {filteredFields.length} champ{filteredFields.length > 1 ? "s" : ""} trouvé{filteredFields.length > 1 ? "s" : ""}
+                  </p>
+                )}
+              </div>
+
               {/* Tabs L1 : picto + texte */}
               <div
                 style={{
@@ -230,7 +278,7 @@ export default function Page() {
                   flexWrap: "wrap",
                   borderBottom: "1px solid var(--border-default-grey)",
                   paddingBottom: 10,
-                  marginBottom: 14,
+                  marginBottom: 12,
                 }}
               >
                 {EMILE_TABS.map((t) => {
@@ -251,6 +299,7 @@ export default function Page() {
                         borderBottom: active ? "3px solid var(--border-action-high-blue-france)" : "3px solid transparent",
                         color: active ? "var(--text-title-blue-france)" : "var(--text-default-grey)",
                         fontWeight: active ? 700 : 500,
+                        opacity: active ? 1 : 0.78,
                       }}
                     >
                       <span style={{ display: "inline-flex" }}>
@@ -262,53 +311,78 @@ export default function Page() {
                 })}
               </div>
 
-              {/* Subtabs L2 : tags */}
-              <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap", marginBottom: 14 }}>
-                {activeTabObj.subtabs.map((st) => {
-                  const active = activeSubtab === st.key;
-                  return (
-                    <button
-                      key={st.key}
-                      type="button"
-                      onClick={() => setActiveSubtab(st.key)}
-                      style={{
-                        border: active ? "1px solid var(--border-action-high-blue-france)" : "1px solid transparent",
-                        background: "var(--background-action-low-blue-france)",
-                        borderRadius: 14,
-                        padding: "10px 18px",
-                        cursor: "pointer",
-                        fontWeight: 700,
-                      }}
-                    >
-                      {st.label}
-                    </button>
-                  );
-                })}
-              </div>
+              {/* Subtabs L2 : tags (hidden during search -> legacy-ish behavior) */}
+              {!isSearching && (
+                <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap", marginBottom: 14 }}>
+                  {activeTabObj.subtabs.map((st) => {
+                    const active = activeSubtab === st.key;
+                    return (
+                      <button
+                        key={st.key}
+                        type="button"
+                        onClick={() => setActiveSubtab(st.key)}
+                        style={{
+                          border: active ? "1px solid var(--border-action-high-blue-france)" : "1px solid transparent",
+                          background: "var(--background-action-low-blue-france)",
+                          borderRadius: 999,
+                          padding: "10px 18px",
+                          cursor: "pointer",
+                          fontWeight: 700,
+                        }}
+                      >
+                        {st.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
 
-              {!isMapped ? (
+              {!isTabMapped ? (
                 <div className="fr-alert fr-alert--info">
-                  <p className="fr-alert__title">Sous-onglet non mappé</p>
+                  <p className="fr-alert__title">Onglet non mappé</p>
                   <p>
-                    Pour l’instant, seuls les sous-onglets <b>Administratif</b> sont mappés sur les colonnes Grist.
+                    Pour l’instant, seul <b>Administratif</b> est mappé sur des colonnes Grist.
                     <br />
-                    Prochaine étape : on mappe <b>{activeTabObj.label}</b> →{" "}
-                    <b>{activeTabObj.subtabs.find((s) => s.key === activeSubtab)?.label}</b>.
+                    Prochaine étape : on mappe <b>{activeTabObj.label}</b>.
                   </p>
                 </div>
               ) : (
-                <div className="emile-form-grid">
-                  {activeFields.map((c) => (
-                    <Field
-                      key={c.colId}
-                      col={c}
-                      value={draft[c.colId]}
-                      onChange={(v) => setDraft((d) => ({ ...d, [c.colId]: v }))}
-                      docApi={docApi}
-                      colRowIdMap={colRowIdMap}
-                    />
-                  ))}
-                </div>
+                <>
+                  {isSearching && (
+                    <div className="fr-hint-text" style={{ textAlign: "center", marginBottom: 10 }}>
+                      Recherche active : on affiche les champs trouvés sur <b>{activeTabObj.label}</b> (toutes sous-sections confondues).
+                    </div>
+                  )}
+
+                  <div
+                    className="emile-form-grid"
+                    style={{
+                      display: "grid",
+                      gap: 16,
+                      gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                    }}
+                  >
+                    {filteredFields.map((c) => (
+                      <Field
+                        key={c.colId}
+                        col={c}
+                        value={draft[c.colId]}
+                        onChange={(v) => setDraft((d) => ({ ...d, [c.colId]: v }))}
+                        docApi={docApi}
+                        colRowIdMap={colRowIdMap}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Responsive tweak without touching CSS file */}
+                  <style jsx>{`
+                    @media (max-width: 860px) {
+                      .emile-form-grid {
+                        grid-template-columns: 1fr !important;
+                      }
+                    }
+                  `}</style>
+                </>
               )}
             </>
           )}
@@ -319,7 +393,7 @@ export default function Page() {
 }
 
 /* =======================
-   FieldRenderer (A6) — DSFR skin
+   FieldRenderer — legacy-like (textarea for comment/notes)
    ======================= */
 
 function Field(props: {
@@ -339,6 +413,11 @@ function Field(props: {
   const isDate = type === "Date";
 
   const disabled = !isEditable(col);
+
+  const lowerLabel = (col.label ?? "").toLowerCase();
+  const lowerId = (col.colId ?? "").toLowerCase();
+  const useTextarea =
+    type === "Text" && (lowerLabel.includes("comment") || lowerLabel.includes("compl") || lowerId.includes("comment"));
 
   const choiceOptions = useMemo(() => {
     const raw = col.widgetOptionsParsed?.choices;
@@ -466,6 +545,21 @@ function Field(props: {
           onChange={(nextIds) => onChange(encodeListCell(nextIds))}
           placeholder={loading ? "Chargement…" : "Rechercher…"}
           disabled={disabled || loading}
+        />
+      </div>
+    );
+  }
+
+  if (useTextarea) {
+    return (
+      <div className="fr-input-group" style={{ gridColumn: "1 / -1" }}>
+        <label className="fr-label">{col.label}</label>
+        <textarea
+          className="fr-input"
+          rows={5}
+          value={value ?? ""}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={disabled}
         />
       </div>
     );
