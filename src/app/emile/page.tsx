@@ -1,18 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
-declare global {
-  interface Window {
-    grist: any;
-  }
-}
+import { initGristOrMock } from "@/lib/grist/init";
 
 type WidgetColumnMap = Record<string, any>;
-type GristDocAPI = {
-  applyUserActions: (actions: any[]) => Promise<any>;
-};
-
+type GristDocAPI = { applyUserActions: (actions: any[]) => Promise<any> };
 type RowRecord = Record<string, any>;
 
 export default function WidgetEmile() {
@@ -23,58 +15,33 @@ export default function WidgetEmile() {
   const [status, setStatus] = useState<string>("");
 
   useEffect(() => {
-    // --- Si on est hors Grist mais mock activé ---
-    if (!window.grist?.ready) {
-      if (
-        typeof window !== "undefined" &&
-        localStorage.getItem("GRIST_MOCK_ENABLED") === "1"
-      ) {
-        const mockRecord = JSON.parse(
-          localStorage.getItem("GRIST_MOCK_RECORD") || "null"
-        );
-        const mockMapping = JSON.parse(
-          localStorage.getItem("GRIST_MOCK_MAPPING") || "null"
-        );
-
-        window.grist = {
-          ready: () => {},
-          onRecord: (cb: any) =>
-            setTimeout(() => cb(mockRecord, mockMapping), 50),
-          docApi: {
-            applyUserActions: async (actions: any[]) => {
-              console.log("MOCK applyUserActions", actions);
-              return [];
-            },
-          },
-        };
-      } else {
-        setStatus(
-          "grist-plugin-api non détecté (utilise /dev/harness pour simuler)."
-        );
-        return;
-      }
-    }
-
-    const grist = window.grist;
-
-    grist.ready({ requiredAccess: "full" });
-
-    grist.onRecord((rec: any, mapping: any) => {
-      setRecord(rec ?? null);
-      setColumns(mapping ?? null);
-      setReady(true);
+    const { grist, mode } = initGristOrMock({
+      requiredAccess: "full",
+      onRecord: (rec, mapping) => {
+        setRecord(rec ?? null);
+        setColumns(mapping ?? null);
+        setReady(true);
+        setStatus(mode === "mock" ? "Mode mock (localStorage)" : "");
+      },
+      onApplyUserActions: (actions) => {
+        // visible en console quand mock
+        console.log("MOCK applyUserActions", actions);
+      },
     });
 
-    setDocApi(grist.docApi);
+    if (mode === "none") {
+      setStatus("grist-plugin-api non détecté (active le mock via /dev/harness).");
+      return;
+    }
+
+    setDocApi((grist?.docApi as any) ?? null);
   }, []);
 
   async function updateField(field: string, value: any) {
     if (!docApi || !record?.id) return;
 
     try {
-      await docApi.applyUserActions([
-        ["UpdateRecord", "AN_PC", record.id, { [field]: value }],
-      ]);
+      await docApi.applyUserActions([["UpdateRecord", "AN_PC", record.id, { [field]: value }]]);
       setStatus("✅ Enregistré");
     } catch (e: any) {
       setStatus(`❌ Erreur: ${e?.message ?? String(e)}`);
@@ -83,7 +50,7 @@ export default function WidgetEmile() {
 
   return (
     <main style={{ padding: 32 }}>
-      <h1>Widget Emile</h1>
+      <h1>Widget Emile (React sandbox)</h1>
 
       {!ready && (
         <div style={{ marginTop: 20 }}>
@@ -95,13 +62,7 @@ export default function WidgetEmile() {
       {ready && (
         <>
           <h3>Record courant</h3>
-          <pre
-            style={{
-              background: "#f5f5f5",
-              padding: 16,
-              overflow: "auto",
-            }}
-          >
+          <pre style={{ background: "#f5f5f5", padding: 16, overflow: "auto" }}>
             {JSON.stringify({ record, columns }, null, 2)}
           </pre>
 
