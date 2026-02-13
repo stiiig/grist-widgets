@@ -17,7 +17,8 @@ import {
   GristDocAPI,
 } from "@/lib/grist/meta";
 import { SearchDropdown, SearchMultiDropdown, Option } from "@/components/SearchDropdown";
-import { GROUPS, GROUPS_ORDER, GROUP_TITLES, GroupKey } from "@/lib/emile/groups";
+import { GROUPS, GroupKey } from "@/lib/emile/groups";
+import { EMILE_TABS, L1TabKey } from "@/lib/emile/tabs";
 
 const TABLE_ID = "CANDIDATS";
 
@@ -51,32 +52,6 @@ function StatusAlert({ status }: { status: string }) {
   );
 }
 
-/**
- * Sous-tabs "visuels" (style screenshot). Pour l'instant ils ne filtrent pas les champs,
- * on s'en sert pour l'UI. Ensuite on pourra mapper subtab -> champs.
- */
-const SUBTABS: Record<GroupKey, { key: string; label: string }[]> = {
-  perso: [
-    { key: "identite", label: "Identité" },
-    { key: "situation", label: "Situation" },
-    { key: "sante", label: "Santé" },
-  ],
-  coord: [{ key: "contacts", label: "Contacts" }],
-  admin: [
-    { key: "situation", label: "Situation actuelle" },
-    { key: "ft", label: "France Travail" },
-    { key: "avis", label: "Avis et attestations" },
-    { key: "complements", label: "Compléments" },
-  ],
-  besoins: [
-    { key: "emploi", label: "Emploi-Formation" },
-    { key: "finances", label: "Finances" },
-    { key: "habitat", label: "Habitat" },
-    { key: "mobilite", label: "Mobilité" },
-  ],
-  complements: [{ key: "notes", label: "Compléments" }],
-};
-
 export default function Page() {
   const [mode, setMode] = useState<string>("boot");
   const [docApi, setDocApi] = useState<GristDocAPI | null>(null);
@@ -93,13 +68,15 @@ export default function Page() {
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState("");
 
-  const [activeTab, setActiveTab] = useState<GroupKey>("perso");
-  const [activeSubtab, setActiveSubtab] = useState<string>(SUBTABS.perso[0].key);
+  // Tabs L1/L2
+  const [activeTab, setActiveTab] = useState<L1TabKey>(EMILE_TABS[0].key);
+  const activeTabObj = useMemo(() => EMILE_TABS.find((t) => t.key === activeTab) ?? EMILE_TABS[0], [activeTab]);
 
+  const [activeSubtab, setActiveSubtab] = useState<string>(activeTabObj.subtabs[0].key);
   useEffect(() => {
-    const first = SUBTABS[activeTab]?.[0]?.key;
+    const first = activeTabObj.subtabs?.[0]?.key;
     if (first) setActiveSubtab(first);
-  }, [activeTab]);
+  }, [activeTabObj]);
 
   // INIT: charge grist-plugin-api.js si besoin (self-hosted)
   useEffect(() => {
@@ -147,7 +124,7 @@ export default function Page() {
     })();
   }, [docApi]);
 
-  // DATA (pour l’instant on garde fetchTable — on passera ensuite à onRecord pour le "record courant")
+  // DATA (temp: fetchTable — on passera à onRecord après)
   useEffect(() => {
     if (!docApi) return;
     (async () => {
@@ -194,15 +171,18 @@ export default function Page() {
     }
   }
 
-  const headerLabel = selected ? candidateLabel(selected) : "";
+  const headerLabel = selected ? candidateLabel(selected) : "EMILE";
   const headerId2 = selected ? (selected["ID2"] ?? "").toString().trim() : "";
 
-  // Champs de l’onglet actif, dans l’ordre legacy
-  const activeFields = useMemo(() => {
-    return GROUPS[activeTab]
-      .map((id) => colById.get(id))
-      .filter((c): c is ColMeta => !!c);
-  }, [activeTab, colById]);
+  /**
+   * TEMP A10: affichage des champs "Administratif" legacy (GROUPS existants).
+   * A10.1: on remplacera ça par une vraie map (tab/subtab -> colonnes).
+   */
+  const adminFields = useMemo(() => {
+    const order: GroupKey[] = ["perso", "coord", "admin", "besoins", "complements"];
+    const colIds = order.flatMap((g) => GROUPS[g]);
+    return colIds.map((id) => colById.get(id)).filter((c): c is ColMeta => !!c);
+  }, [colById]);
 
   return (
     <div className="emile-container">
@@ -211,7 +191,7 @@ export default function Page() {
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <div style={{ display: "grid" }}>
             <div className="fr-h3" style={{ margin: 0 }}>
-              {headerLabel || "EMILE"}
+              {headerLabel}
             </div>
             <div className="fr-hint-text">
               {headerId2 ? <span className="fr-tag fr-tag--sm">{headerId2}</span> : null}{" "}
@@ -241,11 +221,11 @@ export default function Page() {
             </div>
           ) : (
             <>
-              {/* Tabs picto + texte */}
+              {/* Tabs L1 : picto + texte */}
               <div
                 style={{
                   display: "flex",
-                  gap: 24,
+                  gap: 22,
                   alignItems: "center",
                   flexWrap: "wrap",
                   borderBottom: "1px solid var(--border-default-grey)",
@@ -253,13 +233,13 @@ export default function Page() {
                   marginBottom: 14,
                 }}
               >
-                {GROUPS_ORDER.map((g) => {
-                  const active = activeTab === g;
+                {EMILE_TABS.map((t) => {
+                  const active = activeTab === t.key;
                   return (
                     <button
-                      key={g}
+                      key={t.key}
                       type="button"
-                      onClick={() => setActiveTab(g)}
+                      onClick={() => setActiveTab(t.key)}
                       style={{
                         display: "inline-flex",
                         gap: 10,
@@ -274,17 +254,17 @@ export default function Page() {
                       }}
                     >
                       <span style={{ display: "inline-flex" }}>
-                        <TabIcon name={iconForGroup(g)} />
+                        <TabIcon name={t.icon} />
                       </span>
-                      <span>{GROUP_TITLES[g]}</span>
+                      <span>{t.label}</span>
                     </button>
                   );
                 })}
               </div>
 
-              {/* Subtabs tags */}
+              {/* Subtabs L2 : tags */}
               <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap", marginBottom: 14 }}>
-                {SUBTABS[activeTab].map((st) => {
+                {activeTabObj.subtabs.map((st) => {
                   const active = activeSubtab === st.key;
                   return (
                     <button
@@ -306,9 +286,14 @@ export default function Page() {
                 })}
               </div>
 
-              {/* Form */}
+              {/* TEMP content */}
+              <div className="fr-hint-text" style={{ marginBottom: 10 }}>
+                Onglet: <b>{activeTabObj.label}</b> · Sous-onglet: <b>{activeTabObj.subtabs.find((s) => s.key === activeSubtab)?.label}</b>{" "}
+                · (A10: mapping champs à brancher)
+              </div>
+
               <div className="emile-form-grid">
-                {activeFields.map((c) => (
+                {adminFields.map((c) => (
                   <Field
                     key={c.colId}
                     col={c}
@@ -498,23 +483,11 @@ function Field(props: {
    Tabs icons (inline SVG)
    ======================= */
 
-function iconForGroup(g: GroupKey): "user" | "phone" | "building" | "heart" | "edit" {
-  switch (g) {
-    case "admin":
-      return "building";
-    case "coord":
-      return "phone";
-    case "besoins":
-      return "heart";
-    case "complements":
-      return "edit";
-    case "perso":
-    default:
-      return "user";
-  }
-}
-
-function TabIcon({ name }: { name: "user" | "phone" | "building" | "heart" | "edit" }) {
+function TabIcon({
+  name,
+}: {
+  name: "building" | "key" | "briefcase" | "euro" | "users" | "home" | "graduation" | "car" | "monitor" | "heart";
+}) {
   const common = { width: 22, height: 22, viewBox: "0 0 24 24", fill: "none" as const };
   const stroke = { stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
 
@@ -527,34 +500,79 @@ function TabIcon({ name }: { name: "user" | "phone" | "building" | "heart" | "ed
           <path {...stroke} d="M9 9h.01M9 12h.01M9 15h.01M12 9h.01M12 12h.01M12 15h.01M15 9h.01M15 12h.01M15 15h.01" />
         </svg>
       );
-    case "phone":
+    case "key":
       return (
         <svg {...common} aria-hidden="true">
-          <path {...stroke} d="M22 16.92v3a2 2 0 0 1-2.18 2A19.8 19.8 0 0 1 3 5.18 2 2 0 0 1 5 3h3a2 2 0 0 1 2 1.72c.12.86.31 1.7.57 2.5a2 2 0 0 1-.45 2.11L9 10.91a16 16 0 0 0 4.09 4.09l1.58-1.12a2 2 0 0 1 2.11-.45c.8.26 1.64.45 2.5.57A2 2 0 0 1 22 16.92z" />
+          <path {...stroke} d="M21 8l-3 3" />
+          <path {...stroke} d="M7 14a5 5 0 1 1 4-8l10 2-2 2-2 2-2 2-2 2-2-2" />
+          <path {...stroke} d="M7 14l-4 4v3h3l4-4" />
+        </svg>
+      );
+    case "briefcase":
+      return (
+        <svg {...common} aria-hidden="true">
+          <path {...stroke} d="M10 6V5a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v1" />
+          <path {...stroke} d="M4 7h16v12H4z" />
+          <path {...stroke} d="M4 12h16" />
+        </svg>
+      );
+    case "euro":
+      return (
+        <svg {...common} aria-hidden="true">
+          <path {...stroke} d="M18 7a6 6 0 1 0 0 10" />
+          <path {...stroke} d="M6 10h9" />
+          <path {...stroke} d="M6 14h9" />
+        </svg>
+      );
+    case "users":
+      return (
+        <svg {...common} aria-hidden="true">
+          <path {...stroke} d="M17 21a7 7 0 0 0-14 0" />
+          <path {...stroke} d="M10 11a4 4 0 1 0-4-4 4 4 0 0 0 4 4z" />
+          <path {...stroke} d="M22 21a6 6 0 0 0-8-5.2" />
+          <path {...stroke} d="M16 3.4a4 4 0 0 1 0 7.2" />
+        </svg>
+      );
+    case "home":
+      return (
+        <svg {...common} aria-hidden="true">
+          <path {...stroke} d="M3 11l9-8 9 8" />
+          <path {...stroke} d="M5 10v11h14V10" />
+        </svg>
+      );
+    case "graduation":
+      return (
+        <svg {...common} aria-hidden="true">
+          <path {...stroke} d="M22 10L12 5 2 10l10 5 10-5z" />
+          <path {...stroke} d="M6 12v5c0 2 3 4 6 4s6-2 6-4v-5" />
+        </svg>
+      );
+    case "car":
+      return (
+        <svg {...common} aria-hidden="true">
+          <path {...stroke} d="M3 16l1-5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2l1 5" />
+          <path {...stroke} d="M5 16v3" />
+          <path {...stroke} d="M19 16v3" />
+          <path {...stroke} d="M7 16h10" />
+          <path {...stroke} d="M7 12h10" />
+        </svg>
+      );
+    case "monitor":
+      return (
+        <svg {...common} aria-hidden="true">
+          <path {...stroke} d="M4 5h16v11H4z" />
+          <path {...stroke} d="M8 21h8" />
+          <path {...stroke} d="M12 16v5" />
         </svg>
       );
     case "heart":
+    default:
       return (
         <svg {...common} aria-hidden="true">
           <path
             {...stroke}
             d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"
           />
-        </svg>
-      );
-    case "edit":
-      return (
-        <svg {...common} aria-hidden="true">
-          <path {...stroke} d="M12 20h9" />
-          <path {...stroke} d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
-        </svg>
-      );
-    case "user":
-    default:
-      return (
-        <svg {...common} aria-hidden="true">
-          <path {...stroke} d="M20 21a8 8 0 0 0-16 0" />
-          <path {...stroke} d="M12 11a4 4 0 1 0-4-4 4 4 0 0 0 4 4z" />
         </svg>
       );
   }
