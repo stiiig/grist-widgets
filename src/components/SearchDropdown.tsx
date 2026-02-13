@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
-export type Option = { id: number; label: string; hint?: string; q?: string };
+export type Option = { id: number; label: string; q?: string };
 
 export function SearchDropdown(props: {
   options: Option[];
@@ -24,12 +24,9 @@ export function SearchDropdown(props: {
 
   const filtered = useMemo(() => {
     const qq = q.trim().toLowerCase();
-    if (!qq) return options.slice(0, 60);
-    const res = options.filter((o) => {
-      const hay = (o.q ?? (o.label + " " + o.id)).toLowerCase();
-      return hay.includes(qq);
-    });
-    return res.slice(0, 60);
+    if (!qq) return options.slice(0, 80);
+    const res = options.filter((o) => ((o.q ?? o.label).toLowerCase().includes(qq)));
+    return res.slice(0, 80);
   }, [q, options]);
 
   useEffect(() => {
@@ -58,9 +55,7 @@ export function SearchDropdown(props: {
         }}
       >
         {selected ? (
-          <span>
-            {selected.label} <span style={{ opacity: 0.6 }}>#{selected.id}</span>
-          </span>
+          <span>{selected.label}</span>
         ) : (
           <span style={{ opacity: 0.6 }}>{placeholder ?? "Sélectionner…"}</span>
         )}
@@ -91,27 +86,7 @@ export function SearchDropdown(props: {
             />
           </div>
 
-          <div style={{ maxHeight: 260, overflow: "auto" }}>
-            <button
-              type="button"
-              onClick={() => {
-                onChange(null);
-                setOpen(false);
-              }}
-              style={{
-                display: "block",
-                width: "100%",
-                textAlign: "left",
-                padding: "8px 10px",
-                border: 0,
-                background: "white",
-                cursor: "pointer",
-                borderBottom: "1px solid #f3f3f3",
-              }}
-            >
-              — Vider —
-            </button>
-
+          <div style={{ maxHeight: 280, overflow: "auto" }}>
             {filtered.map((o) => (
               <button
                 key={o.id}
@@ -124,7 +99,7 @@ export function SearchDropdown(props: {
                   display: "block",
                   width: "100%",
                   textAlign: "left",
-                  padding: "8px 10px",
+                  padding: "9px 10px",
                   border: 0,
                   background: valueId === o.id ? "#f6f6f6" : "white",
                   cursor: "pointer",
@@ -132,9 +107,6 @@ export function SearchDropdown(props: {
                 }}
               >
                 <div style={{ fontWeight: 600 }}>{o.label}</div>
-                <div style={{ fontSize: 12, opacity: 0.7 }}>
-                  #{o.id} {o.hint ? `· ${o.hint}` : ""}
-                </div>
               </button>
             ))}
 
@@ -166,7 +138,8 @@ export function SearchMultiDropdown(props: {
   const label = useMemo(() => {
     if (valueIds.length === 0) return placeholder ?? "Sélectionner…";
     const names = valueIds
-      .map((id) => options.find((o) => o.id === id)?.label ?? `#${id}`)
+      .map((id) => options.find((o) => o.id === id)?.label ?? "")
+      .filter(Boolean)
       .slice(0, 3);
     const more = valueIds.length > 3 ? ` +${valueIds.length - 3}` : "";
     return names.join(", ") + more;
@@ -174,9 +147,9 @@ export function SearchMultiDropdown(props: {
 
   const filtered = useMemo(() => {
     const qq = q.trim().toLowerCase();
-    if (!qq) return options.slice(0, 80);
-    const res = options.filter((o) => ((o.q ?? (o.label + " " + o.id)).toLowerCase().includes(qq)));
-    return res.slice(0, 80);
+    if (!qq) return options.slice(0, 120);
+    const res = options.filter((o) => ((o.q ?? o.label).toLowerCase().includes(qq)));
+    return res.slice(0, 120);
   }, [q, options]);
 
   useEffect(() => {
@@ -227,43 +200,31 @@ export function SearchMultiDropdown(props: {
             overflow: "hidden",
           }}
         >
-          <div style={{ padding: 8, borderBottom: "1px solid #eee", display: "flex", gap: 8 }}>
+          <div style={{ padding: 8, borderBottom: "1px solid #eee" }}>
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Rechercher…"
-              style={{ flex: 1, padding: 8, borderRadius: 10, border: "1px solid #ddd" }}
+              style={{ width: "100%", padding: 8, borderRadius: 10, border: "1px solid #ddd" }}
               autoFocus
             />
-            <button
-              type="button"
-              onClick={() => onChange([])}
-              style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid #ddd", background: "white" }}
-            >
-              Vider
-            </button>
           </div>
 
-          <div style={{ maxHeight: 300, overflow: "auto" }}>
+          <div style={{ maxHeight: 320, overflow: "auto" }}>
             {filtered.map((o) => (
               <label
                 key={o.id}
                 style={{
                   display: "flex",
                   gap: 10,
-                  padding: "8px 10px",
+                  padding: "9px 10px",
                   borderBottom: "1px solid #f3f3f3",
                   cursor: "pointer",
                   alignItems: "center",
                 }}
               >
                 <input type="checkbox" checked={valueSet.has(o.id)} onChange={() => toggle(o.id)} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600 }}>{o.label}</div>
-                  <div style={{ fontSize: 12, opacity: 0.7 }}>
-                    #{o.id} {o.hint ? `· ${o.hint}` : ""}
-                  </div>
-                </div>
+                <div style={{ fontWeight: 600 }}>{o.label}</div>
               </label>
             ))}
             {filtered.length === 0 ? <div style={{ padding: 10, opacity: 0.7 }}>Aucun résultat.</div> : null}
