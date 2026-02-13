@@ -17,46 +17,37 @@ export default function WidgetEmile() {
 
 useEffect(() => {
   (async () => {
-    const { grist, mode } = await initGristOrMock({
-      requiredAccess: "full",
-      onRecord: (rec: any, mapping: any) => {
-        setRecord(rec ?? null);
-        setColumns(mapping ?? null);
-        setReady(true);
-        if (mode === "mock") {
-          setStatus("Mode mock (localStorage)");
-          postLog("emile: running in mock mode");
-        }
-      },
-      onApplyUserActions: (actions: any) => {
-        postApplyUserActions(actions);
-      },
-    });
+    try {
+      const { grist, mode } = await initGristOrMock({
+        requiredAccess: "full",
+        onRecord: (rec: any, mapping: any) => {
+          setRecord(rec ?? null);
+          setColumns(mapping ?? null);
+          setReady(true);
 
-    // optionnel: si tu veux afficher le mode même avant le 1er record
-    // setStatus(mode === "mock" ? "Mode mock (localStorage)" : "");
-    // setReady(mode !== "none");
-  })();
-}, []);
-
-    if (mode === "none") {
-      setStatus("grist-plugin-api non détecté (active le mock via /dev/harness).");
-      return;
-    }
-
-    const raw = (grist?.docApi as any) ?? null;
-
-    if (raw?.applyUserActions) {
-      setDocApi({
-        applyUserActions: async (actions: any[]) => {
+          if (mode === "mock") {
+            setStatus("Mode mock (localStorage)");
+            postLog("emile: running in mock mode");
+          }
+        },
+        onApplyUserActions: (actions: any) => {
           postApplyUserActions(actions);
-          return raw.applyUserActions(actions);
         },
       });
-    } else {
+
+      // si tu avais un else/if après, on le met ici proprement
+      if (mode === "none") {
+        setStatus("En attente de Grist (ouvre dans Grist ou /dev/harness)");
+        setDocApi(null);
+      } else {
+        setDocApi((grist as any)?.docApi ?? null);
+      }
+    } catch (e: any) {
+      setStatus(`Init error: ${e?.message ?? String(e)}`);
       setDocApi(null);
     }
-  }, []);
+  })();
+}, []);
 
   async function updateField(field: string, value: any) {
     if (!docApi || !record?.id) return;
