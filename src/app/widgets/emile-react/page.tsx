@@ -1,18 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { GROUPS, GROUP_TITLES } from "@/lib/emile/groups";
 
 const TABLE_ID = "CANDIDATS";
-
-// Premier groupe (à ajuster ensuite avec ton vrai mapping)
-const PERSO_FIELDS = [
-  "Nom_de_famille",
-  "Prenom",
-  "ID2",
-  "Date_de_naissance",
-  "Lieu_de_naissance",
-  "Nationalite",
-] as const;
 
 type CandidateItem = { id: number; label: string; extra: string; q: string };
 
@@ -41,11 +32,16 @@ function isProbablyLongText(v: any) {
   return v.length > 80 || v.includes("\n");
 }
 
+function normalizeForCompare(v: any) {
+  if (v == null) return "";
+  if (Array.isArray(v)) return JSON.stringify(v);
+  return String(v);
+}
+
 export default function EmileReact() {
   const [status, setStatus] = useState("Initialisation…");
-  const [debug, setDebug] = useState<any>({});
-
   const [docApi, setDocApi] = useState<any | null>(null);
+
   const [tableCache, setTableCache] = useState<any | null>(null);
   const [keys, setKeys] = useState<string[]>([]);
   const [candidates, setCandidates] = useState<CandidateItem[]>([]);
@@ -53,10 +49,10 @@ export default function EmileReact() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [selectedRecord, setSelectedRecord] = useState<any | null>(null);
 
-  // drafts
   const [draft, setDraft] = useState<Record<string, any>>({});
+  const [debug, setDebug] = useState<any>({});
 
-  // init grist-plugin-api
+  // init grist-plugin-api (script) — méthode qui marche chez toi
   useEffect(() => {
     const script = document.createElement("script");
     script.src = "https://docs.getgrist.com/grist-plugin-api.js";
@@ -89,14 +85,7 @@ export default function EmileReact() {
           setKeys(k);
           setTableCache(t);
           setCandidates(buildCandidateIndexFromTable(t));
-
-          setDebug((d: any) => ({
-            ...d,
-            tableId: TABLE_ID,
-            rows: t?.id?.length ?? 0,
-            keys: k,
-          }));
-
+          setDebug((d: any) => ({ ...d, tableId: TABLE_ID, rows: t?.id?.length ?? 0, keys: k }));
           setStatus("");
         })
         .catch((e: any) => setStatus("Erreur fetchTable: " + (e?.message ?? String(e))));
@@ -106,7 +95,6 @@ export default function EmileReact() {
     document.head.appendChild(script);
   }, []);
 
-  // matches
   const matches = useMemo(() => {
     const q = search.toLowerCase().trim();
     const list = q ? candidates.filter((c) => c.q.includes(q)) : candidates;
@@ -129,14 +117,15 @@ export default function EmileReact() {
     setSelectedRecord(rec);
   }, [tableCache, selectedId]);
 
-  // init drafts when selection changes
+  // init draft from selectedRecord for fields in GROUPS that exist
   useEffect(() => {
     if (!selectedRecord) {
       setDraft({});
       return;
     }
     const next: Record<string, any> = {};
-    for (const f of PERSO_FIELDS) {
+    const allFields = Object.values(GROUPS).flatMap((s) => Array.from(s));
+    for (const f of allFields) {
       if (keys.includes(f)) next[f] = selectedRecord[f] ?? "";
     }
     setDraft(next);
@@ -146,29 +135,26 @@ export default function EmileReact() {
     setDraft((d) => ({ ...d, [colId]: value }));
   }
 
-  function computeDiff(): Record<string, any> {
+  const diff = useMemo(() => {
     if (!selectedRecord) return {};
-    const diff: Record<string, any> = {};
+    const out: Record<string, any> = {};
     for (const [k, v] of Object.entries(draft)) {
-      const old = selectedRecord[k];
-      const oldNorm = old == null ? "" : String(old);
-      const newNorm = v == null ? "" : String(v);
-      if (oldNorm !== newNorm) diff[k] = v;
+      if (normalizeForCompare(selectedRecord[k]) !== normalizeForCompare(v)) out[k] = v;
     }
-    return diff;
-  }
+    return out;
+  }, [draft, selectedRecord]);
+
+  const diffCount = Object.keys(diff).length;
 
   async function saveAll() {
     if (!docApi || !selectedId) return;
-    const diff = computeDiff();
-    const keysDiff = Object.keys(diff);
-    if (keysDiff.length === 0) {
+    if (diffCount === 0) {
       setStatus("Rien à enregistrer.");
       return;
     }
 
     try {
-      setStatus(`Enregistrement (${keysDiff.length})…`);
+      setStatus(`Enregistrement (${diffCount})…`);
       await docApi.applyUserActions([["UpdateRecord", TABLE_ID, selectedId, diff]]);
       setStatus("✅ Enregistré");
 
@@ -181,11 +167,9 @@ export default function EmileReact() {
     }
   }
 
-  const diffCount = useMemo(() => Object.keys(computeDiff()).length, [draft, selectedRecord]);
-
   return (
-    <main style={{ padding: 16, maxWidth: 1100 }}>
-      <h2 style={{ marginTop: 0 }}>EMILE (React) — migration progressive</h2>
+    <main style={{ padding: 16, maxWidth: 1200 }}>
+      <h2 style={{ marginTop: 0 }}>EMILE (React) — A3 Groupes réels</h2>
 
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
         <input
@@ -197,7 +181,6 @@ export default function EmileReact() {
         <button type="button" onClick={saveAll} disabled={!selectedId || diffCount === 0}>
           Enregistrer ({diffCount})
         </button>
-
         <span style={{ fontSize: 12, color: "#666" }}>{status}</span>
 
         <details style={{ marginLeft: "auto" }}>
@@ -242,41 +225,52 @@ export default function EmileReact() {
       {selectedRecord && (
         <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
           <section style={{ border: "1px solid #eee", borderRadius: 10, padding: 12 }}>
-            <h3 style={{ marginTop: 0 }}>Groupe — Informations personnelles</h3>
-
-            {PERSO_FIELDS.filter((f) => keys.includes(f)).map((colId) => {
-              const v = draft[colId] ?? "";
-              const useTextarea = isProbablyLongText(v);
+            {(
+              Object.keys(GROUPS) as Array<keyof typeof GROUPS>
+            ).map((groupKey) => {
+              const fields = Array.from(GROUPS[groupKey]).filter((f) => keys.includes(f));
+              if (fields.length === 0) return null;
 
               return (
-                <div key={colId} style={{ marginTop: 10 }}>
-                  <label style={{ display: "block", fontSize: 12, color: "#666" }}>{colId}</label>
-                  {useTextarea ? (
-                    <textarea
-                      value={String(v)}
-                      onChange={(e) => setField(colId, e.target.value)}
-                      rows={4}
-                      style={{ width: "100%", padding: 8, marginTop: 4 }}
-                    />
-                  ) : (
-                    <input
-                      value={String(v)}
-                      onChange={(e) => setField(colId, e.target.value)}
-                      style={{ width: "100%", padding: 8, marginTop: 4 }}
-                    />
-                  )}
-                </div>
+                <details key={groupKey} open={groupKey === "perso"} style={{ marginBottom: 10 }}>
+                  <summary style={{ cursor: "pointer", fontWeight: 600 }}>
+                    {GROUP_TITLES[groupKey]} ({fields.length})
+                  </summary>
+
+                  <div style={{ marginTop: 10 }}>
+                    {fields.map((colId) => {
+                      const v = draft[colId] ?? "";
+                      const useTextarea = isProbablyLongText(v);
+
+                      return (
+                        <div key={colId} style={{ marginTop: 10 }}>
+                          <label style={{ display: "block", fontSize: 12, color: "#666" }}>{colId}</label>
+                          {useTextarea ? (
+                            <textarea
+                              value={String(v)}
+                              onChange={(e) => setField(colId, e.target.value)}
+                              rows={4}
+                              style={{ width: "100%", padding: 8, marginTop: 4 }}
+                            />
+                          ) : (
+                            <input
+                              value={String(v)}
+                              onChange={(e) => setField(colId, e.target.value)}
+                              style={{ width: "100%", padding: 8, marginTop: 4 }}
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </details>
               );
             })}
-
-            <p style={{ marginTop: 12, fontSize: 12, color: "#666" }}>
-              Champs présents : {PERSO_FIELDS.filter((f) => keys.includes(f)).length} / {PERSO_FIELDS.length}
-            </p>
           </section>
 
           <section style={{ border: "1px solid #eee", borderRadius: 10, padding: 12 }}>
             <h3 style={{ marginTop: 0 }}>Record brut (debug)</h3>
-            <pre style={{ background: "#f5f5f5", padding: 10, overflow: "auto", maxHeight: 520 }}>
+            <pre style={{ background: "#f5f5f5", padding: 10, overflow: "auto", maxHeight: 700 }}>
               {JSON.stringify(selectedRecord, null, 2)}
             </pre>
           </section>
