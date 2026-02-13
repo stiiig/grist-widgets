@@ -126,21 +126,29 @@ export default function Page() {
     setDraft(d);
   }, [selectedId, cols, selected]);
 
-  async function save() {
-    if (!docApi || !selectedId) return;
+async function save() {
+  if (!docApi || !selectedId) return;
 
-    setSaving(true);
-    try {
-      await docApi.applyUserActions([
-        ["UpdateRecord", TABLE_ID, selectedId, draft],
-      ]);
-      setStatus("Enregistré ✅");
-    } catch (e: any) {
-      setStatus("Erreur: " + (e?.message ?? e));
-    } finally {
-      setSaving(false);
+  setSaving(true);
+  try {
+    // ✅ on n’envoie que les colonnes éditables (pas formula)
+    const updates: Record<string, any> = {};
+    for (const c of cols) {
+      if (!isEditable(c)) continue;     // <- exclut isFormula + quelques colonnes système
+      updates[c.colId] = draft[c.colId];
     }
+
+    await docApi.applyUserActions([
+      ["UpdateRecord", TABLE_ID, selectedId, updates],
+    ]);
+
+    setStatus("Enregistré ✅");
+  } catch (e: any) {
+    setStatus("Erreur: " + (e?.message ?? e));
+  } finally {
+    setSaving(false);
   }
+}
 
   return (
     <div style={{ padding: 16 }}>
