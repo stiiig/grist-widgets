@@ -15,10 +15,11 @@ export default function WidgetEmile() {
   const [docApi, setDocApi] = useState<GristDocAPI | null>(null);
   const [status, setStatus] = useState<string>("");
 
-  useEffect(() => {
-    const { grist, mode } = initGristOrMock({
+useEffect(() => {
+  (async () => {
+    const { grist, mode } = await initGristOrMock({
       requiredAccess: "full",
-      onRecord: (rec, mapping) => {
+      onRecord: (rec: any, mapping: any) => {
         setRecord(rec ?? null);
         setColumns(mapping ?? null);
         setReady(true);
@@ -27,10 +28,16 @@ export default function WidgetEmile() {
           postLog("emile: running in mock mode");
         }
       },
-      onApplyUserActions: (actions) => {
+      onApplyUserActions: (actions: any) => {
         postApplyUserActions(actions);
       },
     });
+
+    // optionnel: si tu veux afficher le mode même avant le 1er record
+    // setStatus(mode === "mock" ? "Mode mock (localStorage)" : "");
+    // setReady(mode !== "none");
+  })();
+}, []);
 
     if (mode === "none") {
       setStatus("grist-plugin-api non détecté (active le mock via /dev/harness).");
