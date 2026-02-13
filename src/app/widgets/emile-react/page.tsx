@@ -42,15 +42,39 @@ export default function Page() {
   // INIT GRIST
   // ------------------------------
   useEffect(() => {
-    (async () => {
-      const { mode, docApi } = await initGristOrMock({
-        requiredAccess: "full",
-      });
-      setMode(mode);
-      setDocApi(docApi);
-    })();
-  }, []);
+  (async () => {
+    // 1) si grist n'est pas là, on injecte le script (une seule fois)
+    if (typeof window !== "undefined" && !(window as any).grist) {
+      await new Promise<void>((resolve, reject) => {
+        // évite double injection
+        const existing = document.querySelector('script[data-grist-plugin-api="1"]') as HTMLScriptElement | null;
+        if (existing) {
+          // si déjà chargé, on attend un tick
+          setTimeout(() => resolve(), 0);
+          return;
+        }
 
+        const s = document.createElement("script");
+        s.src = "https://docs.getgrist.com/grist-plugin-api.js";
+        s.async = true;
+        s.setAttribute("data-grist-plugin-api", "1");
+        s.onload = () => resolve();
+        s.onerror = () => reject(new Error("Impossible de charger grist-plugin-api.js"));
+        document.head.appendChild(s);
+      });
+    }
+
+    // 2) maintenant seulement on init (window.grist devrait exister dans Grist)
+    const { mode, docApi } = await initGristOrMock({ requiredAccess: "full" });
+    setMode(mode);
+    setDocApi(docApi);
+
+    // optionnel : message utile si on est hors Grist
+    if (mode === "none") {
+      setStatus("Ouvre ce widget dans Grist (ou utilise /dev/harness)");
+    }
+  })();
+}, []);
   // ------------------------------
   // LOAD META
   // ------------------------------
