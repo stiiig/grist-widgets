@@ -4,16 +4,15 @@ import { useEffect, useMemo, useState } from "react";
 
 const TABLE_ID = "CANDIDATS";
 
-// essaie d'abord ces colonnes (tu peux en ajouter)
-const EDITABLE_TEXT_CANDIDATES = [
-  "Commentaire",
-  "Commentaires",
-  "Notes",
-  "Note",
-  "Observation",
-  "Observations",
-  "Remarques",
-];
+// Premier groupe (à ajuster ensuite avec ton vrai mapping)
+const PERSO_FIELDS = [
+  "Nom_de_famille",
+  "Prenom",
+  "ID2",
+  "Date_de_naissance",
+  "Lieu_de_naissance",
+  "Nationalite",
+] as const;
 
 type CandidateItem = { id: number; label: string; extra: string; q: string };
 
@@ -37,18 +36,16 @@ function buildCandidateIndexFromTable(t: any): CandidateItem[] {
   return res;
 }
 
-function inferEditableField(keys: string[]): string | null {
-  for (const k of EDITABLE_TEXT_CANDIDATES) if (keys.includes(k)) return k;
-  // fallback: premier champ string-ish (hors id + ceux utilisés)
-  const blacklist = new Set(["id", "Nom_de_famille", "Prenom", "ID2"]);
-  const other = keys.find((k) => !blacklist.has(k));
-  return other ?? null;
+function isProbablyLongText(v: any) {
+  if (typeof v !== "string") return false;
+  return v.length > 80 || v.includes("\n");
 }
 
 export default function EmileReact() {
   const [status, setStatus] = useState("Initialisation…");
   const [debug, setDebug] = useState<any>({});
 
+  const [docApi, setDocApi] = useState<any | null>(null);
   const [tableCache, setTableCache] = useState<any | null>(null);
   const [keys, setKeys] = useState<string[]>([]);
   const [candidates, setCandidates] = useState<CandidateItem[]>([]);
@@ -56,12 +53,10 @@ export default function EmileReact() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [selectedRecord, setSelectedRecord] = useState<any | null>(null);
 
-  const [editableField, setEditableField] = useState<string | null>(null);
-  const [draftValue, setDraftValue] = useState<string>("");
+  // drafts
+  const [draft, setDraft] = useState<Record<string, any>>({});
 
-  const [docApi, setDocApi] = useState<any | null>(null);
-
-  // Charger grist-plugin-api dynamiquement (compatible CSP/iframe)
+  // init grist-plugin-api
   useEffect(() => {
     const script = document.createElement("script");
     script.src = "https://docs.getgrist.com/grist-plugin-api.js";
@@ -95,15 +90,11 @@ export default function EmileReact() {
           setTableCache(t);
           setCandidates(buildCandidateIndexFromTable(t));
 
-          const inferred = inferEditableField(k);
-          setEditableField(inferred);
-
           setDebug((d: any) => ({
             ...d,
             tableId: TABLE_ID,
             rows: t?.id?.length ?? 0,
             keys: k,
-            editableFieldInferred: inferred,
           }));
 
           setStatus("");
@@ -115,14 +106,14 @@ export default function EmileReact() {
     document.head.appendChild(script);
   }, []);
 
-  // Matches
+  // matches
   const matches = useMemo(() => {
     const q = search.toLowerCase().trim();
     const list = q ? candidates.filter((c) => c.q.includes(q)) : candidates;
     return list.slice(0, 25);
   }, [search, candidates]);
 
-  // Record sélectionné depuis cache
+  // selected record from cache
   useEffect(() => {
     if (!tableCache || !selectedId) {
       setSelectedRecord(null);
@@ -138,27 +129,50 @@ export default function EmileReact() {
     setSelectedRecord(rec);
   }, [tableCache, selectedId]);
 
-  // Sync draft when selection changes / editableField changes
+  // init drafts when selection changes
   useEffect(() => {
-    if (!selectedRecord || !editableField) {
-      setDraftValue("");
+    if (!selectedRecord) {
+      setDraft({});
       return;
     }
-    const v = selectedRecord[editableField];
-    setDraftValue(v == null ? "" : String(v));
-  }, [selectedRecord, editableField]);
+    const next: Record<string, any> = {};
+    for (const f of PERSO_FIELDS) {
+      if (keys.includes(f)) next[f] = selectedRecord[f] ?? "";
+    }
+    setDraft(next);
+  }, [selectedRecord, keys]);
 
-  async function saveDraft() {
-    if (!docApi || !selectedId || !editableField) return;
+  function setField(colId: string, value: any) {
+    setDraft((d) => ({ ...d, [colId]: value }));
+  }
+
+  function computeDiff(): Record<string, any> {
+    if (!selectedRecord) return {};
+    const diff: Record<string, any> = {};
+    for (const [k, v] of Object.entries(draft)) {
+      const old = selectedRecord[k];
+      const oldNorm = old == null ? "" : String(old);
+      const newNorm = v == null ? "" : String(v);
+      if (oldNorm !== newNorm) diff[k] = v;
+    }
+    return diff;
+  }
+
+  async function saveAll() {
+    if (!docApi || !selectedId) return;
+    const diff = computeDiff();
+    const keysDiff = Object.keys(diff);
+    if (keysDiff.length === 0) {
+      setStatus("Rien à enregistrer.");
+      return;
+    }
 
     try {
-      setStatus("Enregistrement…");
-      await docApi.applyUserActions([
-        ["UpdateRecord", TABLE_ID, selectedId, { [editableField]: draftValue }],
-      ]);
+      setStatus(`Enregistrement (${keysDiff.length})…`);
+      await docApi.applyUserActions([["UpdateRecord", TABLE_ID, selectedId, diff]]);
       setStatus("✅ Enregistré");
 
-      // refresh table (simple et safe)
+      // refresh table
       const t = await docApi.fetchTable(TABLE_ID);
       setTableCache(t);
       setCandidates(buildCandidateIndexFromTable(t));
@@ -166,6 +180,8 @@ export default function EmileReact() {
       setStatus("❌ Erreur: " + (e?.message ?? String(e)));
     }
   }
+
+  const diffCount = useMemo(() => Object.keys(computeDiff()).length, [draft, selectedRecord]);
 
   return (
     <main style={{ padding: 16, maxWidth: 1100 }}>
@@ -178,6 +194,9 @@ export default function EmileReact() {
           onChange={(e) => setSearch(e.target.value)}
           style={{ flex: "1 1 320px", minWidth: 240, padding: 8 }}
         />
+        <button type="button" onClick={saveAll} disabled={!selectedId || diffCount === 0}>
+          Enregistrer ({diffCount})
+        </button>
 
         <span style={{ fontSize: 12, color: "#666" }}>{status}</span>
 
@@ -223,62 +242,41 @@ export default function EmileReact() {
       {selectedRecord && (
         <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
           <section style={{ border: "1px solid #eee", borderRadius: 10, padding: 12 }}>
-            <h3 style={{ marginTop: 0 }}>Fiche</h3>
-            <p style={{ margin: "6px 0" }}>
-              <strong>Nom :</strong> {String(selectedRecord["Nom_de_famille"] ?? "")}
-            </p>
-            <p style={{ margin: "6px 0" }}>
-              <strong>Prénom :</strong> {String(selectedRecord["Prenom"] ?? "")}
-            </p>
-            <p style={{ margin: "6px 0" }}>
-              <strong>ID2 :</strong> {String(selectedRecord["ID2"] ?? "")}
-            </p>
+            <h3 style={{ marginTop: 0 }}>Groupe — Informations personnelles</h3>
 
-            <div style={{ marginTop: 12 }}>
-              <label style={{ display: "block", fontSize: 12, color: "#666" }}>
-                Champ éditable (détecté) :
-              </label>
-              <select
-                value={editableField ?? ""}
-                onChange={(e) => setEditableField(e.target.value || null)}
-                style={{ width: "100%", padding: 8, marginTop: 4 }}
-              >
-                <option value="">(aucun)</option>
-                {keys
-                  .filter((k) => k !== "id")
-                  .map((k) => (
-                    <option key={k} value={k}>
-                      {k}
-                    </option>
-                  ))}
-              </select>
-            </div>
+            {PERSO_FIELDS.filter((f) => keys.includes(f)).map((colId) => {
+              const v = draft[colId] ?? "";
+              const useTextarea = isProbablyLongText(v);
 
-            <div style={{ marginTop: 12 }}>
-              <label style={{ display: "block", fontSize: 12, color: "#666" }}>
-                Valeur :
-              </label>
-              <textarea
-                value={draftValue}
-                onChange={(e) => setDraftValue(e.target.value)}
-                rows={6}
-                style={{ width: "100%", padding: 8, marginTop: 4 }}
-                disabled={!editableField}
-              />
-              <button
-                type="button"
-                onClick={saveDraft}
-                disabled={!editableField}
-                style={{ marginTop: 8, padding: "8px 10px" }}
-              >
-                Enregistrer
-              </button>
-            </div>
+              return (
+                <div key={colId} style={{ marginTop: 10 }}>
+                  <label style={{ display: "block", fontSize: 12, color: "#666" }}>{colId}</label>
+                  {useTextarea ? (
+                    <textarea
+                      value={String(v)}
+                      onChange={(e) => setField(colId, e.target.value)}
+                      rows={4}
+                      style={{ width: "100%", padding: 8, marginTop: 4 }}
+                    />
+                  ) : (
+                    <input
+                      value={String(v)}
+                      onChange={(e) => setField(colId, e.target.value)}
+                      style={{ width: "100%", padding: 8, marginTop: 4 }}
+                    />
+                  )}
+                </div>
+              );
+            })}
+
+            <p style={{ marginTop: 12, fontSize: 12, color: "#666" }}>
+              Champs présents : {PERSO_FIELDS.filter((f) => keys.includes(f)).length} / {PERSO_FIELDS.length}
+            </p>
           </section>
 
           <section style={{ border: "1px solid #eee", borderRadius: 10, padding: 12 }}>
             <h3 style={{ marginTop: 0 }}>Record brut (debug)</h3>
-            <pre style={{ background: "#f5f5f5", padding: 10, overflow: "auto", maxHeight: 380 }}>
+            <pre style={{ background: "#f5f5f5", padding: 10, overflow: "auto", maxHeight: 520 }}>
               {JSON.stringify(selectedRecord, null, 2)}
             </pre>
           </section>
