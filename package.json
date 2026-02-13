@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "node tools/inject-version.mjs && next build",
+    "build": "next build && node tools/inject-version-out.mjs",
     "start": "next start",
     "lint": "next lint"
   },
