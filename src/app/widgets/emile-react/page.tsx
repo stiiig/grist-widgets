@@ -60,9 +60,8 @@ export default function Page() {
   const colById = useMemo(() => new Map(cols.map((c) => [c.colId, c])), [cols]);
   const [colRowIdMap, setColRowIdMap] = useState<Map<number, { colId: string }>>(new Map());
 
-  const [rows, setRows] = useState<Row[]>([]);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
-  const selected = useMemo(() => rows.find((r) => r.id === selectedId) ?? null, [rows, selectedId]);
+  // record courant
+  const [selected, setSelected] = useState<Row | null>(null);
 
   const [draft, setDraft] = useState<Record<string, any>>({});
   const [saving, setSaving] = useState(false);
@@ -124,37 +123,37 @@ export default function Page() {
     })();
   }, [docApi]);
 
-  // DATA (temp: fetchTable — ensuite on passera à onRecord pour le "record courant")
+  // A10.2: record courant via grist.onRecord
   useEffect(() => {
     if (!docApi) return;
-    (async () => {
-      try {
-        const t = await docApi.fetchTable(TABLE_ID);
-        const out: Row[] = [];
-        for (let i = 0; i < t.id.length; i++) {
-          const r: Row = { id: t.id[i] };
-          for (const k of Object.keys(t)) if (k !== "id") r[k] = t[k][i];
-          out.push(r);
-        }
-        setRows(out);
-        if (out.length && selectedId == null) setSelectedId(out[0].id);
-      } catch (e: any) {
-        setStatus(`Erreur: ${e?.message ?? String(e)}`);
+    if (typeof window === "undefined") return;
+    const grist = (window as any).grist;
+    if (!grist) return;
+
+    grist.onRecord((record: any) => {
+      if (!record) {
+        setSelected(null);
+        return;
       }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+      setSelected(record);
+    });
+
+    grist.ready({ requiredAccess: "full" });
   }, [docApi]);
 
-  // RESET DRAFT
+  // RESET DRAFT basé sur record courant
   useEffect(() => {
-    if (!selected) return void setDraft({});
+    if (!selected) {
+      setDraft({});
+      return;
+    }
     const d: Record<string, any> = {};
     for (const c of cols) d[c.colId] = selected[c.colId];
     setDraft(d);
-  }, [selectedId, cols, selected]);
+  }, [selected, cols]);
 
   async function save() {
-    if (!docApi || !selectedId) return;
+    if (!docApi || !selected?.id) return;
     setSaving(true);
     try {
       const updates: Record<string, any> = {};
@@ -162,7 +161,7 @@ export default function Page() {
         if (!isEditable(c)) continue; // ✅ skip formula + colonnes système
         updates[c.colId] = draft[c.colId];
       }
-      await docApi.applyUserActions([["UpdateRecord", TABLE_ID, selectedId, updates]]);
+      await docApi.applyUserActions([["UpdateRecord", TABLE_ID, selected.id, updates]]);
       setStatus("Enregistré ✅");
     } catch (e: any) {
       setStatus("Erreur: " + (e?.message ?? e));
@@ -174,7 +173,7 @@ export default function Page() {
   const headerLabel = selected ? candidateLabel(selected) : "EMILE";
   const headerId2 = selected ? (selected["ID2"] ?? "").toString().trim() : "";
 
-  // A10.1: mapping réel tab/subtab -> colIds (Administratif OK, le reste vide)
+  // A10.1: mapping tab/subtab -> colIds (Administratif OK, le reste vide)
   const activeColIds = useMemo(() => {
     return FIELD_MAP[activeTab]?.[activeSubtab] ?? [];
   }, [activeTab, activeSubtab]);
@@ -203,7 +202,7 @@ export default function Page() {
           </div>
 
           <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
-            <button type="button" className="fr-btn" onClick={save} disabled={!selectedId || !docApi || saving}>
+            <button type="button" className="fr-btn" onClick={save} disabled={!selected?.id || !docApi || saving}>
               {saving ? "Enregistrement…" : "Enregistrer"}
             </button>
           </div>
