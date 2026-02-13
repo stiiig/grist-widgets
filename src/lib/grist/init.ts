@@ -1,54 +1,44 @@
-import { installMockGrist, readMockState } from "./mock";
-
-export type GristLike = {
-  ready: (opts: { requiredAccess: "none" | "read table" | "full" }) => void;
-  onRecord: (cb: (record: any, mapping: any) => void) => void;
-  docApi?: { applyUserActions: (actions: any[]) => Promise<any> };
+// src/lib/grist/init.ts
+type InitResult = {
+  mode: "grist" | "mock" | "none";
+  grist: any | null;
+  docApi: any | null;
 };
 
-export function getGrist(): GristLike | null {
-  return (window as any)?.grist ?? null;
-}
+export async function initGristOrMock(
+  opts: { requiredAccess?: "read table" | "full"; onRecord?: (r: any) => void } = {}
+): Promise<InitResult> {
+  const requiredAccess = opts.requiredAccess ?? "full";
 
-/**
- * Initialise Grist, avec fallback mock via localStorage si absent.
- */
-export function initGristOrMock(opts: {
-  requiredAccess: "none" | "read table" | "full";
-  onRecord: (record: any, mapping: any) => void;
-  onApplyUserActions?: (actions: any[]) => void;
-}): { grist: GristLike | null; mode: "grist" | "mock" | "none" } {
-  const existing = getGrist();
+  // 1) Grist réel : window.grist est fourni dans l'iframe Grist
+  const grist = (typeof window !== "undefined" ? (window as any).grist : null) ?? null;
+  if (grist?.ready) {
+    grist.ready({ requiredAccess });
 
-  if (existing?.ready && existing?.onRecord) {
-    existing.ready({ requiredAccess: opts.requiredAccess });
-    existing.onRecord(opts.onRecord);
-    return { grist: existing, mode: "grist" };
+    if (typeof opts.onRecord === "function") {
+      try {
+        grist.onRecord((rec: any) => opts.onRecord?.(rec));
+      } catch {
+        // ignore
+      }
+    }
+
+    return { mode: "grist", grist, docApi: grist.docApi ?? null };
   }
 
-  // fallback mock
-  const mock = readMockState();
-  if (mock.enabled) {
-    installMockGrist({
-      record: mock.record,
-      mapping: mock.mapping,
-      onApplyUserActions: opts.onApplyUserActions,
-    });
-    const g = getGrist();
-    g?.ready({ requiredAccess: opts.requiredAccess });
-    g?.onRecord(opts.onRecord);
-    return { grist: g, mode: "mock" };
+  // 2) Mock (optionnel) : si tu as déjà un mock installé dans window.__GRIST_MOCK__
+  const mock = (typeof window !== "undefined" ? (window as any).__GRIST_MOCK__ : null) ?? null;
+  if (mock?.docApi) {
+    if (typeof opts.onRecord === "function") {
+      try {
+        mock.onRecord?.((rec: any) => opts.onRecord?.(rec));
+      } catch {
+        // ignore
+      }
+    }
+    return { mode: "mock", grist: mock, docApi: mock.docApi };
   }
 
-  return { grist: null, mode: "none" };
-}
-
-export async function getGristBundled(): Promise<any | null> {
-  try {
-    const mod: any = await import("grist-plugin-api");
-    // selon versions: mod.grist ou mod.default
-    return mod?.grist ?? mod?.default ?? null;
-  } catch {
-    return null;
-  }
+  // 3) Rien
+  return { mode: "none", grist: null, docApi: null };
 }
