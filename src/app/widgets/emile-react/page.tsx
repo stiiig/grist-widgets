@@ -4,10 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import Script from "next/script";
 import { initGristOrMock } from "@/lib/grist/init";
 
-const TABLE_ID = "CANDIDATS"; // à confirmer dans ton doc Grist
-const [gristApiLoaded, setGristApiLoaded] = useState(false);
+const TABLE_ID = "CANDIDATS";
 
 type CandidateItem = { id: number; label: string; extra: string; q: string };
+
 type GristDocAPI = {
   fetchTable: (tableId: string) => Promise<any>;
   applyUserActions: (actions: any[]) => Promise<any>;
@@ -19,7 +19,7 @@ function pickFirstCol(table: any, preferred: string[]): string | null {
   return keys[0] ?? null;
 }
 
-function buildCandidateIndexFromTable(t: any): { items: CandidateItem[]; used: any } {
+function buildCandidateIndexFromTable(t: any) {
   const ids: number[] = t?.id ?? [];
 
   const nomKey = pickFirstCol(t, ["Nom_de_famille", "Nom", "NOM"]);
@@ -31,6 +31,7 @@ function buildCandidateIndexFromTable(t: any): { items: CandidateItem[]; used: a
   const id2Col: any[] = id2Key ? t[id2Key] ?? [] : [];
 
   const res: CandidateItem[] = [];
+
   for (let i = 0; i < ids.length; i++) {
     const id = ids[i];
     const nom = (nomCol[i] ?? "").toString();
@@ -40,22 +41,27 @@ function buildCandidateIndexFromTable(t: any): { items: CandidateItem[]; used: a
     const q = `${nom} ${prenom} ${id2} ${id}`.toLowerCase().trim();
     res.push({ id, label, extra: id2 || "", q });
   }
+
   res.sort((a, b) => a.label.localeCompare(b.label));
 
-  return { items: res, used: { nomKey, prenomKey, id2Key } };
+  return {
+    items: res,
+    used: { nomKey, prenomKey, id2Key },
+  };
 }
 
-export default function EmileReactV1() {
-  const [status, setStatus] = useState<string>("");
+export default function EmileReact() {
+  const [gristApiLoaded, setGristApiLoaded] = useState(false);
+
+  const [status, setStatus] = useState("");
   const [docApi, setDocApi] = useState<GristDocAPI | null>(null);
 
   const [tableCache, setTableCache] = useState<any | null>(null);
   const [candidates, setCandidates] = useState<CandidateItem[]>([]);
-  const [search, setSearch] = useState<string>("");
+  const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [selectedRecord, setSelectedRecord] = useState<any | null>(null);
 
-  // debug
   const [debug, setDebug] = useState<any>({});
 
   const matches = useMemo(() => {
@@ -64,80 +70,92 @@ export default function EmileReactV1() {
     return list.slice(0, 25);
   }, [search, candidates]);
 
-useEffect(() => {
-  if (!gristApiLoaded) return;
-
-  const { grist, mode } = initGristOrMock({
-    requiredAccess: "full",
-    onRecord: () => {},
-  });
-
-  setDebug((d: any) => ({ ...d, mode }));
-
-  if (mode === "none") {
-    setStatus("grist-plugin-api chargé mais window.grist absent (rare) — vérifie la console.");
-    return;
-  }
-
-  const raw = (grist?.docApi as any) ?? null;
-  setDebug((d: any) => ({
-    ...d,
-    mode,
-    hasDocApi: !!raw,
-    hasFetchTable: !!raw?.fetchTable,
-    hasApply: !!raw?.applyUserActions,
-  }));
-
-  if (!raw?.fetchTable) {
-    setStatus("docApi.fetchTable indisponible → vérifie requiredAccess='full'.");
-    return;
-  }
-
-  setDocApi(raw as any);
-  setStatus(mode === "mock" ? "Mode mock (localStorage)" : "");
-}, [gristApiLoaded]);
-
+  // Init après chargement grist-plugin-api
   useEffect(() => {
-    (async () => {
-      if (!docApi) return;
-      setStatus(`Chargement table "${TABLE_ID}"…`);
+    if (!gristApiLoaded) return;
 
+    const { grist, mode } = initGristOrMock({
+      requiredAccess: "full",
+      onRecord: () => {},
+    });
+
+    setDebug((d: any) => ({ ...d, mode }));
+
+    if (mode === "none") {
+      setStatus("grist-plugin-api chargé mais window.grist absent.");
+      return;
+    }
+
+    const raw = (grist?.docApi as any) ?? null;
+
+    setDebug((d: any) => ({
+      ...d,
+      hasDocApi: !!raw,
+      hasFetchTable: !!raw?.fetchTable,
+      hasApply: !!raw?.applyUserActions,
+    }));
+
+    if (!raw?.fetchTable) {
+      setStatus("docApi.fetchTable indisponible (accès pas full ?)");
+      return;
+    }
+
+    setDocApi(raw as GristDocAPI);
+    setStatus(mode === "mock" ? "Mode mock (localStorage)" : "");
+  }, [gristApiLoaded]);
+
+  // Charger la table
+  useEffect(() => {
+    if (!docApi) return;
+
+    (async () => {
       try {
+        setStatus(`Chargement table "${TABLE_ID}"…`);
         const t = await docApi.fetchTable(TABLE_ID);
-        const keys = Object.keys(t || {});
-        setDebug((d: any) => ({
-          ...d,
-          tableId: TABLE_ID,
-          keys,
-          rows: Array.isArray(t?.id) ? t.id.length : null,
-        }));
 
         setTableCache(t);
 
         const built = buildCandidateIndexFromTable(t);
         setCandidates(built.items);
-        setDebug((d: any) => ({ ...d, usedColumns: built.used, candidateCount: built.items.length }));
+
+        setDebug((d: any) => ({
+          ...d,
+          tableId: TABLE_ID,
+          keys: Object.keys(t || {}),
+          rows: Array.isArray(t?.id) ? t.id.length : 0,
+          usedColumns: built.used,
+          candidateCount: built.items.length,
+        }));
 
         setStatus("");
       } catch (e: any) {
-        setStatus(`Erreur fetchTable("${TABLE_ID}") : ${e?.message ?? String(e)}`);
-        setDebug((d: any) => ({ ...d, fetchError: String(e?.message ?? e) }));
+        setStatus(`Erreur fetchTable: ${e?.message ?? String(e)}`);
+        setDebug((d: any) => ({
+          ...d,
+          fetchError: String(e?.message ?? e),
+        }));
       }
     })();
   }, [docApi]);
 
+  // Charger record sélectionné
   useEffect(() => {
     if (!tableCache || !selectedId) {
       setSelectedRecord(null);
       return;
     }
+
     const idx = (tableCache.id ?? []).findIndex((x: any) => x === selectedId);
     if (idx < 0) {
       setSelectedRecord(null);
       return;
     }
+
     const rec: any = { id: selectedId };
-    for (const k of Object.keys(tableCache)) rec[k] = tableCache[k]?.[idx];
+    for (const k of Object.keys(tableCache)) {
+      rec[k] = tableCache[k]?.[idx];
+    }
+
     setSelectedRecord(rec);
   }, [tableCache, selectedId]);
 
@@ -149,91 +167,71 @@ useEffect(() => {
 
   return (
     <main className="container" style={{ padding: 6 }}>
+      {/* grist-plugin-api */}
       <Script
-  src="https://unpkg.com/grist-plugin-api/dist/grist-plugin-api.js"
-  strategy="afterInteractive"
-  onLoad={() => setGristApiLoaded(true)}
-/>
+        src="https://unpkg.com/grist-plugin-api/dist/grist-plugin-api.js"
+        strategy="afterInteractive"
+        onLoad={() => setGristApiLoaded(true)}
+      />
+
+      {/* DSFR JS */}
       <Script
         type="module"
         src="https://cdn.jsdelivr.net/npm/@gouvfr/dsfr@1.14/dist/dsfr.module.min.js"
         strategy="afterInteractive"
       />
 
-      <div style={{ position: "sticky", top: 0, background: "white", paddingBottom: 4, zIndex: 200 }}>
-        <div style={{ display: "flex", gap: 12, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }}>
-          <h2 className="fr-h5" style={{ margin: 0, paddingLeft: 8, paddingRight: 8 }}>EMILE (React)</h2>
+      <h2 className="fr-h5">EMILE (React)</h2>
 
-          <div style={{ flex: "1 1 320px", minWidth: 220 }}>
-            <div className="fr-input-group" style={{ margin: 0 }}>
-              <input
-                className="fr-input"
-                placeholder={`Rechercher… (${candidates.length} candidats)`}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
+      <div className="fr-input-group">
+        <input
+          className="fr-input"
+          placeholder={`Rechercher… (${candidates.length} candidats)`}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
 
-            {matches.length > 0 && (
-              <div style={{ marginTop: 6, border: "1px solid var(--border-default-grey)", borderRadius: 8, background: "white", maxHeight: 220, overflow: "auto" }}>
-                {matches.map((m) => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    onClick={() => setSelectedId(m.id)}
-                    style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 10px", border: 0, background: "transparent", cursor: "pointer" }}
-                  >
-                    <div>{m.label}</div>
-                    {m.extra ? <small style={{ display: "block", color: "var(--text-mention-grey)", fontSize: "0.74rem" }}>{m.extra}</small> : null}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <p className="fr-tag fr-tag--sm fr-tag--icon-left fr-icon-user-line" role="status" aria-live="polite" style={{ margin: 0 }}>
-            {selectedId ? `Sélection : ${selectedLabel}` : "Aucun candidat sélectionné"}
-          </p>
-
-          <span style={{ color: "var(--text-mention-grey)", fontSize: 12 }}>{status}</span>
+      {matches.length > 0 && (
+        <div style={{ marginTop: 8 }}>
+          {matches.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => setSelectedId(m.id)}
+              style={{
+                display: "block",
+                width: "100%",
+                textAlign: "left",
+                padding: 6,
+                border: "1px solid #eee",
+                marginTop: 4,
+              }}
+            >
+              {m.label}
+            </button>
+          ))}
         </div>
+      )}
 
-        <hr style={{ margin: "6px 0 0 0" }} />
-      </div>
+      <p style={{ marginTop: 12 }}>
+        {selectedId ? `Sélection : ${selectedLabel}` : "Aucun candidat sélectionné"}
+      </p>
 
-      <div style={{ marginTop: 16 }}>
-        <details>
-          <summary style={{ cursor: "pointer" }}>Debug</summary>
-          <pre style={{ background: "#f5f5f5", padding: 12, overflow: "auto" }}>
-            {JSON.stringify(debug, null, 2)}
-          </pre>
-        </details>
+      <details style={{ marginTop: 12 }}>
+        <summary>Debug</summary>
+        <pre style={{ background: "#f5f5f5", padding: 10 }}>
+          {JSON.stringify(debug, null, 2)}
+        </pre>
+      </details>
 
-        {!selectedId && candidates.length === 0 && (
-          <div className="fr-callout">
-            <p className="fr-callout__title">Aucun candidat chargé</p>
-            <p className="fr-callout__text">
-              Ouvre “Debug” et regarde :
-              <br />• si <code>hasFetchTable</code> est true
-              <br />• la valeur <code>fetchError</code> si erreur
-              <br />• <code>keys</code> (colonnes reçues)
-            </p>
-          </div>
-        )}
+      {selectedRecord && (
+        <pre style={{ background: "#f5f5f5", padding: 10, marginTop: 12 }}>
+          {JSON.stringify(selectedRecord, null, 2)}
+        </pre>
+      )}
 
-        {selectedId && (
-          <div style={{ border: "1px solid var(--border-default-grey)", borderRadius: 10, padding: 8 }}>
-            <h3 className="fr-h6" style={{ marginTop: 0 }}>Record courant (debug)</h3>
-            <pre style={{ background: "#f5f5f5", padding: 12, overflow: "auto" }}>
-              {JSON.stringify(selectedRecord, null, 2)}
-            </pre>
-          </div>
-        )}
-      </div>
-
-      <footer style={{ marginTop: 14, borderTop: "1px solid var(--border-default-grey)", padding: "10px 0", textAlign: "center", color: "var(--text-mention-grey)", fontSize: "0.85rem" }}>
-        Programme EMILE
-      </footer>
+      <p style={{ marginTop: 8, fontSize: 12, color: "#666" }}>{status}</p>
     </main>
   );
 }
