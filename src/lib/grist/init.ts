@@ -42,3 +42,13 @@ export function initGristOrMock(opts: {
 
   return { grist: null, mode: "none" };
 }
+
+export async function getGristBundled(): Promise<any | null> {
+  try {
+    const mod: any = await import("grist-plugin-api");
+    // selon versions: mod.grist ou mod.default
+    return mod?.grist ?? mod?.default ?? null;
+  } catch {
+    return null;
+  }
+}

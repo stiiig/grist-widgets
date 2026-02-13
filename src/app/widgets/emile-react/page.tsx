@@ -1,281 +1,423 @@
+// src/app/widgets/emile-react/page.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { GROUPS, GROUP_TITLES } from "@/lib/emile/groups";
+import { initGristOrMock } from "@/lib/grist/init";
+import {
+  buildColRowIdMap,
+  decodeListCell,
+  encodeListCell,
+  ensureRefCache,
+  GristDocAPI,
+  isEditable,
+  loadColumnsMetaFor,
+  ColMeta,
+  isoDateToUnixSeconds,
+  unixSecondsToISODate,
+} from "@/lib/grist/meta";
 
-const TABLE_ID = "CANDIDATS";
+const TABLE_ID = "CANDIDATS"; // <- à adapter
 
-type CandidateItem = { id: number; label: string; extra: string; q: string };
+type CandidateRow = { id: number; [k: string]: any };
 
-function buildCandidateIndexFromTable(t: any): CandidateItem[] {
-  const ids: number[] = t?.id ?? [];
-  const nomCol: any[] = t?.["Nom_de_famille"] ?? [];
-  const prenomCol: any[] = t?.["Prenom"] ?? [];
-  const id2Col: any[] = t?.["ID2"] ?? [];
-
-  const res: CandidateItem[] = [];
-  for (let i = 0; i < ids.length; i++) {
-    const id = ids[i];
-    const nom = (nomCol[i] ?? "").toString();
-    const prenom = (prenomCol[i] ?? "").toString();
-    const id2 = (id2Col[i] ?? "").toString().trim();
-    const label = `${prenom} ${nom}`.trim() || `#${id}`;
-    const q = `${nom} ${prenom} ${id2} ${id}`.toLowerCase().trim();
-    res.push({ id, label, extra: id2 || "", q });
-  }
-  res.sort((a, b) => a.label.localeCompare(b.label));
-  return res;
+function pickFirstCol(table: any, preferred: string[]): string | null {
+  const keys = Object.keys(table || {}).filter((k) => k !== "id");
+  for (const p of preferred) if (keys.includes(p)) return p;
+  return keys[0] ?? null;
 }
 
-function isProbablyLongText(v: any) {
-  if (typeof v !== "string") return false;
-  return v.length > 80 || v.includes("\n");
-}
+export default function Page() {
+  const [mode, setMode] = useState<string>("boot");
+  const [docApi, setDocApi] = useState<GristDocAPI | null>(null);
 
-function normalizeForCompare(v: any) {
-  if (v == null) return "";
-  if (Array.isArray(v)) return JSON.stringify(v);
-  return String(v);
-}
+  const [cols, setCols] = useState<ColMeta[]>([]);
+  const [colRowIdMap, setColRowIdMap] = useState<Map<number, { colId: string }>>(new Map());
 
-export default function EmileReact() {
-  const [status, setStatus] = useState("Initialisation…");
-  const [docApi, setDocApi] = useState<any | null>(null);
+  const [rows, setRows] = useState<CandidateRow[]>([]);
+  const [labelCol, setLabelCol] = useState<string | null>(null);
 
-  const [tableCache, setTableCache] = useState<any | null>(null);
-  const [keys, setKeys] = useState<string[]>([]);
-  const [candidates, setCandidates] = useState<CandidateItem[]>([]);
-  const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [selectedRecord, setSelectedRecord] = useState<any | null>(null);
+  const selected = useMemo(
+    () => rows.find((r) => r.id === selectedId) ?? null,
+    [rows, selectedId]
+  );
 
+  // local draft values (what we will write to Grist on Save)
   const [draft, setDraft] = useState<Record<string, any>>({});
-  const [debug, setDebug] = useState<any>({});
+  const [saving, setSaving] = useState(false);
+  const [status, setStatus] = useState<string>("");
 
-  // init grist-plugin-api (script) — méthode qui marche chez toi
   useEffect(() => {
-    const script = document.createElement("script");
-    script.src = "https://docs.getgrist.com/grist-plugin-api.js";
-    script.async = true;
-
-    script.onload = () => {
-      const grist: any = (window as any).grist;
-      if (!grist) {
-        setStatus("window.grist absent");
-        setDebug({ mode: "none" });
-        return;
-      }
-
-      grist.ready({ requiredAccess: "full" });
-
-      if (!grist.docApi?.fetchTable || !grist.docApi?.applyUserActions) {
-        setStatus("docApi indisponible (fetchTable/applyUserActions)");
-        setDebug({ mode: "grist", hasDocApi: !!grist.docApi });
-        return;
-      }
-
-      setDocApi(grist.docApi);
-      setDebug({ mode: "grist" });
-      setStatus("Chargement table…");
-
-      grist.docApi
-        .fetchTable(TABLE_ID)
-        .then((t: any) => {
-          const k = Object.keys(t || {});
-          setKeys(k);
-          setTableCache(t);
-          setCandidates(buildCandidateIndexFromTable(t));
-          setDebug((d: any) => ({ ...d, tableId: TABLE_ID, rows: t?.id?.length ?? 0, keys: k }));
-          setStatus("");
-        })
-        .catch((e: any) => setStatus("Erreur fetchTable: " + (e?.message ?? String(e))));
-    };
-
-    script.onerror = () => setStatus("Impossible de charger grist-plugin-api");
-    document.head.appendChild(script);
+    (async () => {
+      const init = await initGristOrMock();
+      setMode(init.mode);
+      if (init.docApi) setDocApi(init.docApi as any);
+    })();
   }, []);
 
-  const matches = useMemo(() => {
-    const q = search.toLowerCase().trim();
-    const list = q ? candidates.filter((c) => c.q.includes(q)) : candidates;
-    return list.slice(0, 25);
-  }, [search, candidates]);
-
-  // selected record from cache
   useEffect(() => {
-    if (!tableCache || !selectedId) {
-      setSelectedRecord(null);
-      return;
-    }
-    const idx = (tableCache.id ?? []).findIndex((x: any) => x === selectedId);
-    if (idx < 0) {
-      setSelectedRecord(null);
-      return;
-    }
-    const rec: any = { id: selectedId };
-    for (const k of Object.keys(tableCache)) rec[k] = tableCache[k]?.[idx];
-    setSelectedRecord(rec);
-  }, [tableCache, selectedId]);
+    if (!docApi) return;
+    (async () => {
+      setStatus("Chargement métadonnées…");
+      const [meta, map] = await Promise.all([
+        loadColumnsMetaFor(docApi, TABLE_ID),
+        buildColRowIdMap(docApi),
+      ]);
+      setCols(meta);
+      setColRowIdMap(map);
+      setStatus("");
+    })().catch((e) => setStatus(String(e?.message || e)));
+  }, [docApi]);
 
-  // init draft from selectedRecord for fields in GROUPS that exist
   useEffect(() => {
-    if (!selectedRecord) {
+    if (!docApi) return;
+    (async () => {
+      setStatus("Chargement candidats…");
+      const t = await docApi.fetchTable(TABLE_ID);
+      const lc = pickFirstCol(t, ["Nom", "nom", "Label", "label", "Prenom", "Prénom", "Identite"]);
+      setLabelCol(lc);
+
+      const out: CandidateRow[] = [];
+      for (let i = 0; i < t.id.length; i++) {
+        const r: CandidateRow = { id: t.id[i] };
+        for (const k of Object.keys(t)) {
+          if (k === "id") continue;
+          r[k] = t[k][i];
+        }
+        out.push(r);
+      }
+      setRows(out);
+      setStatus("");
+      if (!out.length) setSelectedId(null);
+      else if (selectedId == null) setSelectedId(out[0].id);
+    })().catch((e) => setStatus(String(e?.message || e)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [docApi]);
+
+  // when selection changes -> reset draft from record
+  useEffect(() => {
+    if (!selected) {
       setDraft({});
       return;
     }
-    const next: Record<string, any> = {};
-    const allFields = Object.values(GROUPS).flatMap((s) => Array.from(s));
-    for (const f of allFields) {
-      if (keys.includes(f)) next[f] = selectedRecord[f] ?? "";
-    }
-    setDraft(next);
-  }, [selectedRecord, keys]);
+    const d: Record<string, any> = {};
+    for (const c of cols) d[c.colId] = (selected as any)[c.colId];
+    setDraft(d);
+  }, [selectedId, cols, selected]);
 
-  function setField(colId: string, value: any) {
-    setDraft((d) => ({ ...d, [colId]: value }));
-  }
-
-  const diff = useMemo(() => {
-    if (!selectedRecord) return {};
-    const out: Record<string, any> = {};
-    for (const [k, v] of Object.entries(draft)) {
-      if (normalizeForCompare(selectedRecord[k]) !== normalizeForCompare(v)) out[k] = v;
-    }
-    return out;
-  }, [draft, selectedRecord]);
-
-  const diffCount = Object.keys(diff).length;
-
-  async function saveAll() {
+  async function save() {
     if (!docApi || !selectedId) return;
-    if (diffCount === 0) {
-      setStatus("Rien à enregistrer.");
-      return;
-    }
-
+    setSaving(true);
+    setStatus("");
     try {
-      setStatus(`Enregistrement (${diffCount})…`);
-      await docApi.applyUserActions([["UpdateRecord", TABLE_ID, selectedId, diff]]);
-      setStatus("✅ Enregistré");
-
-      // refresh table
-      const t = await docApi.fetchTable(TABLE_ID);
-      setTableCache(t);
-      setCandidates(buildCandidateIndexFromTable(t));
+      const updates: Record<string, any> = {};
+      for (const c of cols) {
+        if (!isEditable(c)) continue;
+        updates[c.colId] = draft[c.colId];
+      }
+      await docApi.applyUserActions([["UpdateRecord", TABLE_ID, selectedId, updates]]);
+      setStatus("Enregistré ✅");
     } catch (e: any) {
-      setStatus("❌ Erreur: " + (e?.message ?? String(e)));
+      setStatus(`Erreur: ${String(e?.message || e)}`);
+    } finally {
+      setSaving(false);
     }
   }
 
   return (
-    <main style={{ padding: 16, maxWidth: 1200 }}>
-      <h2 style={{ marginTop: 0 }}>EMILE (React) — A3 Groupes réels</h2>
-
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
-        <input
-          placeholder={`Rechercher (${candidates.length})`}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          style={{ flex: "1 1 320px", minWidth: 240, padding: 8 }}
-        />
-        <button type="button" onClick={saveAll} disabled={!selectedId || diffCount === 0}>
-          Enregistrer ({diffCount})
-        </button>
-        <span style={{ fontSize: 12, color: "#666" }}>{status}</span>
-
-        <details style={{ marginLeft: "auto" }}>
-          <summary style={{ cursor: "pointer" }}>Debug</summary>
-          <pre style={{ background: "#f5f5f5", padding: 10, overflow: "auto" }}>
-            {JSON.stringify(debug, null, 2)}
-          </pre>
-        </details>
+    <div style={{ padding: 16, fontFamily: "system-ui, -apple-system, Segoe UI, Roboto" }}>
+      <div style={{ display: "flex", gap: 16, alignItems: "baseline" }}>
+        <h2 style={{ margin: 0 }}>EMILE (React)</h2>
+        <small style={{ opacity: 0.7 }}>
+          mode: <code>{mode}</code>
+        </small>
       </div>
 
-      {matches.length > 0 && (
-        <div style={{ marginTop: 10, border: "1px solid #eee", borderRadius: 8, maxHeight: 240, overflow: "auto" }}>
-          {matches.map((m) => (
-            <button
-              key={m.id}
-              type="button"
-              onClick={() => setSelectedId(m.id)}
-              style={{
-                display: "block",
-                width: "100%",
-                textAlign: "left",
-                padding: "8px 10px",
-                border: 0,
-                borderBottom: "1px solid #f0f0f0",
-                background: selectedId === m.id ? "#f6f6f6" : "transparent",
-                cursor: "pointer",
-              }}
-            >
-              <div>{m.label}</div>
-              {m.extra ? <small style={{ color: "#666" }}>{m.extra}</small> : null}
-            </button>
-          ))}
+      {status ? (
+        <div style={{ marginTop: 12, padding: 10, border: "1px solid #ddd", borderRadius: 8 }}>
+          {status}
         </div>
-      )}
+      ) : null}
 
-      {!selectedRecord && (
-        <div style={{ marginTop: 16, padding: 12, background: "#fafafa", border: "1px solid #eee", borderRadius: 8 }}>
-          Sélectionne un candidat.
-        </div>
-      )}
-
-      {selectedRecord && (
-        <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-          <section style={{ border: "1px solid #eee", borderRadius: 10, padding: 12 }}>
-            {(
-              Object.keys(GROUPS) as Array<keyof typeof GROUPS>
-            ).map((groupKey) => {
-              const fields = Array.from(GROUPS[groupKey]).filter((f) => keys.includes(f));
-              if (fields.length === 0) return null;
-
+      <div style={{ display: "grid", gridTemplateColumns: "280px 1fr", gap: 16, marginTop: 16 }}>
+        {/* left: candidates list */}
+        <div style={{ border: "1px solid #eee", borderRadius: 12, padding: 12 }}>
+          <div style={{ fontWeight: 600, marginBottom: 8 }}>Candidats</div>
+          <div style={{ display: "grid", gap: 6, maxHeight: 420, overflow: "auto" }}>
+            {rows.map((r) => {
+              const label = labelCol ? String((r as any)[labelCol] ?? r.id) : String(r.id);
+              const isSel = r.id === selectedId;
               return (
-                <details key={groupKey} open={groupKey === "perso"} style={{ marginBottom: 10 }}>
-                  <summary style={{ cursor: "pointer", fontWeight: 600 }}>
-                    {GROUP_TITLES[groupKey]} ({fields.length})
-                  </summary>
-
-                  <div style={{ marginTop: 10 }}>
-                    {fields.map((colId) => {
-                      const v = draft[colId] ?? "";
-                      const useTextarea = isProbablyLongText(v);
-
-                      return (
-                        <div key={colId} style={{ marginTop: 10 }}>
-                          <label style={{ display: "block", fontSize: 12, color: "#666" }}>{colId}</label>
-                          {useTextarea ? (
-                            <textarea
-                              value={String(v)}
-                              onChange={(e) => setField(colId, e.target.value)}
-                              rows={4}
-                              style={{ width: "100%", padding: 8, marginTop: 4 }}
-                            />
-                          ) : (
-                            <input
-                              value={String(v)}
-                              onChange={(e) => setField(colId, e.target.value)}
-                              style={{ width: "100%", padding: 8, marginTop: 4 }}
-                            />
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </details>
+                <button
+                  key={r.id}
+                  onClick={() => setSelectedId(r.id)}
+                  style={{
+                    textAlign: "left",
+                    padding: "8px 10px",
+                    borderRadius: 10,
+                    border: "1px solid " + (isSel ? "#333" : "#ddd"),
+                    background: isSel ? "#f5f5f5" : "white",
+                    cursor: "pointer",
+                  }}
+                >
+                  <div style={{ fontWeight: 600 }}>{label}</div>
+                  <div style={{ opacity: 0.65, fontSize: 12 }}>id: {r.id}</div>
+                </button>
               );
             })}
-          </section>
-
-          <section style={{ border: "1px solid #eee", borderRadius: 10, padding: 12 }}>
-            <h3 style={{ marginTop: 0 }}>Record brut (debug)</h3>
-            <pre style={{ background: "#f5f5f5", padding: 10, overflow: "auto", maxHeight: 700 }}>
-              {JSON.stringify(selectedRecord, null, 2)}
-            </pre>
-          </section>
+          </div>
         </div>
-      )}
-    </main>
+
+        {/* right: dynamic form */}
+        <div style={{ border: "1px solid #eee", borderRadius: 12, padding: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ fontWeight: 600 }}>Fiche</div>
+            <button
+              onClick={save}
+              disabled={!selectedId || saving}
+              style={{
+                padding: "8px 12px",
+                borderRadius: 10,
+                border: "1px solid #ddd",
+                background: saving ? "#fafafa" : "white",
+                cursor: saving ? "default" : "pointer",
+              }}
+            >
+              {saving ? "Enregistrement…" : "Enregistrer"}
+            </button>
+          </div>
+
+          {!selected ? (
+            <div style={{ marginTop: 12, opacity: 0.7 }}>Aucun candidat sélectionné.</div>
+          ) : (
+            <div style={{ marginTop: 12, display: "grid", gap: 12 }}>
+              {cols.filter(isEditable).map((c) => (
+                <Field
+                  key={c.colId}
+                  col={c}
+                  value={draft[c.colId]}
+                  onChange={(v) => setDraft((d) => ({ ...d, [c.colId]: v }))}
+                  docApi={docApi}
+                  colRowIdMap={colRowIdMap}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Field(props: {
+  col: ColMeta;
+  value: any;
+  onChange: (v: any) => void;
+  docApi: GristDocAPI;
+  colRowIdMap: Map<number, { colId: string }>;
+}) {
+  const { col, value, onChange, docApi, colRowIdMap } = props;
+
+  const type = col.type || "Text";
+  const isRef = /^Ref:/.test(type);
+  const isRefList = /^RefList:/.test(type);
+  const isChoice = type === "Choice";
+  const isChoiceList = type === "ChoiceList";
+  const isDate = type === "Date";
+
+  const [refOptions, setRefOptions] = useState<{ id: number; label: string }[]>([]);
+  const [loadingRef, setLoadingRef] = useState(false);
+
+  // Load ref options (simple list) when needed
+  useEffect(() => {
+    if (!isRef && !isRefList) return;
+    (async () => {
+      setLoadingRef(true);
+      try {
+        const cache = await ensureRefCache(docApi, col, colRowIdMap);
+        const opts = (cache?.rows || []).slice(0, 400).map((r) => ({ id: r.id, label: r.label }));
+        setRefOptions(opts);
+      } finally {
+        setLoadingRef(false);
+      }
+    })();
+  }, [isRef, isRefList, docApi, col, colRowIdMap]);
+
+  // CHOICE options: from widgetOptions.choices (comme ton HTML)  [oai_citation:9‡index.html](sediment://file_00000000c8307246a79ff09ceabb26c4)
+  const choiceOptions = useMemo(() => {
+    const wopts = col.widgetOptionsParsed || {};
+    const arr = Array.isArray(wopts.choices) ? wopts.choices : [];
+    return arr.map((x: any) => String(x));
+  }, [col.widgetOptionsParsed]);
+
+  return (
+    <div style={{ display: "grid", gap: 6 }}>
+      <label style={{ fontWeight: 600 }}>
+        {col.label} <span style={{ opacity: 0.6, fontWeight: 400 }}>({col.colId})</span>
+      </label>
+
+      {/* DATE */}
+      {isDate ? (
+        <input
+          type="date"
+          value={unixSecondsToISODate(value)}
+          onChange={(e) => onChange(isoDateToUnixSeconds(e.target.value))}
+          style={{ padding: 8, borderRadius: 10, border: "1px solid #ddd" }}
+        />
+      ) : null}
+
+      {/* CHOICE */}
+      {isChoice ? (
+        <select
+          value={value == null ? "" : String(value)}
+          onChange={(e) => onChange(e.target.value || null)}
+          style={{ padding: 8, borderRadius: 10, border: "1px solid #ddd" }}
+        >
+          <option value="">—</option>
+          {choiceOptions.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
+      ) : null}
+
+      {/* CHOICELIST (["L", ...]) */}
+      {isChoiceList ? (
+        <ChoiceListEditor
+          options={choiceOptions}
+          value={value}
+          onChange={onChange}
+        />
+      ) : null}
+
+      {/* REF */}
+      {isRef ? (
+        <select
+          value={typeof value === "number" ? String(value) : ""}
+          onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
+          disabled={loadingRef}
+          style={{ padding: 8, borderRadius: 10, border: "1px solid #ddd" }}
+        >
+          <option value="">—</option>
+          {refOptions.map((o) => (
+            <option key={o.id} value={o.id}>
+              {o.label} (#{o.id})
+            </option>
+          ))}
+        </select>
+      ) : null}
+
+      {/* REFLIST (["L", ...ids]) */}
+      {isRefList ? (
+        <RefListEditor
+          options={refOptions}
+          value={value}
+          onChange={onChange}
+          disabled={loadingRef}
+        />
+      ) : null}
+
+      {/* DEFAULT TEXT */}
+      {!isDate && !isChoice && !isChoiceList && !isRef && !isRefList ? (
+        <input
+          type="text"
+          value={value == null ? "" : String(value)}
+          onChange={(e) => onChange(e.target.value)}
+          style={{ padding: 8, borderRadius: 10, border: "1px solid #ddd" }}
+        />
+      ) : null}
+
+      {col.description ? <small style={{ opacity: 0.7 }}>{col.description}</small> : null}
+    </div>
+  );
+}
+
+function ChoiceListEditor(props: {
+  options: string[];
+  value: any;
+  onChange: (v: any) => void;
+}) {
+  const { options, value, onChange } = props;
+  const selected = useMemo(
+    () => decodeListCell(value).filter((x) => typeof x === "string"),
+    [value]
+  );
+
+  function toggle(opt: string) {
+    const next = selected.includes(opt) ? selected.filter((x) => x !== opt) : [...selected, opt];
+    onChange(encodeListCell(next)); // ["L", ...]  [oai_citation:10‡index.html](sediment://file_00000000c8307246a79ff09ceabb26c4)
+  }
+
+  return (
+    <details style={{ border: "1px solid #ddd", borderRadius: 10, padding: 8 }}>
+      <summary style={{ cursor: "pointer" }}>
+        {selected.length ? selected.join(", ") : "Sélectionner…"}
+      </summary>
+      <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
+        {options.map((o) => (
+          <label key={o} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <input
+              type="checkbox"
+              checked={selected.includes(o)}
+              onChange={() => toggle(o)}
+            />
+            <span>{o}</span>
+          </label>
+        ))}
+      </div>
+    </details>
+  );
+}
+
+function RefListEditor(props: {
+  options: { id: number; label: string }[];
+  value: any;
+  onChange: (v: any) => void;
+  disabled?: boolean;
+}) {
+  const { options, value, onChange, disabled } = props;
+  const selectedIds = useMemo(
+    () => decodeListCell(value).filter((x) => typeof x === "number") as number[],
+    [value]
+  );
+
+  function toggle(id: number) {
+    const next = selectedIds.includes(id) ? selectedIds.filter((x) => x !== id) : [...selectedIds, id];
+    onChange(encodeListCell(next)); // ["L", ...]  [oai_citation:11‡index.html](sediment://file_00000000c8307246a79ff09ceabb26c4)
+  }
+
+  const label = selectedIds.length
+    ? selectedIds
+        .map((id) => options.find((o) => o.id === id)?.label ?? `#${id}`)
+        .join(", ")
+    : "Sélectionner…";
+
+  return (
+    <details
+      style={{
+        border: "1px solid #ddd",
+        borderRadius: 10,
+        padding: 8,
+        opacity: disabled ? 0.6 : 1,
+        pointerEvents: disabled ? "none" : "auto",
+      }}
+    >
+      <summary style={{ cursor: "pointer" }}>{label}</summary>
+      <div style={{ marginTop: 8, display: "grid", gap: 6, maxHeight: 240, overflow: "auto" }}>
+        {options.map((o) => (
+          <label key={o.id} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <input
+              type="checkbox"
+              checked={selectedIds.includes(o.id)}
+              onChange={() => toggle(o.id)}
+            />
+            <span>
+              {o.label} <small style={{ opacity: 0.7 }}>#{o.id}</small>
+            </span>
+          </label>
+        ))}
+      </div>
+    </details>
   );
 }
