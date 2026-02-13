@@ -1,11 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { initGristOrMock } from "@/lib/grist/init";
+import * as gristModule from "grist-plugin-api";
 
 const TABLE_ID = "CANDIDATS";
 
-type CandidateItem = { id: number; label: string; extra: string; q: string };
+type CandidateItem = {
+  id: number;
+  label: string;
+  extra: string;
+  q: string;
+};
 
 type GristDocAPI = {
   fetchTable: (tableId: string) => Promise<any>;
@@ -25,8 +30,10 @@ function buildCandidateIndexFromTable(t: any): CandidateItem[] {
     const nom = (nomCol[i] ?? "").toString();
     const prenom = (prenomCol[i] ?? "").toString();
     const id2 = (id2Col[i] ?? "").toString().trim();
+
     const label = `${prenom} ${nom}`.trim() || `#${id}`;
     const q = `${nom} ${prenom} ${id2} ${id}`.toLowerCase().trim();
+
     res.push({ id, label, extra: id2 || "", q });
   }
 
@@ -41,20 +48,24 @@ export default function EmileReact() {
   const [search, setSearch] = useState("");
   const [debug, setDebug] = useState<any>({});
 
+  // INIT GRIST (bundled)
   useEffect(() => {
-    const { grist, mode } = initGristOrMock({
-      requiredAccess: "full",
-      onRecord: () => {},
-    });
+    const grist: any =
+      (gristModule as any).grist ??
+      (gristModule as any).default ??
+      gristModule;
 
-    setDebug({ mode });
-
-    if (mode === "none") {
-      setStatus("window.grist non détecté");
+    if (!grist?.ready) {
+      setDebug({ mode: "none" });
+      setStatus("grist-plugin-api non détecté (bundled)");
       return;
     }
 
-    const raw = (grist?.docApi as any) ?? null;
+    setDebug({ mode: "grist(bundled)" });
+
+    grist.ready({ requiredAccess: "full" });
+
+    const raw = grist.docApi ?? null;
 
     if (!raw?.fetchTable) {
       setStatus("docApi.fetchTable indisponible");
@@ -62,21 +73,27 @@ export default function EmileReact() {
     }
 
     setDocApi(raw as GristDocAPI);
-    setStatus(mode === "mock" ? "Mode mock" : "Mode grist");
+    setStatus("Mode grist");
   }, []);
 
+  // LOAD TABLE
   useEffect(() => {
     if (!docApi) return;
 
     (async () => {
       try {
+        setStatus(`Chargement ${TABLE_ID}...`);
         const t = await docApi.fetchTable(TABLE_ID);
+
         setCandidates(buildCandidateIndexFromTable(t));
+
         setDebug((d: any) => ({
           ...d,
-          keys: Object.keys(t || {}),
           rows: t?.id?.length ?? 0,
+          keys: Object.keys(t || {}),
         }));
+
+        setStatus("");
       } catch (e: any) {
         setStatus(`Erreur fetchTable: ${e?.message ?? e}`);
       }
