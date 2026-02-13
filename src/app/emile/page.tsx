@@ -92,7 +92,8 @@ export default function WidgetEmile() {
             <label>Commentaire</label>
             <br />
             <textarea
-              rows={3}
+              rows={6}
+              style={{ width: "100%", minHeight: 120 }}
               defaultValue={record?.Commentaire ?? ""}
               onBlur={(e) => updateField("Commentaire", e.target.value)}
             />
