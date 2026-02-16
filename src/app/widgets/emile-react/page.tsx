@@ -24,19 +24,20 @@ const TABLE_ID = "CANDIDATS";
 
 type Row = { id: number; [k: string]: any };
 
-function candidateLabel(r: Row) {
+function fullName(r: Row) {
   const prenom = (r["Prenom"] ?? "").toString().trim();
   const nom = (r["Nom_de_famille"] ?? "").toString().trim();
-  const id2 = (r["ID2"] ?? "").toString().trim();
-  const name = `${prenom} ${nom}`.trim();
-  return `${name || `#${r.id}`}${id2 ? ` — ${id2}` : ""}`;
+  return `${prenom} ${nom}`.trim();
+}
+
+function candidateHint(r: Row) {
+  return (r["ID2"] ?? "").toString().trim();
 }
 
 function StatusAlert({ status }: { status: string }) {
   if (!status) return null;
   const isError = status.toLowerCase().includes("erreur") || status.toLowerCase().includes("error");
   const isSuccess = status.includes("✅") || status.toLowerCase().includes("enregistr");
-
   const cls = isError
     ? "fr-alert fr-alert--error"
     : isSuccess
@@ -44,7 +45,7 @@ function StatusAlert({ status }: { status: string }) {
     : "fr-alert fr-alert--info";
 
   return (
-    <div className={cls} style={{ marginTop: 12 }}>
+    <div className={cls} style={{ marginTop: 10 }}>
       <p className="fr-alert__title">{isError ? "Erreur" : isSuccess ? "Succès" : "Info"}</p>
       <p>{status.replace("Erreur:", "").trim()}</p>
     </div>
@@ -61,6 +62,8 @@ export default function Page() {
 
   // record courant
   const [selected, setSelected] = useState<Row | null>(null);
+  const selectedName = selected ? fullName(selected) : "";
+  const selectedHint = selected ? candidateHint(selected) : "";
 
   const [draft, setDraft] = useState<Record<string, any>>({});
   const [saving, setSaving] = useState(false);
@@ -76,11 +79,11 @@ export default function Page() {
     if (first) setActiveSubtab(first);
   }, [activeTabObj]);
 
-  // Recherche globale (sur toute la tab L1)
-  const [fieldQuery, setFieldQuery] = useState("");
-  useEffect(() => {
-    setFieldQuery("");
-  }, [activeTab]);
+  // Liste candidats (pour recherche)
+  const [candidateOptions, setCandidateOptions] = useState<Option[]>([]);
+  const [candidateIdByRowId, setCandidateIdByRowId] = useState<Map<number, number>>(new Map());
+  const [rowIdByCandidateId, setRowIdByCandidateId] = useState<Map<number, number>>(new Map());
+  const [candidateValueId, setCandidateValueId] = useState<number | null>(null);
 
   // INIT: charge grist-plugin-api.js si besoin (self-hosted)
   useEffect(() => {
@@ -88,9 +91,7 @@ export default function Page() {
       try {
         if (typeof window !== "undefined" && !(window as any).grist) {
           await new Promise<void>((resolve, reject) => {
-            const existing = document.querySelector(
-              'script[data-grist-plugin-api="1"]'
-            ) as HTMLScriptElement | null;
+            const existing = document.querySelector('script[data-grist-plugin-api="1"]') as HTMLScriptElement | null;
             if (existing) return resolve();
 
             const s = document.createElement("script");
@@ -146,7 +147,7 @@ export default function Page() {
     grist.ready({ requiredAccess: "full" });
   }, [docApi]);
 
-  // RESET DRAFT basé sur record courant
+  // Reset draft
   useEffect(() => {
     if (!selected) {
       setDraft({});
@@ -157,13 +158,64 @@ export default function Page() {
     setDraft(d);
   }, [selected, cols]);
 
+  // Fetch table pour construire la recherche candidats
+  useEffect(() => {
+    if (!docApi) return;
+    (async () => {
+      try {
+        const t = await docApi.fetchTable(TABLE_ID);
+
+        // On fabrique un "catalogue candidats"
+        // Option.id = rowId (mais SearchDropdown veut number id ; OK)
+        const opts: Option[] = [];
+        const idByRow = new Map<number, number>();
+        const rowById = new Map<number, number>();
+
+        for (let i = 0; i < t.id.length; i++) {
+          const rowId = t.id[i] as number;
+          const prenom = (t["Prenom"]?.[i] ?? "").toString().trim();
+          const nom = (t["Nom_de_famille"]?.[i] ?? "").toString().trim();
+          const label = `${prenom} ${nom}`.trim() || `#${rowId}`;
+          const hint = (t["ID2"]?.[i] ?? "").toString().trim();
+          const q = `${label} ${hint}`.toLowerCase();
+
+          // on invente un id interne stable (i+1) pour SearchDropdown
+          const candidateId = i + 1;
+          idByRow.set(rowId, candidateId);
+          rowById.set(candidateId, rowId);
+
+          opts.push({
+            id: candidateId,
+            label,
+            q,
+            hint, // <-- si ton SearchDropdown ignore hint, on affichera autrement (voir note)
+          } as any);
+        }
+
+        setCandidateOptions(opts);
+        setCandidateIdByRowId(idByRow);
+        setRowIdByCandidateId(rowById);
+      } catch (e: any) {
+        // pas bloquant
+        setStatus(`Erreur: ${e?.message ?? String(e)}`);
+      }
+    })();
+  }, [docApi]);
+
+  // Sync dropdown value avec record courant
+  useEffect(() => {
+    if (!selected?.id) return;
+    const v = candidateIdByRowId.get(selected.id) ?? null;
+    setCandidateValueId(v);
+  }, [selected?.id, candidateIdByRowId]);
+
   async function save() {
     if (!docApi || !selected?.id) return;
     setSaving(true);
     try {
       const updates: Record<string, any> = {};
       for (const c of cols) {
-        if (!isEditable(c)) continue; // skip formule/système
+        if (!isEditable(c)) continue;
         updates[c.colId] = draft[c.colId];
       }
       await docApi.applyUserActions([["UpdateRecord", TABLE_ID, selected.id, updates]]);
@@ -175,62 +227,49 @@ export default function Page() {
     }
   }
 
-  const headerLabel = selected ? candidateLabel(selected) : "EMILE";
-  const headerId2 = selected ? (selected["ID2"] ?? "").toString().trim() : "";
-
-  // ===== Mapping champs =====
+  // Mapping champs : on affiche la sous-tab, MAIS si recherche candidat on ne change pas
   const subtabColIds = useMemo(() => FIELD_MAP[activeTab]?.[activeSubtab] ?? [], [activeTab, activeSubtab]);
-
-  const subtabFields = useMemo(() => {
-    return subtabColIds.map((id) => colById.get(id)).filter((c): c is ColMeta => !!c);
-  }, [subtabColIds, colById]);
-
-  const tabColIds = useMemo(() => {
+  const subtabFields = useMemo(() => subtabColIds.map((id) => colById.get(id)).filter((c): c is ColMeta => !!c), [subtabColIds, colById]);
+  const isTabMapped = useMemo(() => {
     const subMap = FIELD_MAP[activeTab] ?? {};
-    const ids = Object.values(subMap).flat();
-    const seen = new Set<string>();
-    const out: string[] = [];
-    for (const id of ids) {
-      if (!seen.has(id)) {
-        seen.add(id);
-        out.push(id);
-      }
-    }
-    return out;
+    return Object.values(subMap).flat().length > 0;
   }, [activeTab]);
 
-  const tabFields = useMemo(() => {
-    return tabColIds.map((id) => colById.get(id)).filter((c): c is ColMeta => !!c);
-  }, [tabColIds, colById]);
-
-  const isTabMapped = tabColIds.length > 0;
-
-  const filteredFields = useMemo(() => {
-    const q = fieldQuery.trim().toLowerCase();
-    if (!q) return subtabFields;
-
-    // recherche sur TOUTE la tab (L1)
-    return tabFields.filter((c) => {
-      const label = (c.label ?? "").toLowerCase();
-      const id = (c.colId ?? "").toLowerCase();
-      return label.includes(q) || id.includes(q);
-    });
-  }, [fieldQuery, subtabFields, tabFields]);
-
-  const isSearching = fieldQuery.trim().length > 0;
+  const headerTitle = selectedName || "EMILE";
 
   return (
     <div className="emile-container">
-      {/* Header sticky (legacy-like) */}
+      {/* Header sticky */}
       <div className="emile-sticky-actions">
-        <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-          <div style={{ display: "grid" }}>
-            <div className="fr-h3" style={{ margin: 0 }}>
-              {headerLabel}
-            </div>
-            <div className="fr-hint-text" style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-              {headerId2 ? <span className="fr-tag fr-tag--sm">{headerId2}</span> : null}
-              <span className="fr-tag fr-tag--sm">mode: {mode}</span>
+        {/* Ligne top: recherche candidat + save */}
+        <div style={{ display: "flex", gap: 14, alignItems: "flex-start", flexWrap: "wrap" }}>
+          <div style={{ flex: "1 1 420px", minWidth: 320 }}>
+            <div className="fr-input-group" style={{ margin: 0 }}>
+              <label className="fr-label">Rechercher un candidat</label>
+              <SearchDropdown
+                options={candidateOptions}
+                valueId={candidateValueId}
+                onChange={(candidateId) => {
+                  if (!candidateId) return;
+                  setCandidateValueId(candidateId);
+                  const rowId = rowIdByCandidateId.get(candidateId);
+                  const grist = (window as any).grist;
+
+                  // ✅ en Grist: on se positionne sur la ligne -> onRecord fera le reste
+                  if (rowId && grist?.setCursorPos) {
+                    grist.setCursorPos({ rowId });
+                  } else {
+                    // fallback (hors Grist): on ne peut pas bouger le curseur => on affiche une info
+                    setStatus("Info: sélection candidat active uniquement dans Grist.");
+                  }
+                }}
+                placeholder="Tape prénom, nom ou ID…"
+                disabled={candidateOptions.length === 0}
+              />
+              {/* Hint affiché comme tu veux : ID en dessous */}
+              <p className="fr-hint-text" style={{ marginTop: 6 }}>
+                {selectedHint ? <>ID : <b>{selectedHint}</b></> : " "}
+              </p>
             </div>
           </div>
 
@@ -238,6 +277,16 @@ export default function Page() {
             <button type="button" className="fr-btn" onClick={save} disabled={!selected?.id || !docApi || saving}>
               {saving ? "Enregistrement…" : "Enregistrer"}
             </button>
+          </div>
+        </div>
+
+        {/* Ligne 2: nom candidat */}
+        <div style={{ marginTop: 8 }}>
+          <div className="fr-h3" style={{ margin: 0 }}>
+            {headerTitle}
+          </div>
+          <div className="fr-hint-text" style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <span className="fr-tag fr-tag--sm">mode: {mode}</span>
           </div>
         </div>
 
@@ -249,27 +298,11 @@ export default function Page() {
           {!selected || !docApi ? (
             <div className="fr-alert fr-alert--info">
               <p className="fr-alert__title">En attente</p>
-              <p>Sélectionne un candidat dans Grist (ligne courante) et ouvre le widget.</p>
+              <p>Sélectionne un candidat (ligne courante) et ouvre le widget.</p>
             </div>
           ) : (
             <>
-              {/* Recherche globale (top, legacy-like) */}
-              <div className="fr-input-group" style={{ maxWidth: 560, margin: "0 auto 16px auto" }}>
-                <label className="fr-label">Rechercher un champ</label>
-                <input
-                  className="fr-input"
-                  value={fieldQuery}
-                  onChange={(e) => setFieldQuery(e.target.value)}
-                  placeholder="Ex: nationalité, date, téléphone…"
-                />
-                {!!fieldQuery && (
-                  <p className="fr-hint-text" style={{ marginTop: 6 }}>
-                    {filteredFields.length} champ{filteredFields.length > 1 ? "s" : ""} trouvé{filteredFields.length > 1 ? "s" : ""}
-                  </p>
-                )}
-              </div>
-
-              {/* Tabs L1 : picto + texte */}
+              {/* Tabs L1 */}
               <div
                 style={{
                   display: "flex",
@@ -311,31 +344,29 @@ export default function Page() {
                 })}
               </div>
 
-              {/* Subtabs L2 : tags (hidden during search -> legacy-ish behavior) */}
-              {!isSearching && (
-                <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap", marginBottom: 14 }}>
-                  {activeTabObj.subtabs.map((st) => {
-                    const active = activeSubtab === st.key;
-                    return (
-                      <button
-                        key={st.key}
-                        type="button"
-                        onClick={() => setActiveSubtab(st.key)}
-                        style={{
-                          border: active ? "1px solid var(--border-action-high-blue-france)" : "1px solid transparent",
-                          background: "var(--background-action-low-blue-france)",
-                          borderRadius: 999,
-                          padding: "10px 18px",
-                          cursor: "pointer",
-                          fontWeight: 700,
-                        }}
-                      >
-                        {st.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+              {/* Subtabs L2 */}
+              <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap", marginBottom: 14 }}>
+                {activeTabObj.subtabs.map((st) => {
+                  const active = activeSubtab === st.key;
+                  return (
+                    <button
+                      key={st.key}
+                      type="button"
+                      onClick={() => setActiveSubtab(st.key)}
+                      style={{
+                        border: active ? "1px solid var(--border-action-high-blue-france)" : "1px solid transparent",
+                        background: "var(--background-action-low-blue-france)",
+                        borderRadius: 999,
+                        padding: "10px 18px",
+                        cursor: "pointer",
+                        fontWeight: 700,
+                      }}
+                    >
+                      {st.label}
+                    </button>
+                  );
+                })}
+              </div>
 
               {!isTabMapped ? (
                 <div className="fr-alert fr-alert--info">
@@ -348,12 +379,6 @@ export default function Page() {
                 </div>
               ) : (
                 <>
-                  {isSearching && (
-                    <div className="fr-hint-text" style={{ textAlign: "center", marginBottom: 10 }}>
-                      Recherche active : on affiche les champs trouvés sur <b>{activeTabObj.label}</b> (toutes sous-sections confondues).
-                    </div>
-                  )}
-
                   <div
                     className="emile-form-grid"
                     style={{
@@ -362,7 +387,7 @@ export default function Page() {
                       gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
                     }}
                   >
-                    {filteredFields.map((c) => (
+                    {subtabFields.map((c) => (
                       <Field
                         key={c.colId}
                         col={c}
@@ -374,7 +399,6 @@ export default function Page() {
                     ))}
                   </div>
 
-                  {/* Responsive tweak without touching CSS file */}
                   <style jsx>{`
                     @media (max-width: 860px) {
                       .emile-form-grid {
@@ -393,7 +417,7 @@ export default function Page() {
 }
 
 /* =======================
-   FieldRenderer — legacy-like (textarea for comment/notes)
+   FieldRenderer — textarea for comment/notes
    ======================= */
 
 function Field(props: {
@@ -554,13 +578,7 @@ function Field(props: {
     return (
       <div className="fr-input-group" style={{ gridColumn: "1 / -1" }}>
         <label className="fr-label">{col.label}</label>
-        <textarea
-          className="fr-input"
-          rows={5}
-          value={value ?? ""}
-          onChange={(e) => onChange(e.target.value)}
-          disabled={disabled}
-        />
+        <textarea className="fr-input" rows={5} value={value ?? ""} onChange={(e) => onChange(e.target.value)} disabled={disabled} />
       </div>
     );
   }
