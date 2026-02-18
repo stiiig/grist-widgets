@@ -113,14 +113,7 @@ body {
 }
 
 .emile-header__search-wrap {
-  width: 200px;
-}
-
-/* Override SearchDropdown pour le header sombre */
-.emile-header__search-wrap input,
-.emile-header__search-wrap [class*="dropdown"] {
-  font-size: 0.8rem !important;
-  height: 2rem !important;
+  width: 220px;
 }
 
 .emile-save-btn {

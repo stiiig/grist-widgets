@@ -277,6 +277,8 @@ export default function Page() {
               }}
               placeholder="Candidat…"
               disabled={candidateOptions.length === 0}
+              searchable={true}
+              variant="header"
             />
           </div>
           <button
@@ -434,6 +436,7 @@ function Field(props: {
   if (isChoice) {
     const valueStr = value == null ? "" : String(value);
     const valueId = valueStr ? choiceIdByLabel.get(valueStr) ?? null : null;
+    const needsSearch = choiceOptions.length > 6;
     return (
       <div className={wrapCls}>
         <div className={labelCls}>{col.label}</div>
@@ -443,6 +446,7 @@ function Field(props: {
           onChange={(id) => onChange(id ? choiceLabelById.get(id) ?? null : null)}
           placeholder="—"
           disabled={disabled || choiceOptions.length === 0}
+          searchable={needsSearch}
         />
       </div>
     );
@@ -453,6 +457,7 @@ function Field(props: {
     const selectedIds = selectedLabels
       .map((lab) => choiceIdByLabel.get(lab))
       .filter((x): x is number => typeof x === "number");
+    const needsSearch = choiceOptions.length > 6;
     return (
       <div className={wrapCls}>
         <div className={labelCls}>{col.label}</div>
@@ -465,6 +470,7 @@ function Field(props: {
           }}
           placeholder="—"
           disabled={disabled || choiceOptions.length === 0}
+          searchable={needsSearch}
         />
       </div>
     );
