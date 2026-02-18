@@ -1,0 +1,2928 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+  <!-- DSFR 1.14 -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@gouvfr/dsfr@1.14/dist/dsfr.min.css">
+  <script type="module" src="https://cdn.jsdelivr.net/npm/@gouvfr/dsfr@1.14/dist/dsfr.module.min.js"></script>
+
+  <!-- FontAwesome 6.5.1 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+  <!-- Grist plugin API -->
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+
+  <style>
+    /* ── Reset & base ── */
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #f0f0f0;
+      font-family: Marianne, arial, sans-serif;
+      font-size: 0.875rem;
+      color: #1e1e1e;
+      min-height: 100vh;
+    }
+
+    /* ── Layout principal ── */
+    .app-shell {
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+    .app-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transition: margin-right 0.3s ease;
+    }
+    .app-main.sidebar-open {
+      margin-right: 320px;
+    }
+
+    /* ── Header ── */
+    .app-header {
+      background: #000091;
+      padding: 0 1.25rem;
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+      flex-shrink: 0;
+      height: 3.25rem;
+    }
+    .app-header__logo {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #fff;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding-right: 1rem;
+      border-right: 1px solid rgba(255,255,255,.2);
+      margin-right: 1rem;
+      flex-shrink: 0;
+    }
+    .app-header__logo i { font-size: 1.1rem; }
+    .app-header__title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      flex: 1;
+    }
+
+    /* ── Onglets principaux ── */
+    .app-tabs {
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+      margin-left: auto;
+    }
+    .app-tab {
+      background: #000091 !important; /* force le fond bleu — évite le fond système browser */
+      border: none;
+      color: rgba(255,255,255,.65);
+      padding: 0 1.1rem;
+      cursor: pointer;
+      font-size: 0.82rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      border-bottom: 3px solid transparent;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+      white-space: nowrap;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    .app-tab:hover  { color: #fff; background: #1c1cae !important; }
+    .app-tab.active { color: #fff; border-bottom-color: #fff; background: rgba(255,255,255,.12) !important; }
+
+    /* ── Bouton journal ── */
+    .btn-log-toggle {
+      position: relative;
+      background: rgba(255,255,255,.12) !important;
+      border: 1px solid rgba(255,255,255,.25);
+      border-radius: 0.375rem;
+      padding: 0.4rem 0.8rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: background 0.15s, border-color 0.15s;
+      flex-shrink: 0;
+      align-self: center;
+      margin-left: 0.75rem;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    .btn-log-toggle:hover { background: #1c1cae !important; border-color: rgba(255,255,255,.4); color: #fff; }
+    .btn-log-toggle .log-badge {
+      position: absolute;
+      top: -6px;
+      right: -6px;
+      background: #e1000f;
+      color: #fff;
+      font-size: 0.65rem;
+      font-weight: 700;
+      min-width: 1.1rem;
+      height: 1.1rem;
+      border-radius: 1rem;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 0 0.2rem;
+    }
+    .btn-log-toggle .log-badge.visible { display: flex; }
+
+    /* ── Scroll content ── */
+    .app-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    /* ── Commune selector ── */
+    .commune-bar {
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 0.5rem;
+      padding: 0.75rem 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    }
+    .commune-bar__label {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #555;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .commune-bar__search {
+      flex: 1;
+      min-width: 200px;
+      position: relative;
+    }
+    .commune-input-wrap { position: relative; }
+    .commune-input {
+      width: 100%;
+      height: 2.5rem;
+      padding: 0 2.5rem 0 0.875rem;
+      border: 2px solid #000091;
+      border-radius: 0.375rem;
+      background: #f5f5fe;
+      font-size: 0.9rem;
+      color: #161616;
+      font-weight: 500;
+    }
+    .commune-input:focus { outline: 2px solid #000091; outline-offset: 2px; background: #fff; }
+    .commune-input::placeholder { color: #999; font-weight: 400; }
+    .commune-clear-btn {
+      position: absolute;
+      right: 0.4rem;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #666;
+      padding: 0.2rem;
+      display: none;
+      font-size: 0.85rem;
+    }
+    .commune-clear-btn.visible { display: flex; align-items: center; }
+
+    /* ── Dropdown communes ── */
+    .dd-panel {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 0.375rem;
+      max-height: 260px;
+      overflow-y: auto;
+      z-index: 200;
+      box-shadow: 0 4px 16px rgba(0,0,0,.12);
+      display: none;
+    }
+    .dd-panel.open { display: block; }
+    .dd-option {
+      padding: 0.5rem 0.875rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      border-bottom: 1px solid #f5f5f5;
+      font-size: 0.875rem;
+    }
+    .dd-option:last-child { border-bottom: none; }
+    .dd-option:hover, .dd-option:focus { background: #f0f4ff; outline: none; }
+    .dd-option__arr {
+      font-size: 0.65rem; font-weight: 700; white-space: nowrap;
+      background: #f0f0f0; border: 1px solid #ddd; border-radius: 2px;
+      padding: 0.1rem 0.4rem; color: #555; flex-shrink: 0;
+    }
+    .dd-option__name { font-weight: 500; flex: 1; min-width: 0; }
+    .dd-empty { padding: 0.75rem; text-align: center; color: #888; font-style: italic; font-size: 0.8rem; }
+
+    /* ── Badge statut commune ── */
+    .sel-badge {
+      display: none;
+      padding: 0.2rem 0.65rem;
+      border-radius: 2px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      white-space: nowrap;
+      align-items: center;
+      gap: 0.3rem;
+      border: 1px solid transparent;
+    }
+    .sel-badge.visible { display: inline-flex; }
+    .sel-badge--fixe     { background: #EFE0FF; border-color: #D8B4FE; color: #6B21A8; }
+    .sel-badge--ciblee   { background: #FFF0D9; border-color: #FDE68A; color: #92400E; }
+    .sel-badge--rotation { background: #FDE8FC; border-color: #F0ABFC; color: #86198F; }
+
+    /* ── Mini-chip statut inline (Fixe/Ciblée/Rotation) ── */
+    .statut-chip {
+      display: inline-flex; align-items: center;
+      padding: 0.1rem 0.45rem;
+      border-radius: 2px;
+      font-size: 0.68rem; font-weight: 700;
+      white-space: nowrap; border: 1px solid transparent;
+      vertical-align: middle; margin-left: 0.4rem;
+    }
+    .statut-chip--fixe     { background: #EFE0FF; border-color: #D8B4FE; color: #6B21A8; }
+    .statut-chip--ciblee   { background: #FFF0D9; border-color: #FDE68A; color: #92400E; }
+    .statut-chip--rotation { background: #FDE8FC; border-color: #F0ABFC; color: #86198F; }
+    /* Dot violet pour vue année */
+    .statut-dot {
+      display: inline-block; width: .52rem; height: .52rem;
+      background: #A855F7; border-radius: 50%;
+      margin-left: .4rem; vertical-align: middle; cursor: default; flex-shrink: 0;
+    }
+
+    /* ── Badge arrondissement commune ── */
+    .arr-badge {
+      display: none;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: #555;
+      background: #f5f5f5;
+      border: 1px solid #ddd;
+      border-radius: 2px;
+      padding: 0.15rem 0.55rem;
+      white-space: nowrap;
+    }
+    .arr-badge.visible { display: inline-flex; align-items: center; }
+
+    /* ── No-commune placeholder ── */
+    .no-commune {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      color: #888;
+      padding: 3rem;
+      text-align: center;
+    }
+    .no-commune i { font-size: 3rem; color: #ccc; }
+    .no-commune h2 { font-size: 1.1rem; color: #555; margin: 0; }
+    .no-commune p { margin: 0; font-size: 0.875rem; }
+
+    /* ══════════════════════════════════════
+       ONGLET SAISIE
+    ══════════════════════════════════════ */
+
+    /* ── Barre de période saisie ── */
+    .saisie-period-bar {
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 0.5rem;
+      padding: 0.6rem 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    }
+    .saisie-period-bar__nav {
+      background: none;
+      border: 1.5px solid #ddd;
+      border-radius: 0.375rem;
+      width: 2rem;
+      height: 2rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #555;
+      font-size: 0.8rem;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+      flex-shrink: 0;
+    }
+    .saisie-period-bar__nav:hover:not(:disabled) { background: #f0f4ff; border-color: #000091; color: #000091; }
+    .saisie-period-bar__nav:disabled { opacity: 0.35; cursor: not-allowed; }
+    .saisie-period-bar__label {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #161616;
+      min-width: 130px;
+      text-align: center;
+    }
+    .saisie-period-bar__total {
+      margin-left: auto;
+      font-size: 0.875rem;
+      color: #555;
+      white-space: nowrap;
+    }
+    .saisie-period-bar__total strong { color: #000091; font-size: 1.1rem; }
+    .period-badge {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 0.15rem 0.55rem;
+      border-radius: 2rem;
+      border: 1px solid transparent;
+    }
+    .period-badge--current  { background: #dbeafe; border-color: #bfdbfe; color: #1d4ed8; }
+    .period-badge--prev     { background: #ede9fe; border-color: #ddd6fe; color: #6d28d9; }
+    .period-badge--readonly { background: #fef2f2; border-color: #fecaca; color: #b91c1c; }
+
+    /* ── Readonly overlay sur les tuiles ── */
+    .tiles-readonly-notice {
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      border-radius: 0.5rem;
+      padding: 0.6rem 1rem;
+      font-size: 0.8rem;
+      color: #9a3412;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .tile--readonly .tile__btn--plus,
+    .tile--readonly .tile__btn--minus { opacity: 0.25; cursor: not-allowed; pointer-events: none; }
+    .tile--readonly { opacity: 0.65; }
+
+    /* ── Période header (dans la zone saisie) ── */
+    .periode-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.25rem 0.25rem 0.5rem;
+    }
+    .periode-header__label {
+      font-size: 0.875rem;
+      font-weight: 700;
+      color: #444;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .periode-header__total {
+      font-size: 0.875rem;
+      color: #555;
+    }
+    .periode-header__total strong { color: #000091; font-size: 1.1rem; }
+
+    /* ── Grid de tuiles ── */
+    .tiles-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 0.75rem;
+    }
+
+    /* ── Tuile ── */
+    .tile {
+      background: #fff;
+      border: 2px solid #e5e5e5;
+      border-radius: 0.75rem;
+      padding: 1rem 0.75rem 0.75rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      cursor: pointer;
+      transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+      user-select: none;
+      position: relative;
+      min-height: 130px;
+    }
+    .tile:hover {
+      border-color: #000091;
+      box-shadow: 0 4px 16px rgba(0,0,145,.12);
+      transform: translateY(-2px);
+    }
+    .tile:active { transform: translateY(0); box-shadow: none; }
+    .tile.tile--pulse { animation: tilePulse 0.4s ease; }
+    @keyframes tilePulse {
+      0%   { transform: scale(1); }
+      30%  { transform: scale(1.08); border-color: #000091; }
+      60%  { transform: scale(0.97); }
+      100% { transform: scale(1); }
+    }
+    .tile__code {
+      font-size: 1rem;
+      font-weight: 800;
+      color: #000091;
+      letter-spacing: 0.02em;
+    }
+    .tile__label {
+      font-size: 0.68rem;
+      color: #777;
+      text-align: center;
+      line-height: 1.3;
+      min-height: 1.8em;
+    }
+    .tile__counter {
+      font-size: 2rem;
+      font-weight: 900;
+      color: #161616;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+      transition: color 0.2s;
+    }
+    .tile__counter.just-updated { color: #000091; }
+    .tile__actions {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      margin-top: auto;
+    }
+    .tile__btn {
+      width: 2rem;
+      height: 2rem;
+      border-radius: 50%;
+      border: 1.5px solid #ddd;
+      background: #f8f8f8;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.875rem;
+      color: #555;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+      flex-shrink: 0;
+    }
+    .tile__btn--plus {
+      width: 2.5rem;
+      height: 2.5rem;
+      background: #000091;
+      border-color: #000091;
+      color: #fff;
+      font-size: 1.1rem;
+      font-weight: 700;
+    }
+    .tile__btn--plus:hover { background: #1212ff; border-color: #1212ff; }
+    .tile__btn--minus:hover { background: #ffe5e5; border-color: #f87171; color: #b91c1c; }
+    .tile__btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    /* ── Tuile héro (DP) ── */
+    .tile-hero-zone {
+      display: flex;
+      justify-content: center;
+      margin-top: 1rem;
+      margin-bottom: 0.5rem;
+    }
+    .tile--hero {
+      min-width: 200px;
+      max-width: 300px;
+      flex: 1;
+      min-height: 190px;
+      border-width: 3px;
+      border-color: #3b82f6;
+      box-shadow: 0 2px 12px rgba(59,130,246,.15);
+    }
+    .tile--hero:hover {
+      border-color: #1d4ed8;
+      box-shadow: 0 6px 20px rgba(59,130,246,.25);
+    }
+    .tile--hero .tile__code { font-size: 1.5rem; }
+    .tile--hero .tile__counter { font-size: 3.2rem; }
+    .tile--hero .tile__btn--plus { width: 3rem; height: 3rem; font-size: 1.3rem; }
+
+    /* ── Section label ── */
+    .tiles-section-label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #aaa;
+      padding: 0.5rem 0.25rem 0.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .tiles-section-label::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: #e5e5e5;
+    }
+
+    /* ── Tuiles secondaires ── */
+    .tiles-grid--secondary .tile {
+      min-height: 110px;
+      background: #fafafa;
+      border-color: #e8e8e8;
+    }
+    .tiles-grid--secondary .tile:hover {
+      background: #fff;
+      border-color: #000091;
+    }
+    .tiles-grid--secondary .tile__counter { font-size: 1.8rem; }
+    .tiles-grid--secondary .tile__code { font-size: 0.875rem; }
+    .tiles-grid--secondary .tile__label { font-size: 0.62rem; }
+    .tiles-grid--secondary .tile__btn--plus { width: 2.2rem; height: 2.2rem; font-size: 1rem; }
+
+    /* ══════════════════════════════════════
+       ONGLET DASHBOARD
+    ══════════════════════════════════════ */
+
+    /* ── Barre de période dashboard ── */
+    .dashboard-toolbar {
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 0.5rem;
+      padding: 0.6rem 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    }
+    .dashboard-toolbar__period {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #444;
+    }
+
+    /* ── Navigation période dashboard ← → ── */
+    .dash-nav {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .dash-nav-btn {
+      background: none;
+      border: 1.5px solid #ddd;
+      border-radius: 0.375rem;
+      width: 2rem;
+      height: 2rem;
+      cursor: pointer;
+      color: #555;
+      font-size: 0.8rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+      flex-shrink: 0;
+    }
+    .dash-nav-btn:hover:not(:disabled) { background: #f0f4ff; border-color: #000091; color: #000091; }
+    .dash-nav-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .dash-period-label {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: #161616;
+      min-width: 120px;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    /* ── Vue selector (partagé saisie recup / dashboard) ── */
+    .vue-selector {
+      display: flex;
+      gap: 0.35rem;
+      background: #f5f5f5;
+      border: 1px solid #ddd;
+      border-radius: 0.375rem;
+      padding: 0.2rem;
+    }
+    .vue-btn {
+      padding: 0.3rem 0.8rem;
+      border-radius: 0.25rem;
+      border: none;
+      background: transparent;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      color: #555;
+      transition: background 0.15s, color 0.15s;
+    }
+    .vue-btn.active { background: #000091 !important; color: #fff; -webkit-appearance: none; appearance: none; }
+    .vue-btn.active:hover { background: #1c1cae !important; color: #fff; }
+    .vue-btn:hover:not(.active) { background: #e0e0e0; }
+
+    /* ── Scope bar (commune / toutes) ── */
+    .scope-bar {
+      display: flex;
+      gap: 0.5rem;
+      margin-left: auto;
+    }
+    .scope-btn {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.3rem 0.8rem;
+      border-radius: 0.375rem;
+      border: 1.5px solid #ddd;
+      background: #fff;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #555;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+    .scope-btn:hover { border-color: #000091; color: #000091; background: #f5f5fe; }
+    .scope-btn.active { background: #000091; border-color: #000091; color: #fff; }
+    .scope-btn.active:hover { background: #1c1cae !important; border-color: #1c1cae; color: #fff; }
+
+    /* ── Sous-onglets (tableau croisé / par commune / graphique) ── */
+    .sub-tabs {
+      display: flex;
+      gap: 0;
+      border-bottom: 2px solid #e5e5e5;
+      align-items: center;
+    }
+    .sort-toggle-btn {
+      margin-left: auto;
+      margin-right: 0.5rem;
+      padding: 0.25rem 0.6rem;
+      border: 1.5px solid #ddd;
+      border-radius: 0.375rem;
+      background: transparent;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: #555;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      transition: background 0.12s, border-color 0.12s, color 0.12s;
+      white-space: nowrap;
+    }
+    .sort-toggle-btn:hover { background: #f0f4ff; border-color: #000091; color: #000091; }
+    .sub-tab {
+      padding: 0.5rem 1rem;
+      border: none;
+      background: transparent;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #777;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      transition: color 0.15s, border-color 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .sub-tab:hover { color: #000091; }
+    .sub-tab.active { color: #000091; border-bottom-color: #000091; }
+
+    /* ── Récap tableau ── */
+    .recap-table-wrap {
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 0.5rem;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,.05);
+    }
+    .recap-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.78rem;
+    }
+    .recap-table th {
+      background: #f0f0f0;
+      padding: 0.5rem 0.6rem;
+      text-align: left;
+      font-weight: 700;
+      color: #333;
+      border-bottom: 1px solid #ddd;
+      white-space: nowrap;
+    }
+    .recap-table th.col-num { text-align: right; }
+    .recap-table td {
+      padding: 0.45rem 0.6rem;
+      border-bottom: 1px solid #f0f0f0;
+      vertical-align: middle;
+    }
+    .recap-table td.col-num {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+      color: #000091;
+    }
+    .recap-table td.col-num.zero { color: #ccc; font-weight: 400; }
+    .recap-table tr:last-child td { border-bottom: none; }
+    .recap-table tr.total-row td { font-weight: 800; background: #f5f5fe; color: #000091; }
+    .recap-table tr:hover td { background: #f9f9ff; }
+
+    /* ── Tableau croisé toutes communes ── */
+    .croise-wrap {
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 0.5rem;
+      overflow: auto;
+      box-shadow: 0 1px 3px rgba(0,0,0,.05);
+    }
+    .croise-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.75rem;
+      min-width: 600px;
+    }
+    .croise-table th {
+      background: #f0f0f0;
+      padding: 0.45rem 0.5rem;
+      font-weight: 700;
+      color: #333;
+      border-bottom: 1px solid #ddd;
+      white-space: nowrap;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    .croise-table th:first-child {
+      text-align: left;
+      position: sticky;
+      left: 0;
+      z-index: 2;
+      background: #eaeaea;
+    }
+    .croise-table th.col-num { text-align: right; }
+    .croise-table td {
+      padding: 0.4rem 0.5rem;
+      border-bottom: 1px solid #f0f0f0;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+    .croise-table td:first-child {
+      font-weight: 600;
+      background: #fafafa;
+      position: sticky;
+      left: 0;
+    }
+    .croise-table td.col-num {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      color: #000091;
+      font-weight: 600;
+    }
+    .croise-table td.col-num.zero { color: #ddd; font-weight: 400; }
+    .croise-table tr.total-row td { font-weight: 800; background: #f5f5fe !important; color: #000091; }
+    .croise-table tr:hover td { background: #f9f9ff; }
+    .croise-table tr:hover td:first-child { background: #f0f0f8; }
+    .croise-table tr.croise-row-commune:hover td { background: #eef0fb; }
+    .croise-table tr.croise-row-commune:hover td:first-child { background: #e4e7f7; color: #000091; }
+
+    /* ── Vue par commune (detail) ── */
+    .commune-detail-list { display: flex; flex-direction: column; gap: 0.5rem; }
+    .commune-detail-item {
+      background: #fff;
+      border: 1px solid #e5e5e5;
+      border-radius: 0.5rem;
+      padding: 0.6rem 1rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      transition: background 0.12s, border-color 0.12s;
+    }
+    .commune-detail-item:hover {
+      background: #eef0fb;
+      border-color: #000091;
+    }
+    .commune-detail-item__name {
+      font-weight: 700;
+      color: #161616;
+      font-size: 0.875rem;
+      flex: 0 0 220px;
+      width: 220px;
+    }
+    .commune-detail-item__total {
+      font-size: 1.4rem;
+      font-weight: 900;
+      color: #000091;
+      font-variant-numeric: tabular-nums;
+      flex: 0 0 3rem;
+      width: 3rem;
+      text-align: right;
+    }
+    .commune-detail-item__breakdown {
+      flex: 1;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.3rem;
+    }
+    .detail-chip {
+      font-size: 0.68rem;
+      font-weight: 600;
+      padding: 0.1rem 0.4rem;
+      border-radius: 0.25rem;
+      background: #f0f4ff;
+      color: #000091;
+      border: 1px solid #dbeafe;
+    }
+    .detail-chip.zero { color: #ccc; background: #fafafa; border-color: #eee; }
+
+    /* ── Graphique SVG ── */
+    .chart-wrap {
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 0.5rem;
+      padding: 1rem 1.25rem;
+      overflow-x: auto;
+      box-shadow: 0 1px 3px rgba(0,0,0,.05);
+    }
+    .chart-empty {
+      text-align: center;
+      color: #888;
+      padding: 2rem;
+      font-style: italic;
+    }
+
+    /* ── Historique ── */
+    .hist-section {
+      background: #fff;
+      border: 1px solid #e5e5e5;
+      border-radius: 0.5rem;
+      overflow: hidden;
+    }
+    .hist-section__header {
+      padding: 0.75rem 1rem;
+      background: #f8f8f8;
+      border-bottom: 1px solid #e5e5e5;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #333;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    /* ── Sidebar logs ── */
+    .sidebar {
+      position: fixed;
+      top: 0;
+      right: -320px;
+      width: 320px;
+      height: 100vh;
+      background: #fff;
+      border-left: 2px solid #000091;
+      display: flex;
+      flex-direction: column;
+      z-index: 100;
+      transition: right 0.3s ease;
+      box-shadow: -4px 0 16px rgba(0,0,0,.1);
+    }
+    .sidebar.open { right: 0; }
+    .sidebar__header {
+      padding: 1rem 1.25rem;
+      background: #000091;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .sidebar__header h2 {
+      margin: 0;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .sidebar__close {
+      background: transparent !important;
+      border: none;
+      color: #fff;
+      cursor: pointer;
+      font-size: 1rem;
+      padding: 0.35rem 0.5rem;
+      display: flex;
+      align-items: center;
+      border-radius: 0.375rem;
+      transition: background 0.15s;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    .sidebar__close:hover,
+    .sidebar__close:focus-visible { background: #4040dd !important; outline: none; }
+    .sidebar__body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0.75rem 0;
+    }
+    .sidebar__empty {
+      padding: 2rem 1.25rem;
+      text-align: center;
+      color: #888;
+      font-style: italic;
+      font-size: 0.8rem;
+    }
+    .log-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      padding: 0.6rem 1.25rem;
+      border-bottom: 1px solid #f0f0f0;
+      transition: background 0.15s;
+    }
+    .log-item:hover { background: #fafafa; }
+    .log-item__icon {
+      width: 1.6rem;
+      height: 1.6rem;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 0.1rem;
+    }
+    .log-item__icon--plus  { background: #dbeafe; color: #1d4ed8; }
+    .log-item__icon--minus { background: #fee2e2; color: #b91c1c; }
+    .log-item__body { flex: 1; min-width: 0; }
+    .log-item__desc {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #161616;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .log-item__meta { font-size: 0.7rem; color: #888; margin-top: 0.1rem; }
+    .log-item__rollback {
+      background: none;
+      border: 1px solid #ddd;
+      border-radius: 0.25rem;
+      cursor: pointer;
+      color: #777;
+      font-size: 0.7rem;
+      padding: 0.2rem 0.45rem;
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: background 0.15s, color 0.15s;
+    }
+    .log-item__rollback:hover { background: #fee2e2; border-color: #fca5a5; color: #b91c1c; }
+    .log-item__rollback:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    /* ── Toast ── */
+    #toastContainer {
+      position: fixed;
+      bottom: 1.25rem;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 9999;
+      display: flex;
+      flex-direction: column-reverse;
+      gap: 0.5rem;
+      align-items: center;
+      pointer-events: none;
+      width: min(480px, calc(100vw - 2rem));
+    }
+    .toast {
+      pointer-events: all;
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      padding: 0.75rem 1rem;
+      border-radius: 0.5rem;
+      border-left: 4px solid;
+      background: #fff;
+      box-shadow: 0 4px 16px rgba(0,0,0,.15);
+      animation: toastIn 0.25s ease;
+      min-width: 240px;
+      max-width: 100%;
+    }
+    .toast--closing { animation: toastOut 0.28s ease forwards; }
+    @keyframes toastIn  { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+    @keyframes toastOut { from { opacity:1; transform:translateY(0); } to { opacity:0; transform:translateY(12px); } }
+    .toast--success { border-color: #18753c; }
+    .toast--error   { border-color: #e1000f; }
+    .toast--info    { border-color: #0063cb; }
+    .toast--warning { border-color: #b34000; }
+    .toast__icon { font-size: 1rem; margin-top: 0.1rem; }
+    .toast--success .toast__icon { color: #18753c; }
+    .toast--error   .toast__icon { color: #e1000f; }
+    .toast--info    .toast__icon { color: #0063cb; }
+    .toast--warning .toast__icon { color: #b34000; }
+    .toast__content { flex: 1; min-width: 0; }
+    .toast__title   { font-weight: 700; font-size: 0.875rem; color: #161616; }
+    .toast__message { font-size: 0.8rem; color: #555; margin-top: 0.2rem; }
+    .toast__close {
+      background: none; border: none; cursor: pointer;
+      color: #888; font-size: 0.875rem; padding: 0; margin-top: 0.1rem;
+      flex-shrink: 0; display: flex; align-items: center;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 640px) {
+      .tiles-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+      .commune-bar { flex-direction: column; align-items: stretch; }
+      .tile--hero { max-width: 100%; }
+      .app-header__title { display: none; }
+      .scope-bar { margin-left: 0; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════
+     SIDEBAR LOGS
+═══════════════════════════════════════════════ -->
+<aside class="sidebar" id="logSidebar" aria-label="Journal des opérations">
+  <div class="sidebar__header">
+    <h2><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i> Journal</h2>
+    <button class="sidebar__close" id="btnCloseSidebar" type="button" aria-label="Fermer le journal">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+  </div>
+  <div class="sidebar__body" id="logList">
+    <div class="sidebar__empty">Aucune opération pour le moment.</div>
+  </div>
+</aside>
+
+<!-- ═══════════════════════════════════════════════
+     APP SHELL
+═══════════════════════════════════════════════ -->
+<div class="app-shell">
+  <div class="app-main" id="appMain">
+
+    <!-- HEADER -->
+    <header class="app-header">
+      <div class="app-header__logo">
+        <i class="fa-solid fa-landmark" aria-hidden="true"></i>
+        DDT 31
+      </div>
+      <div class="app-header__title">Décompte des actes</div>
+
+      <!-- Onglets principaux -->
+      <nav class="app-tabs" role="tablist" aria-label="Modes">
+        <button class="app-tab active" data-tab="saisie" role="tab" aria-selected="true" type="button">
+          <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i> Saisie
+        </button>
+        <button class="app-tab" data-tab="dashboard" role="tab" aria-selected="false" type="button">
+          <i class="fa-solid fa-chart-column" aria-hidden="true"></i> Tableau de bord
+        </button>
+      </nav>
+
+      <!-- Bouton journal -->
+      <button class="btn-log-toggle" id="btnToggleSidebar" type="button" aria-label="Ouvrir le journal">
+        <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i>
+        Journal
+        <span class="log-badge" id="logBadge">0</span>
+      </button>
+    </header>
+
+    <!-- SCROLLABLE CONTENT -->
+    <div class="app-content" id="appContent">
+
+      <!-- BARRE COMMUNE (partagée entre les deux onglets) -->
+      <div class="commune-bar">
+        <div class="commune-bar__label">
+          <i class="fa-solid fa-location-dot" aria-hidden="true"></i>
+          Commune
+        </div>
+        <div class="commune-bar__search">
+          <div class="commune-input-wrap" id="communeWrap">
+            <input
+              type="text"
+              id="communeInput"
+              class="commune-input"
+              placeholder="Rechercher une commune…"
+              autocomplete="off"
+              aria-label="Rechercher une commune"
+              aria-autocomplete="list"
+              aria-controls="communeDd"
+              aria-expanded="false"
+            />
+            <button class="commune-clear-btn" id="communeClearBtn" type="button" aria-label="Effacer la commune" tabindex="-1">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+            <div class="dd-panel" id="communeDd" role="listbox" aria-label="Communes disponibles"></div>
+          </div>
+        </div>
+
+        <!-- Badge statut commune -->
+        <span id="communeSelBadge" class="sel-badge" aria-live="polite"></span>
+
+        <!-- Badge arrondissement -->
+        <span id="communeArrBadge" class="arr-badge" aria-live="polite"></span>
+      </div>
+
+      <!-- ZONE PRINCIPALE (injectée dynamiquement) -->
+      <div id="mainZone"></div>
+
+    </div><!-- /app-content -->
+  </div><!-- /app-main -->
+</div><!-- /app-shell -->
+
+<!-- TOAST CONTAINER -->
+<div id="toastContainer" aria-live="polite" aria-atomic="false"></div>
+
+<!-- ═══════════════════════════════════════════════
+     JAVASCRIPT
+═══════════════════════════════════════════════ -->
+<script>
+/* ══════════════════════════════════════
+   CONFIG
+══════════════════════════════════════ */
+/*
+ * ── TABLES GRIST ──────────────────────────────────────────────────────────
+ * TABLE_DECOMPTE  → compteurs par commune/mois/type de document
+ *                   1 ligne = 1 commune × 1 mois × 1 année
+ * TABLE_COMMUNES  → référentiel des communes (lecture seule)
+ * TABLE_LOGS      → journal de toutes les opérations (+1/-1)
+ *                   1 ligne = 1 action sur 1 doc type
+ * TABLE_STATUT    → statut trimestriel d'une commune (Fixe/Ciblée/Rotation)
+ *
+ * ── COLONNES DECOMPTE (DECOMPTE_COLS) ────────────────────────────────────
+ * Commune    : Reference → Communes (entier = rowId Grist)
+ * Annee/Mois : Integer, ex. 2026 / 2
+ * Trimestre  : Text calculé au format "YYYY-TN", ex. "2026-T1"
+ * + 12 colonnes doc types (DP, PC, PA, Trans_Proro, etc.) = Integer
+ *
+ * ── DOC_TYPES ─────────────────────────────────────────────────────────────
+ * 12 types de documents, chacun a : key (=nom colonne Grist), code, label,
+ * icon (FontAwesome), color (hex).
+ * La tuile avec hero:true (DP) s'affiche en grand dans l'onglet Saisie.
+ * Pour ajouter un nouveau type : (1) ajouter dans DECOMPTE_COLS,
+ * (2) ajouter dans DOC_TYPES, (3) créer la colonne dans la table Grist DECOMPTE.
+ */
+const TABLE_DECOMPTE = "DECOMPTE";
+const TABLE_COMMUNES  = "Communes";
+const TABLE_LOGS      = "DECOMPTE_LOGS";
+const TABLE_STATUT    = "Communes_Statut";
+
+const SHOW_SELECTIONS = new Set(["Fixe","Ciblée","Rotation"]);
+
+const COM = {
+  Nom:    "Nom commune",
+  INSEE:  "Code INSEE",
+  ARR:    "Arrondissement",
+  LOG:    "Logements",
+};
+
+// Colonnes décompte
+const DECOMPTE_COLS = {
+  Commune:         "Commune",
+  Annee:           "Annee",
+  Mois:            "Mois",
+  Trimestre:       "Trimestre",
+  Trans_Proro:     "Trans_Proro",
+  Retraits_Rejets: "Retraits_Rejets",
+  Refus_Sursis:    "Refus_Sursis",
+  PD:              "PD",
+  CU:              "CU",
+  DP:              "DP",
+  DP_Division:     "DP_Division",
+  PC:              "PC",
+  Pcm:             "Pcm",
+  PA:              "PA",
+  Pam:             "Pam",
+  Permis_ZA:       "Permis_ZA",
+};
+
+const LOG_COLS = {
+  Commune:    "Commune",
+  DecompteId: "DecompteId",
+  Type:       "Type",
+  Delta:      "Delta",
+  Timestamp:  "Timestamp",
+  CommuneNom: "CommuneNom",
+  Annee:      "Annee",
+  Mois:       "Mois",
+};
+
+// Types de documents — DP est le héro
+const DOC_TYPES = [
+  { key: "Trans_Proro",     code: "Trans/Proro",    label: "Transmissions & Prorogations",      icon: "fa-arrows-rotate",    color: "#6366f1" },
+  { key: "Retraits_Rejets", code: "Ret./Rej.",       label: "Retraits & Rejets",                 icon: "fa-ban",              color: "#ef4444" },
+  { key: "Refus_Sursis",    code: "Ref./Sursis",     label: "Refus & Sursis",                    icon: "fa-circle-xmark",     color: "#f97316" },
+  { key: "PD",              code: "PD",              label: "Permis de Démolir",                 icon: "fa-hammer",           color: "#8b5cf6" },
+  { key: "CU",              code: "CU",              label: "Certificat d'Urbanisme",            icon: "fa-file-circle-check",color: "#14b8a6" },
+  { key: "DP",              code: "DP",              label: "Déclaration Préalable",             icon: "fa-file-lines",       color: "#3b82f6", hero: true },
+  { key: "DP_Division",     code: "DP Div.",         label: "DP Division",                       icon: "fa-scissors",         color: "#0369a1" },
+  { key: "PC",              code: "PC",              label: "Permis de Construire",              icon: "fa-building",         color: "#000091" },
+  { key: "Pcm",             code: "Pcm",             label: "Permis de Construire modificatif",  icon: "fa-pen-to-square",    color: "#4338ca" },
+  { key: "PA",              code: "PA",              label: "Permis d'Aménager",                 icon: "fa-map-location-dot", color: "#0891b2" },
+  { key: "Pam",             code: "Pam",             label: "Permis d'Aménager modificatif",     icon: "fa-map-pin",          color: "#0e7490" },
+  { key: "Permis_ZA",       code: "ZA",              label: "Permis Zone Agricole",              icon: "fa-wheat-awn",        color: "#65a30d" },
+];
+
+const DEBOUNCE_DELAY_MS  = 250;
+const BLUR_DELAY_MS      = 150;
+const MAX_COMMUNE_RESULTS = 25;
+
+/* ══════════════════════════════════════
+   STATE
+══════════════════════════════════════ */
+/*
+ * STATE — Source de vérité côté client (cache en mémoire de Grist)
+ * ─────────────────────────────────────────────────────────────────
+ * communes / communesById   : référentiel chargé une fois au démarrage
+ * selectedCommune            : commune active { id, nom, insee, arr } ou null
+ *
+ * tab                        : onglet actif — "saisie" | "dashboard"
+ * saisieMonth / saisieYear   : mois/année affiché dans l'onglet Saisie
+ *                              Défaut = mois courant. Navigation via ← →.
+ *
+ * decompteRows               : lignes DECOMPTE pour la commune sélectionnée
+ *                              Rechargé à chaque changement de commune.
+ * allDecompteRows            : TOUTES les lignes DECOMPTE (toutes communes)
+ *                              Chargé une seule fois au démarrage (init).
+ *                              Mis à jour en mémoire après chaque increment().
+ *                              Utilisé par le dashboard "Toutes les communes".
+ *
+ * vue                        : granularité dashboard — "mois" | "trimestre" | "annee"
+ * dashScope                  : périmètre dashboard — "commune" | "all"
+ * dashSubTab                 : sous-onglet dashboard — "croise" | "detail" | "chart"
+ *
+ * statutsByKey               : Map "communeId|trimestre" → { selection, debut, fin }
+ * logs                       : tous les logs triés par timestamp décroissant
+ * busy                       : verrou anti-double-clic (true pendant une écriture Grist)
+ */
+const state = {
+  // Communes
+  communes:         [],
+  communesById:     new Map(),
+  selectedCommune:  null,
+
+  // Navigation onglets
+  tab:              "saisie",    // "saisie" | "dashboard"
+
+  // Onglet Saisie — mois sélectionné
+  saisieMonth:      new Date().getMonth() + 1,
+  saisieYear:       new Date().getFullYear(),
+
+  // Données DECOMPTE pour la commune sélectionnée
+  decompteRows:     [],
+  currentRowId:     null,
+  currentCounters:  {},
+
+  // Données DECOMPTE globales (toutes communes) — pour le dashboard
+  allDecompteRows:  [],          // { id, communeId, annee, mois, DP, PC, … }
+  allDecompteLoaded: false,
+
+  // Dashboard
+  vue:              "mois",      // "mois" | "trimestre" | "annee"
+  dashMonth:        new Date().getMonth() + 1, // période naviguée (1-12)
+  dashYear:         new Date().getFullYear(),   // période naviguée
+  dashScope:        "all",       // "commune" | "all"
+  dashSubTab:       "croise",    // "croise" | "detail" | "chart"
+  dashSort:         "alpha",     // "total" | "alpha"
+
+  // Statuts trimestriels
+  statutsByKey:     new Map(),
+
+  // Logs
+  logs:             [],
+  logCount:         0,
+
+  // Divers
+  now:              new Date(),
+  sidebarOpen:      false,
+  busy:             false,
+};
+
+/* ══════════════════════════════════════
+   HELPERS TEMPS
+══════════════════════════════════════ */
+const MONTHS_FR = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
+
+function nowAnnee()     { return state.now.getFullYear(); }
+function nowMois()      { return state.now.getMonth() + 1; }
+function nowTrimestre() {
+  const t = Math.floor(state.now.getMonth() / 3) + 1;
+  return `${nowAnnee()}-T${t}`;
+}
+function trimestreLabel(tr) {
+  if (!tr) return "";
+  const m = tr.match(/^(\d{4})-T(\d)$/);
+  return m ? `T${m[2]} ${m[1]}` : tr;
+}
+function moisLabel(m, a) {
+  return `${MONTHS_FR[(m || 1) - 1]} ${a}`;
+}
+function isoNow() {
+  return new Date().toISOString();
+}
+function formatTime(iso) {
+  if (!iso) return "";
+  try {
+    const d = new Date(iso);
+    return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  } catch { return iso; }
+}
+
+/* Label de la période naviguée dans le dashboard */
+function dashPeriodLabel() {
+  const a = state.dashYear, m = state.dashMonth;
+  if (state.vue === "mois")      return moisLabel(m, a);
+  if (state.vue === "trimestre") {
+    const t = Math.floor((m - 1) / 3) + 1;
+    return trimestreLabel(`${a}-T${t}`);
+  }
+  return `Année ${a}`;
+}
+
+/* Retourne true si la période naviguée du dashboard est la période courante */
+function isDashAtCurrentPeriod() {
+  const a = nowAnnee(), m = nowMois();
+  if (state.vue === "mois")      return state.dashYear === a && state.dashMonth === m;
+  if (state.vue === "trimestre") {
+    const tCurrent = Math.floor((m - 1) / 3) + 1;
+    const tDash    = Math.floor((state.dashMonth - 1) / 3) + 1;
+    return state.dashYear === a && tDash === tCurrent;
+  }
+  return state.dashYear === a;
+}
+
+/* Navigation ±1 période dans le dashboard */
+function navigateDashPeriod(delta) {
+  if (state.vue === "mois") {
+    let m = state.dashMonth + delta;
+    let a = state.dashYear;
+    if (m > 12) { m = 1;  a++; }
+    if (m < 1)  { m = 12; a--; }
+    state.dashMonth = m;
+    state.dashYear  = a;
+  } else if (state.vue === "trimestre") {
+    let t = Math.floor((state.dashMonth - 1) / 3) + 1 + delta;
+    let a = state.dashYear;
+    if (t > 4) { t = 1; a++; }
+    if (t < 1) { t = 4; a--; }
+    state.dashMonth = (t - 1) * 3 + 1; // premier mois du trimestre
+    state.dashYear  = a;
+  } else {
+    state.dashYear += delta;
+  }
+  renderDashboardTab();
+}
+
+/* ══════════════════════════════════════
+   HELPERS PÉRIODE SAISIE
+══════════════════════════════════════ */
+
+/*
+ * RÈGLE MÉTIER : Périodes modifiables
+ * ─────────────────────────────────────────────────────────────────────────
+ * Seuls deux mois sont en écriture :
+ *   1. Le mois courant  (M, année N)
+ *   2. Le mois précédent (M-1, même année N) — pour rattraper un oubli
+ *      Cas limite : si on est en janvier N, le mois précédent est décembre N-1.
+ *
+ * Tout mois plus ancien → LECTURE SEULE.
+ * Raison : éviter de modifier des données déjà validées/transmises à la hiérarchie.
+ *
+ * Cette fonction est la seule source de vérité pour cette règle.
+ * Elle est appelée par :
+ *   - increment()        → bloque l'écriture Grist + affiche toast warning
+ *   - renderSaisieTab()  → affiche notice + grise les tuiles
+ *   - renderTiles()      → disable boutons +/−
+ */
+function isEditablePeriod(m, a) {
+  const nm = nowMois(), na = nowAnnee();
+  if (a === na && m === nm) return true;               // mois courant
+  if (a === na && m === nm - 1) return true;           // mois précédent (même année)
+  if (nm === 1 && a === na - 1 && m === 12) return true; // janvier courant → décembre année précédente
+  return false;
+}
+
+/* Naviguer de ±1 mois dans la saisie */
+function navigateSaisieMois(delta) {
+  let m = state.saisieMonth + delta;
+  let a = state.saisieYear;
+  if (m > 12) { m = 1;  a++; }
+  if (m < 1)  { m = 12; a--; }
+  state.saisieMonth = m;
+  state.saisieYear  = a;
+  renderApp();
+}
+
+/* ══════════════════════════════════════
+   HELPERS STATUTS
+══════════════════════════════════════ */
+function statutKey(communeId, trimestre) {
+  return `${communeId}|${trimestre}`;
+}
+
+function parseDate(v) {
+  if (!v) return null;
+  // Grist stocke les dates en secondes depuis epoch (pas millisecondes)
+  if (typeof v === "number") return new Date(v * 1000);
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function cleanSelection(v) {
+  // Grist renvoie les champs Choice List sous forme ["L", "val1", "val2", ...]
+  if (Array.isArray(v)) {
+    const items = v.filter(x => x !== "L" && x !== null && x !== undefined && x !== "");
+    return items[0]?.toString().trim() ?? "";
+  }
+  return (v ?? "").toString().trim();
+}
+
+function getStatutSelection(communeId, trimestre, dateStr) {
+  if (!communeId || !trimestre) return "";
+  const statut = state.statutsByKey.get(statutKey(communeId, trimestre));
+  if (!statut) return "";
+  if (statut.debut || statut.fin) {
+    const d = parseDate(dateStr);
+    if (!d) return "";
+    if (statut.debut && d < statut.debut) return "";
+    if (statut.fin   && d > statut.fin)   return "";
+  }
+  return statut.selection || "";
+}
+
+function getCurrentStatutForCommune(communeId) {
+  const trimestre = nowTrimestre();
+  const today = state.now.toISOString().slice(0, 10);
+  return getStatutSelection(communeId, trimestre, today);
+}
+
+/* Retourne le statut d'une commune pour un mois/année donnés */
+function getStatutForPeriod(communeId, annee, mois) {
+  const trimestre = `${annee}-T${Math.floor((mois - 1) / 3) + 1}`;
+  const dateRef   = `${annee}-${String(mois).padStart(2, "0")}-15`;
+  return getStatutSelection(communeId, trimestre, dateRef);
+}
+
+/* Génère le HTML d'un mini-chip statut (vide si pas de statut) */
+function statutChipHtml(sel) {
+  if (!sel || !SHOW_SELECTIONS.has(sel)) return "";
+  const cls = sel === "Fixe" ? "fixe" : sel === "Ciblée" ? "ciblee" : "rotation";
+  return `<span class="statut-chip statut-chip--${cls}">${escapeHtml(sel)}</span>`;
+}
+
+/* ══════════════════════════════════════
+   HELPERS DOM
+══════════════════════════════════════ */
+const $ = id => document.getElementById(id);
+
+function norm(s) {
+  return (s ?? "").toString().toLowerCase()
+    .normalize("NFD").replace(/\p{Diacritic}/gu, "")
+    .replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function pickCol(tableObj, candidates) {
+  const keys = Object.keys(tableObj);
+  for (const c of candidates) if (keys.includes(c)) return c;
+  const normMap = new Map(keys.map(k => [norm(k), k]));
+  for (const c of candidates) {
+    const hit = normMap.get(norm(c));
+    if (hit) return hit;
+  }
+  return null;
+}
+
+function escapeHtml(s) {
+  return (s ?? "").toString()
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+}
+
+function debounce(fn, delay) {
+  let t = null;
+  return function(...args) { clearTimeout(t); t = setTimeout(() => fn.apply(this, args), delay); };
+}
+
+/* ══════════════════════════════════════
+   TOAST
+══════════════════════════════════════ */
+let toastCounter = 0;
+function showToast(kind, title, desc, duration = 4000) {
+  const container = $("toastContainer");
+  if (!container) return;
+  const id = `toast-${++toastCounter}`;
+  const iconMap = { success:"fa-circle-check", error:"fa-circle-xmark", info:"fa-circle-info", warning:"fa-triangle-exclamation" };
+  const icon = iconMap[kind] || iconMap.info;
+  const toast = document.createElement("div");
+  toast.className = `toast toast--${kind}`;
+  toast.id = id;
+  toast.innerHTML = `
+    <div class="toast__icon"><i class="fa-solid ${icon}" aria-hidden="true"></i></div>
+    <div class="toast__content">
+      <div class="toast__title">${escapeHtml(title)}</div>
+      ${desc ? `<div class="toast__message">${escapeHtml(desc)}</div>` : ""}
+    </div>
+    <button class="toast__close" type="button" aria-label="Fermer"><i class="fa-solid fa-xmark"></i></button>
+  `;
+  container.appendChild(toast);
+  toast.querySelector(".toast__close").addEventListener("click", () => closeToast(id));
+  if (kind !== "error" && duration > 0) setTimeout(() => closeToast(id), duration);
+}
+function closeToast(id) {
+  const el = $(id);
+  if (!el) return;
+  el.classList.add("toast--closing");
+  setTimeout(() => el.parentNode && el.parentNode.removeChild(el), 300);
+}
+
+/* ══════════════════════════════════════
+   GRIST API
+══════════════════════════════════════ */
+async function gristFetch(table) {
+  return grist.docApi.fetchTable(table);
+}
+
+async function gristAdd(table, fields) {
+  const res = await grist.docApi.applyUserActions([["AddRecord", table, null, fields]]);
+  return res?.retValues?.[0] ?? null;
+}
+
+async function gristUpdate(table, rowId, fields) {
+  await grist.docApi.applyUserActions([["UpdateRecord", table, rowId, fields]]);
+}
+
+/* ══════════════════════════════════════
+   CHARGEMENT DONNÉES
+══════════════════════════════════════ */
+async function loadCommunes() {
+  try {
+    const tbl = await gristFetch(TABLE_COMMUNES);
+    const colNom   = pickCol(tbl, [COM.Nom,   "Nom_commune",  "Nom"]);
+    const colInsee = pickCol(tbl, [COM.INSEE,  "Code_INSEE",   "INSEE"]);
+    const colArr   = pickCol(tbl, [COM.ARR,   "Arrondissement"]);
+
+    if (!colNom) {
+      console.error("loadCommunes: colonnes disponibles =", Object.keys(tbl));
+      showToast("error", "Configuration", "Colonne 'Nom commune' introuvable dans la table Communes.");
+      return;
+    }
+
+    const ids    = tbl.id            || [];
+    const noms   = tbl[colNom]       || [];
+    const insees = colInsee ? (tbl[colInsee] || []) : [];
+    const arrs   = colArr   ? (tbl[colArr]   || []) : [];
+
+    state.communes = [];
+    state.communesById.clear();
+
+    ids.forEach((id, i) => {
+      const c = {
+        id,
+        nom:   (noms[i]   ?? "").toString().trim(),
+        insee: (insees[i] ?? "").toString().trim(),
+        arr:   (arrs[i]   ?? "").toString().trim(),
+      };
+      if (c.nom) {
+        state.communes.push(c);
+        state.communesById.set(id, c);
+      }
+    });
+
+    state.communes.sort((a, b) => a.nom.localeCompare(b.nom, "fr"));
+    console.log(`loadCommunes: ${state.communes.length} communes chargées`);
+  } catch(e) {
+    console.error("loadCommunes:", e);
+    showToast("error", "Erreur", "Impossible de charger les communes.");
+  }
+}
+
+async function loadStatuts() {
+  state.statutsByKey.clear();
+  try {
+    const tbl = await gristFetch(TABLE_STATUT);
+
+    const colCommune = pickCol(tbl, ["Commune", "Communes", "CommuneRef"]);
+    const colTrim    = pickCol(tbl, ["Trimestre", "Trimestre_acte"]);
+    const colSel     = pickCol(tbl, ["Selection", "Sélection", "Sélection ?", "Selection ?"]);
+    const colDebut   = pickCol(tbl, ["Debut", "Début", "Date_debut", "Date_début"]);
+    const colFin     = pickCol(tbl, ["Fin", "Date_fin"]);
+
+    if (!colCommune || !colTrim || !colSel) {
+      console.warn(`loadStatuts: colonnes manquantes dans ${TABLE_STATUT}`);
+      return;
+    }
+
+    const ids = tbl.id || [];
+    ids.forEach((id, i) => {
+      const communeRaw = tbl[colCommune][i];
+      const communeId  = Array.isArray(communeRaw) ? communeRaw[1] : parseInt(communeRaw, 10);
+      const trimestre  = (tbl[colTrim][i] ?? "").toString().trim();
+      const selection  = cleanSelection(tbl[colSel][i]);
+      if (!communeId || isNaN(communeId) || !trimestre || !selection) return;
+      state.statutsByKey.set(statutKey(communeId, trimestre), {
+        selection,
+        debut: colDebut ? parseDate(tbl[colDebut][i]) : null,
+        fin:   colFin   ? parseDate(tbl[colFin][i])   : null,
+      });
+    });
+    console.log(`loadStatuts: ${state.statutsByKey.size} entrées chargées`);
+  } catch(e) {
+    console.warn(`loadStatuts: table ${TABLE_STATUT} inaccessible`, e);
+  }
+}
+
+/*
+ * loadDecompteForCommune(communeId) vs loadAllDecompte()
+ * ─────────────────────────────────────────────────────────────────────────
+ * loadDecompteForCommune : filtre les lignes d'une seule commune
+ *   → stocké dans state.decompteRows
+ *   → rechargé à chaque sélection de commune
+ *   → utilisé par l'onglet Saisie (tuiles, counters, recap par commune)
+ *
+ * loadAllDecompte         : charge TOUTES les lignes sans filtre
+ *   → stocké dans state.allDecompteRows (contient aussi le champ communeId)
+ *   → chargé UNE SEULE FOIS au démarrage dans init()
+ *   → utilisé par le dashboard "Toutes les communes" (croisé, détail, graphique)
+ *   → cohérence : après chaque increment(), la ligne est mise à jour IN PLACE
+ *     dans allDecompteRows sans recharger Grist
+ */
+async function loadDecompteForCommune(communeId) {
+  try {
+    const tbl = await gristFetch(TABLE_DECOMPTE);
+    const ids       = tbl.id             || [];
+    const communes  = tbl[DECOMPTE_COLS.Commune] || [];
+    const annees    = tbl[DECOMPTE_COLS.Annee]   || [];
+    const mois      = tbl[DECOMPTE_COLS.Mois]    || [];
+
+    state.decompteRows = [];
+    ids.forEach((id, i) => {
+      const cid = communes[i];
+      const cRef = Array.isArray(cid) ? cid[1] : cid;
+      if (parseInt(cRef, 10) !== communeId) return;
+      const row = {
+        id,
+        annee: parseInt(annees[i] ?? 0, 10),
+        mois:  parseInt(mois[i]   ?? 0, 10),
+      };
+      DOC_TYPES.forEach(dt => { row[dt.key] = parseInt(tbl[dt.key]?.[i] ?? 0, 10) || 0; });
+      state.decompteRows.push(row);
+    });
+  } catch(e) {
+    console.error("loadDecompteForCommune:", e);
+    showToast("error", "Erreur", "Impossible de charger les données de décompte.");
+  }
+}
+
+/* Charge TOUTES les lignes DECOMPTE (toutes communes) — pour le dashboard global */
+async function loadAllDecompte() {
+  try {
+    const tbl = await gristFetch(TABLE_DECOMPTE);
+    const ids       = tbl.id             || [];
+    const communes  = tbl[DECOMPTE_COLS.Commune] || [];
+    const annees    = tbl[DECOMPTE_COLS.Annee]   || [];
+    const mois      = tbl[DECOMPTE_COLS.Mois]    || [];
+
+    state.allDecompteRows = [];
+    ids.forEach((id, i) => {
+      const cid = communes[i];
+      const communeId = parseInt(Array.isArray(cid) ? cid[1] : cid, 10);
+      if (!communeId || isNaN(communeId)) return;
+      const row = {
+        id,
+        communeId,
+        annee: parseInt(annees[i] ?? 0, 10),
+        mois:  parseInt(mois[i]   ?? 0, 10),
+      };
+      DOC_TYPES.forEach(dt => { row[dt.key] = parseInt(tbl[dt.key]?.[i] ?? 0, 10) || 0; });
+      state.allDecompteRows.push(row);
+    });
+    state.allDecompteLoaded = true;
+    console.log(`loadAllDecompte: ${state.allDecompteRows.length} lignes chargées`);
+  } catch(e) {
+    console.error("loadAllDecompte:", e);
+  }
+}
+
+/* Charge TOUS les logs (toutes communes) */
+async function loadAllLogs() {
+  try {
+    const tbl = await gristFetch(TABLE_LOGS);
+    const ids       = tbl.id || [];
+    const communes  = tbl[LOG_COLS.Commune]    || [];
+    const types     = tbl[LOG_COLS.Type]       || [];
+    const deltas    = tbl[LOG_COLS.Delta]      || [];
+    const times     = tbl[LOG_COLS.Timestamp]  || [];
+    const annees    = tbl[LOG_COLS.Annee]      || [];
+    const moisArr   = tbl[LOG_COLS.Mois]       || [];
+    const decIds    = tbl[LOG_COLS.DecompteId] || [];
+    const comNoms   = tbl[LOG_COLS.CommuneNom] || [];
+
+    state.logs = [];
+    ids.forEach((id, i) => {
+      const cid = communes[i];
+      const communeRefId = Array.isArray(cid) ? cid[1] : cid;
+      state.logs.push({
+        id,
+        communeId:  communeRefId,
+        communeNom: (comNoms[i] ?? "").toString(),
+        type:       (types[i]   ?? "").toString(),
+        delta:      parseInt(deltas[i] ?? 0, 10),
+        timestamp:  (times[i]   ?? "").toString(),
+        annee:      parseInt(annees[i]  ?? 0, 10),
+        mois:       parseInt(moisArr[i] ?? 0, 10),
+        decompteId: Array.isArray(decIds[i]) ? decIds[i][1] : decIds[i],
+      });
+    });
+
+    state.logs.sort((a, b) => (b.timestamp || "").localeCompare(a.timestamp || ""));
+    // Badge = logs du jour seulement (se remet à 0 naturellement le lendemain)
+    const today = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+    state.logCount = state.logs.filter(l => l.timestamp.startsWith(today)).length;
+    updateLogBadge();
+  } catch(e) {
+    console.error("loadAllLogs:", e);
+  }
+}
+
+/* ══════════════════════════════════════
+   LOGIQUE ROWS
+══════════════════════════════════════ */
+
+/* Cherche la ligne correspondant au mois de saisie sélectionné */
+function findRowForSaisie() {
+  return state.decompteRows.find(r => r.annee === state.saisieYear && r.mois === state.saisieMonth) || null;
+}
+
+function getCounters(row) {
+  if (!row) return Object.fromEntries(DOC_TYPES.map(dt => [dt.key, 0]));
+  return Object.fromEntries(DOC_TYPES.map(dt => [dt.key, row[dt.key] || 0]));
+}
+
+function totalCounters(counters) {
+  return DOC_TYPES.reduce((s, dt) => s + (counters[dt.key] || 0), 0);
+}
+
+function aggregateRows(rows) {
+  const out = Object.fromEntries(DOC_TYPES.map(dt => [dt.key, 0]));
+  rows.forEach(row => {
+    DOC_TYPES.forEach(dt => { out[dt.key] += row[dt.key] || 0; });
+  });
+  return out;
+}
+
+/* ══════════════════════════════════════
+   INCRÉMENT (SAISIE)
+══════════════════════════════════════ */
+/*
+ * FLUX D'ÉCRITURE : increment(docKey, delta)
+ * ─────────────────────────────────────────────────────────────────────────
+ * docKey : clé du type de document (ex. "DP", "PC", "Trans_Proro")
+ * delta  : +1 (saisie) ou -1 (correction manuelle ou rollback)
+ *
+ * Séquence :
+ *   1. Vérifie isEditablePeriod(saisieMonth, saisieYear)
+ *      → Si lecture seule : toast warning, return immédiat
+ *   2. Vérifie state.busy → si true, ignore (anti-double-clic)
+ *   3. Cherche la ligne DECOMPTE pour (communeId, saisieYear, saisieMonth)
+ *      → Si absente : crée la ligne via gristAdd avec tous les doc types à 0
+ *   4. newVal = max(0, oldVal + delta)  ← jamais en négatif
+ *   5. Écrit newVal dans Grist via gristUpdate
+ *   6. Met à jour state.decompteRows ET state.allDecompteRows (pour cohérence dashboard)
+ *   7. Crée une entrée dans TABLE_LOGS (commune, type, delta, timestamp, mois/annee)
+ *   8. Animation pulse sur la tuile + flash counter
+ *   9. Toast success (+1) ou info (−1)
+ */
+async function increment(docKey, delta = 1) {
+  if (!state.selectedCommune) return;
+  if (state.busy) return;
+
+  // Vérifier que le mois de saisie est éditable
+  if (!isEditablePeriod(state.saisieMonth, state.saisieYear)) {
+    showToast("warning", "Période non modifiable",
+      `${moisLabel(state.saisieMonth, state.saisieYear)} est en lecture seule. Seuls le mois courant et le mois précédent sont modifiables.`, 4000);
+    return;
+  }
+
+  state.busy = true;
+
+  const communeId = state.selectedCommune.id;
+  const a = state.saisieYear;
+  const m = state.saisieMonth;
+  const trimestre = `${a}-T${Math.floor((m - 1) / 3) + 1}`;
+
+  try {
+    let row = findRowForSaisie();
+
+    // Créer la ligne si elle n'existe pas
+    if (!row) {
+      const newFields = {
+        [DECOMPTE_COLS.Commune]:   communeId,
+        [DECOMPTE_COLS.Annee]:     a,
+        [DECOMPTE_COLS.Mois]:      m,
+        [DECOMPTE_COLS.Trimestre]: trimestre,
+      };
+      DOC_TYPES.forEach(dt => { newFields[dt.key] = 0; });
+      const rowId = await gristAdd(TABLE_DECOMPTE, newFields);
+
+      const newRow = { id: rowId, annee: a, mois: m, ...Object.fromEntries(DOC_TYPES.map(dt => [dt.key, 0])) };
+      state.decompteRows.push(newRow);
+      // Synchroniser allDecompteRows (dashboard) — avec communeId requis par getRowsForPeriod
+      state.allDecompteRows.push({ ...newRow, communeId });
+      row = newRow;
+    }
+
+    // Calculer la nouvelle valeur
+    const oldVal = row[docKey] || 0;
+    const newVal = Math.max(0, oldVal + delta);
+
+    // Mettre à jour Grist
+    await gristUpdate(TABLE_DECOMPTE, row.id, { [docKey]: newVal });
+
+    // Mettre à jour en mémoire
+    row[docKey] = newVal;
+    state.currentRowId    = row.id;
+    state.currentCounters = getCounters(findRowForSaisie());
+
+    // Mettre à jour allDecompteRows aussi (pour cohérence dashboard)
+    const globalRow = state.allDecompteRows.find(r => r.id === row.id);
+    if (globalRow) globalRow[docKey] = newVal;
+
+    // Enregistrer le log
+    const logFields = {
+      [LOG_COLS.Commune]:    communeId,
+      [LOG_COLS.DecompteId]: row.id,
+      [LOG_COLS.Type]:       docKey,
+      [LOG_COLS.Delta]:      delta,
+      [LOG_COLS.Timestamp]:  isoNow(),
+      [LOG_COLS.CommuneNom]: state.selectedCommune.nom,
+      [LOG_COLS.Annee]:      a,
+      [LOG_COLS.Mois]:       m,
+    };
+    const logId = await gristAdd(TABLE_LOGS, logFields);
+    const logEntry = {
+      id: logId, communeId, communeNom: state.selectedCommune.nom,
+      type: docKey, delta, timestamp: logFields[LOG_COLS.Timestamp],
+      annee: a, mois: m, decompteId: row.id,
+    };
+    state.logs.unshift(logEntry);
+    state.logCount++;
+    updateLogBadge();
+    renderLogList();
+
+    // Re-render tuiles
+    renderTiles();
+
+    // Pulse animation
+    const tileEl = document.querySelector(`.tile[data-key="${docKey}"]`);
+    if (tileEl) {
+      tileEl.classList.remove("tile--pulse");
+      void tileEl.offsetWidth;
+      tileEl.classList.add("tile--pulse");
+      tileEl.addEventListener("animationend", () => tileEl.classList.remove("tile--pulse"), { once: true });
+    }
+
+    // Flash counter
+    const counterEl = document.querySelector(`.tile[data-key="${docKey}"] .tile__counter`);
+    if (counterEl) {
+      counterEl.classList.add("just-updated");
+      setTimeout(() => counterEl.classList.remove("just-updated"), 600);
+    }
+
+    const dt = DOC_TYPES.find(d => d.key === docKey);
+    const label = dt ? dt.code : docKey;
+    if (delta > 0) {
+      showToast("success", `+1 ${label}`, `${state.selectedCommune.nom} · ${moisLabel(m, a)}`, 2500);
+    } else {
+      showToast("info", `-1 ${label}`, `${state.selectedCommune.nom} · ${moisLabel(m, a)}`, 2500);
+    }
+
+  } catch(e) {
+    console.error("increment:", e);
+    showToast("error", "Erreur d'enregistrement", e?.message || "Veuillez réessayer.");
+  } finally {
+    state.busy = false;
+  }
+}
+
+/* ══════════════════════════════════════
+   ROLLBACK
+══════════════════════════════════════ */
+/*
+ * ROLLBACK D'UN LOG — rollbackLog(logEntry)
+ * ─────────────────────────────────────────────────────────────────────────
+ * Annule une opération passée en appliquant l'inverse du delta.
+ * Ex : un log +1 DP de janvier → applique -1 DP sur janvier.
+ *
+ * Problème : l'utilisateur peut être en train de consulter mars pendant
+ * qu'il rollback un log de janvier. increment() utilise state.saisieMonth.
+ *
+ * Solution (mécanisme de bascule temporaire) :
+ *   1. Sauvegarde state.saisieMonth / state.saisieYear courants
+ *   2. Bascule saisieMonth/Year sur le mois/année du log
+ *   3. Appelle increment(logEntry.type, -logEntry.delta)
+ *      → écrit sur le bon mois dans Grist
+ *   4. Restaure les valeurs sauvegardées
+ *      → l'utilisateur retrouve sa vue inchangée
+ *
+ * Note : le rollback NE SUPPRIME PAS le log original dans Grist.
+ * Il crée un nouveau log avec le delta inversé (traçabilité complète).
+ */
+async function rollbackLog(logEntry) {
+  if (state.busy) return;
+  // Sauvegarder le mois de saisie courant, basculer temporairement sur le mois du log
+  const savedMonth = state.saisieMonth;
+  const savedYear  = state.saisieYear;
+  state.saisieMonth = logEntry.mois;
+  state.saisieYear  = logEntry.annee;
+  await increment(logEntry.type, -logEntry.delta);
+  // Restaurer le mois de saisie
+  state.saisieMonth = savedMonth;
+  state.saisieYear  = savedYear;
+}
+
+/* ══════════════════════════════════════
+   RENDU — DISPATCHEUR PRINCIPAL
+══════════════════════════════════════ */
+/*
+ * renderApp() — Point d'entrée UNIQUE du rendu
+ * ─────────────────────────────────────────────────────────────────────────
+ * Toujours appeler renderApp() et non renderSaisieTab() / renderDashboardTab()
+ * directement. renderApp() synchronise aussi l'état visuel des onglets header
+ * (classe "active", aria-selected).
+ *
+ * Appelé par :
+ *   - init()                 au démarrage
+ *   - Clic sur onglet        Saisie / Tableau de bord
+ *   - selectCommune()        après chargement commune
+ *   - clearCommune()         après effacement commune
+ *   - navigateSaisieMois()   navigation ← → mois
+ *
+ * Dispatch :
+ *   state.tab === "saisie"    → renderSaisieTab()
+ *   state.tab === "dashboard" → renderDashboardTab()
+ */
+function renderApp() {
+  // Mettre à jour les onglets actifs
+  document.querySelectorAll(".app-tab").forEach(btn => {
+    const active = btn.dataset.tab === state.tab;
+    btn.classList.toggle("active", active);
+    btn.setAttribute("aria-selected", active ? "true" : "false");
+  });
+
+  // Recalculer le badge statut selon la période consultée
+  updateSelBadge();
+
+  if (state.tab === "saisie") {
+    renderSaisieTab();
+  } else {
+    renderDashboardTab();
+  }
+}
+
+/* ══════════════════════════════════════
+   ONGLET SAISIE
+══════════════════════════════════════ */
+function renderSaisieTab() {
+  const zone = $("mainZone");
+  if (!zone) return;
+
+  const isEditable = isEditablePeriod(state.saisieMonth, state.saisieYear);
+  const isCurrent  = state.saisieMonth === nowMois() && state.saisieYear === nowAnnee();
+  const isPrev     = !isCurrent && isEditable;
+  const isNextDisabled = isCurrent;
+
+  // Badge période
+  let badgeHtml = "";
+  if (isCurrent) {
+    badgeHtml = `<span class="period-badge period-badge--current">en cours</span>`;
+  } else if (isPrev) {
+    badgeHtml = `<span class="period-badge period-badge--prev">mois précédent</span>`;
+  } else {
+    badgeHtml = `<span class="period-badge period-badge--readonly"><i class="fa-solid fa-lock" style="font-size:.65rem"></i> lecture seule</span>`;
+  }
+
+  if (!state.selectedCommune) {
+    zone.innerHTML = `
+      <div class="saisie-period-bar">
+        <button class="saisie-period-bar__nav" id="btnPrevMois" type="button" aria-label="Mois précédent">
+          <i class="fa-solid fa-chevron-left"></i>
+        </button>
+        <span class="saisie-period-bar__label">${escapeHtml(moisLabel(state.saisieMonth, state.saisieYear))}</span>
+        <button class="saisie-period-bar__nav" id="btnNextMois" type="button" aria-label="Mois suivant"${isNextDisabled ? " disabled" : ""}>
+          <i class="fa-solid fa-chevron-right"></i>
+        </button>
+        ${badgeHtml}
+      </div>
+      <div class="no-commune">
+        <i class="fa-solid fa-magnifying-glass-location" aria-hidden="true"></i>
+        <h2>Sélectionnez une commune</h2>
+        <p>Tapez le nom ou le code INSEE pour commencer à décompter.</p>
+      </div>
+    `;
+    wireSaisiePeriodBar();
+    return;
+  }
+
+  // Commune sélectionnée
+  const heroType   = DOC_TYPES.find(dt => dt.hero);
+  const otherTypes = DOC_TYPES.filter(dt => !dt.hero);
+  const row = findRowForSaisie();
+  const counters = getCounters(row);
+  const total = totalCounters(counters);
+  function makeTileHtml(dt, extraClass = "") {
+    const readonlyCls = !isEditable ? " tile--readonly" : "";
+    return `
+    <div class="tile${extraClass ? " " + extraClass : ""}${readonlyCls}" data-key="${dt.key}" role="group" aria-label="${escapeHtml(dt.label)}">
+      <div class="tile__code" style="color:${dt.color}">${escapeHtml(dt.code)}</div>
+      <div class="tile__label">${escapeHtml(dt.label)}</div>
+      <div class="tile__counter" aria-live="polite" aria-atomic="true">${counters[dt.key] || 0}</div>
+      <div class="tile__actions">
+        <button class="tile__btn tile__btn--minus" data-key="${dt.key}" data-delta="-1" type="button"
+          aria-label="Retirer 1 ${escapeHtml(dt.code)}"
+          ${(counters[dt.key] || 0) <= 0 || !isEditable ? "disabled" : ""}>
+          <i class="fa-solid fa-minus" aria-hidden="true"></i>
+        </button>
+        <button class="tile__btn tile__btn--plus" data-key="${dt.key}" data-delta="1" type="button"
+          aria-label="Ajouter 1 ${escapeHtml(dt.code)}"
+          ${!isEditable ? "disabled" : ""}>
+          <i class="fa-solid fa-plus" aria-hidden="true"></i>
+        </button>
+      </div>
+    </div>`;
+  }
+
+  zone.innerHTML = `
+    <div class="saisie-period-bar">
+      <button class="saisie-period-bar__nav" id="btnPrevMois" type="button" aria-label="Mois précédent">
+        <i class="fa-solid fa-chevron-left"></i>
+      </button>
+      <span class="saisie-period-bar__label">${escapeHtml(moisLabel(state.saisieMonth, state.saisieYear))}</span>
+      <button class="saisie-period-bar__nav" id="btnNextMois" type="button" aria-label="Mois suivant"${isNextDisabled ? " disabled" : ""}>
+        <i class="fa-solid fa-chevron-right"></i>
+      </button>
+      ${badgeHtml}
+      <span class="saisie-period-bar__total" id="saisieTotal">Total : <strong>${total}</strong></span>
+    </div>
+
+    ${!isEditable ? `
+    <div class="tiles-readonly-notice">
+      <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+      <span><strong>${escapeHtml(moisLabel(state.saisieMonth, state.saisieYear))}</strong> est en lecture seule.
+      Seuls le mois courant et le mois précédent sont modifiables.</span>
+    </div>` : ""}
+
+    ${heroType ? `<div class="tile-hero-zone" id="tilesHeroZone">${makeTileHtml(heroType, "tile--hero")}</div>` : ""}
+
+    <div class="tiles-section-label">Autres actes</div>
+
+    <div class="tiles-grid tiles-grid--secondary" id="tilesZone">
+      ${otherTypes.map(dt => makeTileHtml(dt)).join("")}
+    </div>
+  `;
+
+  // Wiring boutons navigation
+  wireSaisiePeriodBar();
+
+  // Wiring boutons tuiles
+  if (isEditable) {
+    zone.querySelectorAll(".tile__btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const key   = btn.dataset.key;
+        const delta = parseInt(btn.dataset.delta, 10);
+        increment(key, delta);
+      });
+    });
+
+    zone.querySelectorAll(".tile").forEach(tile => {
+      tile.addEventListener("click", (e) => {
+        if (e.target.closest(".tile__btn")) return;
+        const key = tile.dataset.key;
+        increment(key, 1);
+      });
+    });
+  }
+}
+
+function wireSaisiePeriodBar() {
+  $("btnPrevMois")?.addEventListener("click", () => navigateSaisieMois(-1));
+  $("btnNextMois")?.addEventListener("click", () => navigateSaisieMois(+1));
+}
+
+/* Refresh uniquement les compteurs (sans reconstruire tout le DOM) */
+function renderTiles() {
+  const row = findRowForSaisie();
+  const counters = getCounters(row);
+  const total = totalCounters(counters);
+  const isEditable = isEditablePeriod(state.saisieMonth, state.saisieYear);
+
+  const saisieTotalEl = $("saisieTotal");
+  if (saisieTotalEl) {
+    saisieTotalEl.querySelector("strong").textContent = total;
+  }
+
+  DOC_TYPES.forEach(dt => {
+    const tile = document.querySelector(`.tile[data-key="${dt.key}"]`);
+    if (!tile) return;
+    const counter = tile.querySelector(".tile__counter");
+    if (counter) counter.textContent = counters[dt.key] || 0;
+    const minusBtn = tile.querySelector(".tile__btn--minus");
+    if (minusBtn) minusBtn.disabled = !isEditable || (counters[dt.key] || 0) <= 0;
+    const plusBtn = tile.querySelector(".tile__btn--plus");
+    if (plusBtn) plusBtn.disabled = !isEditable;
+  });
+}
+
+/* ══════════════════════════════════════
+   ONGLET DASHBOARD
+══════════════════════════════════════ */
+function renderDashboardTab() {
+  const zone = $("mainZone");
+  if (!zone) return;
+
+  const atCurrent = isDashAtCurrentPeriod();
+
+  zone.innerHTML = `
+    <div class="dashboard-toolbar">
+      <span class="dashboard-toolbar__period">
+        <i class="fa-solid fa-calendar" aria-hidden="true" style="color:#000091;margin-right:.3rem"></i>
+        Période :
+      </span>
+      <div class="vue-selector" role="group" aria-label="Granularité">
+        <button class="vue-btn ${state.vue === "mois" ? "active" : ""}" data-vue="mois" type="button">Mois</button>
+        <button class="vue-btn ${state.vue === "trimestre" ? "active" : ""}" data-vue="trimestre" type="button">Trim.</button>
+        <button class="vue-btn ${state.vue === "annee" ? "active" : ""}" data-vue="annee" type="button">Année</button>
+      </div>
+      <div class="dash-nav">
+        <button class="dash-nav-btn" id="btnDashPrev" type="button" aria-label="Période précédente">
+          <i class="fa-solid fa-chevron-left"></i>
+        </button>
+        <span class="dash-period-label">${escapeHtml(dashPeriodLabel())}</span>
+        <button class="dash-nav-btn" id="btnDashNext" type="button" aria-label="Période suivante"${atCurrent ? " disabled" : ""}>
+          <i class="fa-solid fa-chevron-right"></i>
+        </button>
+      </div>
+      <div class="scope-bar">
+        <button class="scope-btn ${state.dashScope === "commune" ? "active" : ""}" data-scope="commune" type="button">
+          <i class="fa-solid fa-location-dot" aria-hidden="true"></i>
+          <span id="scopeCommuneLabel">${state.selectedCommune ? escapeHtml(state.selectedCommune.nom) : "Commune sélectionnée"}</span>
+        </button>
+        <button class="scope-btn ${state.dashScope === "all" ? "active" : ""}" data-scope="all" type="button">
+          <i class="fa-solid fa-earth-europe" aria-hidden="true"></i>
+          Toutes les communes
+        </button>
+      </div>
+    </div>
+
+    <div id="dashContent"></div>
+  `;
+
+  // Wiring vue selector — reset dashMonth/Year au mois courant pour éviter états incohérents
+  zone.querySelectorAll(".vue-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      state.vue = btn.dataset.vue;
+      state.dashMonth = nowMois();
+      state.dashYear  = nowAnnee();
+      renderDashboardTab();
+    });
+  });
+
+  // Wiring navigation période
+  $("btnDashPrev")?.addEventListener("click", () => navigateDashPeriod(-1));
+  $("btnDashNext")?.addEventListener("click", () => navigateDashPeriod(+1));
+
+  // Wiring scope
+  zone.querySelectorAll(".scope-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      state.dashScope = btn.dataset.scope;
+      renderDashboardTab();
+    });
+  });
+
+  renderDashContent();
+}
+
+function renderDashContent() {
+  const dashContent = $("dashContent");
+  if (!dashContent) return;
+
+  if (state.dashScope === "commune") {
+    renderDashCommune(dashContent);
+  } else {
+    renderDashAll(dashContent);
+  }
+}
+
+/* ── Dashboard > Commune sélectionnée ── */
+function renderDashCommune(container) {
+  if (!state.selectedCommune) {
+    container.innerHTML = `
+      <div class="no-commune">
+        <i class="fa-solid fa-magnifying-glass-location" aria-hidden="true"></i>
+        <h2>Sélectionnez une commune</h2>
+        <p>Tapez le nom dans la barre ci-dessus pour afficher ses données.</p>
+      </div>
+    `;
+    return;
+  }
+
+  const a = state.dashYear;
+  const m = state.dashMonth;
+  const nowM = nowMois(), nowA = nowAnnee();
+
+  let rows, title;
+  if (state.vue === "mois") {
+    const row = state.decompteRows.find(r => r.annee === a && r.mois === m);
+    const counters = getCounters(row);
+    const total = totalCounters(counters);
+    const isCurrent = a === nowA && m === nowM;
+
+    const moisStatutChip = statutChipHtml(getStatutForPeriod(state.selectedCommune.id, a, m));
+    const colHeaders = DOC_TYPES.map(dt => `<th class="col-num">${escapeHtml(dt.code)}</th>`).join("");
+    const cells = DOC_TYPES.map(dt => {
+      const v = counters[dt.key] || 0;
+      return `<td class="col-num${v === 0 ? " zero" : ""}">${v}</td>`;
+    }).join("");
+
+    container.innerHTML = `
+      <div class="hist-section">
+        <div class="hist-section__header">
+          <i class="fa-solid fa-table" aria-hidden="true"></i>
+          ${escapeHtml(moisLabel(m, a))} — ${escapeHtml(state.selectedCommune.nom)}${moisStatutChip}
+          <span style="margin-left:auto;font-weight:400;color:#555">Total : <strong style="color:#000091">${total}</strong></span>
+        </div>
+        <div class="recap-table-wrap">
+          <table class="recap-table">
+            <thead><tr><th>Période</th>${colHeaders}<th class="col-num">Total</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><strong>${escapeHtml(moisLabel(m, a))}</strong>${isCurrent ? ' <span style="color:#000091;font-size:.65rem;">◀ en cours</span>' : ""}</td>
+                ${cells}
+                <td class="col-num">${total || '<span style="color:#ccc">0</span>'}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  let headerStatutChip = "";
+  if (state.vue === "trimestre") {
+    const t = Math.floor((m - 1) / 3) + 1;
+    const mStart = (t - 1) * 3 + 1;
+    const moisDuTrim = [mStart, mStart+1, mStart+2].filter(mm => mm <= 12);
+    title = trimestreLabel(`${a}-T${t}`);
+    headerStatutChip = statutChipHtml(getStatutForPeriod(state.selectedCommune.id, a, mStart));
+
+    const tableRows = moisDuTrim.map(mm => {
+      const row = state.decompteRows.find(r => r.annee === a && r.mois === mm);
+      return { label: MONTHS_FR[mm-1], counters: getCounters(row), isCurrent: a === nowA && mm === nowM,
+               statut: getStatutForPeriod(state.selectedCommune.id, a, mm) };
+    });
+    const totals = aggregateRows(moisDuTrim.map(mm => state.decompteRows.find(r => r.annee === a && r.mois === mm)).filter(Boolean));
+    rows = [...tableRows, { label: "TOTAL", counters: totals, isTotal: true }];
+  } else {
+    title = `Année ${a}`;
+    const trimRows = [1,2,3,4].map(t => {
+      const mStart = (t-1)*3+1;
+      const mEnd   = t*3;
+      const matching = state.decompteRows.filter(r => r.annee === a && r.mois >= mStart && r.mois <= mEnd);
+      const isCurTrim = a === nowA && t === Math.floor((nowM-1)/3)+1;
+      return { label: `T${t} ${a}`, counters: aggregateRows(matching), isCurrent: isCurTrim,
+               statut: getStatutForPeriod(state.selectedCommune.id, a, mStart) };
+    });
+    const totals = aggregateRows(state.decompteRows.filter(r => r.annee === a));
+    rows = [...trimRows, { label: "TOTAL ANNUEL", counters: totals, isTotal: true }];
+  }
+
+  const colHeaders = DOC_TYPES.map(dt => `<th class="col-num">${escapeHtml(dt.code)}</th>`).join("");
+  const bodyRows = rows.map(r => {
+    const cls = r.isTotal ? "total-row" : "";
+    const cells = DOC_TYPES.map(dt => {
+      const v = r.counters[dt.key] || 0;
+      return `<td class="col-num${v === 0 ? " zero" : ""}">${v}</td>`;
+    }).join("");
+    const totalCell = totalCounters(r.counters);
+    return `<tr class="${cls}">
+      <td><strong>${escapeHtml(r.label)}</strong>${r.isCurrent && !r.isTotal ? ' <span style="color:#000091;font-size:.65rem;">◀ en cours</span>' : ""}${!r.isTotal ? statutChipHtml(r.statut) : ""}</td>
+      ${cells}
+      <td class="col-num">${totalCell || '<span style="color:#ccc">0</span>'}</td>
+    </tr>`;
+  }).join("");
+
+  container.innerHTML = `
+    <div class="hist-section">
+      <div class="hist-section__header">
+        <i class="fa-solid fa-table" aria-hidden="true"></i>
+        Vue ${escapeHtml(title)} — ${escapeHtml(state.selectedCommune.nom)}${headerStatutChip}
+      </div>
+      <div class="recap-table-wrap">
+        <table class="recap-table" aria-label="Récapitulatif ${escapeHtml(title)}">
+          <thead><tr><th>Période</th>${colHeaders}<th class="col-num">Total</th></tr></thead>
+          <tbody>${bodyRows}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+/* ── Dashboard > Toutes les communes ── */
+function renderDashAll(container) {
+  container.innerHTML = `
+    <div style="background:#fff;border:1px solid #ddd;border-radius:.5rem;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.05);">
+      <div class="sub-tabs" id="subTabsBar">
+        <button class="sub-tab ${state.dashSubTab === "croise" ? "active" : ""}" data-subtab="croise" type="button">
+          <i class="fa-solid fa-table" aria-hidden="true"></i> Tableau croisé
+        </button>
+        <button class="sub-tab ${state.dashSubTab === "detail" ? "active" : ""}" data-subtab="detail" type="button">
+          <i class="fa-solid fa-list" aria-hidden="true"></i> Par commune
+        </button>
+        <button class="sub-tab ${state.dashSubTab === "chart" ? "active" : ""}" data-subtab="chart" type="button">
+          <i class="fa-solid fa-chart-bar" aria-hidden="true"></i> Graphique
+        </button>
+        <button class="sort-toggle-btn" id="btnDashSort" type="button" title="${state.dashSort === "alpha" ? "Trier par total décroissant" : "Trier par ordre alphabétique"}">
+          <i class="fa-solid ${state.dashSort === "alpha" ? "fa-arrow-down-9-1" : "fa-arrow-down-a-z"}" aria-hidden="true"></i>
+          ${state.dashSort === "alpha" ? "Par total" : "A→Z"}
+        </button>
+      </div>
+      <div id="subTabContent" style="padding:.75rem 1rem 1rem"></div>
+    </div>
+  `;
+
+  // Wiring sous-onglets
+  container.querySelectorAll(".sub-tab").forEach(btn => {
+    btn.addEventListener("click", () => {
+      state.dashSubTab = btn.dataset.subtab;
+      container.querySelectorAll(".sub-tab").forEach(b => b.classList.toggle("active", b.dataset.subtab === state.dashSubTab));
+      renderSubTabContent();
+    });
+  });
+
+  // Wiring bouton tri A→Z / par total
+  $("btnDashSort")?.addEventListener("click", () => {
+    state.dashSort = state.dashSort === "alpha" ? "total" : "alpha";
+    renderDashAll(container);
+  });
+
+  renderSubTabContent();
+}
+
+function renderSubTabContent() {
+  const sub = $("subTabContent");
+  if (!sub) return;
+
+  // Calculer les données agrégées selon la période
+  const rows = getRowsForPeriod(state.allDecompteRows);
+
+  // Agréger par commune
+  const byCommune = new Map(); // communeId → { nom, counters }
+  rows.forEach(row => {
+    const commune = state.communesById.get(row.communeId);
+    if (!commune) return;
+    if (!byCommune.has(row.communeId)) {
+      byCommune.set(row.communeId, { id: row.communeId, nom: commune.nom, counters: Object.fromEntries(DOC_TYPES.map(dt => [dt.key, 0])) });
+    }
+    const entry = byCommune.get(row.communeId);
+    DOC_TYPES.forEach(dt => { entry.counters[dt.key] += row[dt.key] || 0; });
+  });
+
+  // Enrichir avec statut selon la période courante du dashboard
+  const da = state.dashYear, dm = state.dashMonth;
+  byCommune.forEach((entry, communeId) => {
+    if (state.vue === "annee") {
+      // Vue année : calculer les statuts des 4 trimestres
+      const statutsTrim = [1,2,3,4]
+        .map(t => ({ t, sel: getStatutForPeriod(communeId, da, (t-1)*3+1) }))
+        .filter(x => x.sel);
+      entry.statutsAnnee = statutsTrim; // [{ t, sel }]
+    } else {
+      entry.statut = getStatutForPeriod(communeId, da, dm);
+    }
+  });
+
+  // Trier selon state.dashSort
+  const communeList = Array.from(byCommune.values())
+    .map(c => ({ ...c, total: totalCounters(c.counters) }))
+    .sort((a, b) => state.dashSort === "alpha"
+      ? a.nom.localeCompare(b.nom, "fr")
+      : b.total - a.total);
+
+  if (communeList.length === 0) {
+    sub.innerHTML = `<div class="chart-empty">Aucune donnée pour cette période.</div>`;
+    return;
+  }
+
+  if (state.dashSubTab === "croise") {
+    renderCroiseTable(sub, communeList);
+  } else if (state.dashSubTab === "detail") {
+    renderDetailTable(sub, communeList);
+  } else {
+    renderChart(sub, communeList);
+  }
+}
+
+/* Retourne les lignes allDecompteRows filtrées selon state.vue */
+function getRowsForPeriod(allRows) {
+  const a = state.dashYear, m = state.dashMonth;
+  if (state.vue === "mois") {
+    return allRows.filter(r => r.annee === a && r.mois === m);
+  }
+  if (state.vue === "trimestre") {
+    const t = Math.floor((m - 1) / 3) + 1;
+    const mStart = (t - 1) * 3 + 1;
+    const mEnd   = t * 3;
+    return allRows.filter(r => r.annee === a && r.mois >= mStart && r.mois <= mEnd);
+  }
+  // Année
+  return allRows.filter(r => r.annee === a);
+}
+
+function renderCroiseTable(container, communeList) {
+  const totals = Object.fromEntries(DOC_TYPES.map(dt => [dt.key, 0]));
+  communeList.forEach(c => DOC_TYPES.forEach(dt => { totals[dt.key] += c.counters[dt.key]; }));
+  const grandTotal = communeList.reduce((s, c) => s + c.total, 0);
+
+  const colHeaders = DOC_TYPES.map(dt =>
+    `<th class="col-num" title="${escapeHtml(dt.label)}">${escapeHtml(dt.code)}</th>`
+  ).join("");
+
+  const bodyRows = communeList.map(c => {
+    const cells = DOC_TYPES.map(dt => {
+      const v = c.counters[dt.key] || 0;
+      return `<td class="col-num${v === 0 ? " zero" : ""}">${v}</td>`;
+    }).join("");
+    // Statut : chip pour mois/trimestre/année (avec tooltip détail trimestres pour vue année)
+    let statutHtml = "";
+    if (state.vue === "annee" && c.statutsAnnee?.length) {
+      const tooltip = c.statutsAnnee.map(x => `T${x.t}\u00a0: ${x.sel}`).join("  |  ");
+      const sel = c.statutsAnnee[0].sel;
+      const cls = sel === "Fixe" ? "fixe" : sel === "Ciblée" ? "ciblee" : "rotation";
+      statutHtml = `<span class="statut-chip statut-chip--${cls}" title="${escapeHtml(tooltip)}">${escapeHtml(sel)}</span>`;
+    } else if (c.statut) {
+      statutHtml = statutChipHtml(c.statut);
+    }
+    return `<tr class="croise-row-commune" data-commune-id="${c.id}" title="Voir le détail de ${escapeHtml(c.nom)}" style="cursor:pointer">
+      <td>${escapeHtml(c.nom)}${statutHtml}</td>
+      ${cells}
+      <td class="col-num" style="font-weight:700">${c.total}</td>
+    </tr>`;
+  }).join("");
+
+  const totalCells = DOC_TYPES.map(dt => {
+    const v = totals[dt.key] || 0;
+    return `<td class="col-num">${v}</td>`;
+  }).join("");
+
+  container.innerHTML = `
+    <div class="croise-wrap">
+      <table class="croise-table">
+        <thead>
+          <tr>
+            <th>Commune</th>${colHeaders}<th class="col-num">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${bodyRows}
+          <tr class="total-row">
+            <td><strong>TOTAL</strong></td>
+            ${totalCells}
+            <td class="col-num"><strong>${grandTotal}</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  // Clic sur une ligne → zoomer sur cette commune
+  container.querySelectorAll(".croise-row-commune").forEach(tr => {
+    tr.addEventListener("click", () => {
+      const commune = state.communesById.get(Number(tr.dataset.communeId));
+      if (commune) selectCommune(commune);
+    });
+  });
+}
+
+function renderDetailTable(container, communeList) {
+  const items = communeList.map(c => {
+    const chips = DOC_TYPES
+      .filter(dt => (c.counters[dt.key] || 0) > 0)
+      .map(dt => `<span class="detail-chip">${escapeHtml(dt.code)} ${c.counters[dt.key]}</span>`)
+      .join("");
+
+    // Statut : chip pour mois/trimestre/année (avec tooltip détail trimestres pour vue année)
+    let statutHtml = "";
+    if (state.vue === "annee" && c.statutsAnnee?.length) {
+      const tooltip = c.statutsAnnee.map(x => `T${x.t}\u00a0: ${x.sel}`).join("  |  ");
+      const sel = c.statutsAnnee[0].sel;
+      const cls = sel === "Fixe" ? "fixe" : sel === "Ciblée" ? "ciblee" : "rotation";
+      statutHtml = `<span class="statut-chip statut-chip--${cls}" title="${escapeHtml(tooltip)}">${escapeHtml(sel)}</span>`;
+    } else if (c.statut) {
+      statutHtml = statutChipHtml(c.statut);
+    }
+
+    return `
+      <div class="commune-detail-item" data-commune-id="${c.id}" title="Voir le détail de ${escapeHtml(c.nom)}" style="cursor:pointer">
+        <div class="commune-detail-item__name">${escapeHtml(c.nom)}${statutHtml}</div>
+        <div class="commune-detail-item__total">${c.total}</div>
+        <div class="commune-detail-item__breakdown">${chips || '<span style="color:#ccc;font-size:.75rem">—</span>'}</div>
+      </div>
+    `;
+  }).join("");
+
+  container.innerHTML = `<div class="commune-detail-list">${items}</div>`;
+
+  // Clic sur une commune → zoomer sur cette commune
+  container.querySelectorAll(".commune-detail-item").forEach(div => {
+    div.addEventListener("click", () => {
+      const commune = state.communesById.get(Number(div.dataset.communeId));
+      if (commune) selectCommune(commune);
+    });
+  });
+}
+
+function renderChart(container, communeList) {
+  if (communeList.length === 0) {
+    container.innerHTML = `<div class="chart-empty">Aucune donnée.</div>`;
+    return;
+  }
+
+  // Limiter à 30 communes max pour la lisibilité
+  const data = communeList.slice(0, 30);
+  const maxVal = Math.max(...data.map(c => c.total), 1);
+  const BAR_W  = 36;
+  const BAR_GAP = 10;
+  const CHART_H = 200;
+  const LABEL_H = 60;
+  const LEFT_PAD = 32;
+  const TOP_PAD  = 10;
+  const totalW = LEFT_PAD + data.length * (BAR_W + BAR_GAP);
+  const svgH = CHART_H + LABEL_H + TOP_PAD;
+
+  // Barres
+  const bars = data.map((c, i) => {
+    const x = LEFT_PAD + i * (BAR_W + BAR_GAP);
+    const barH = Math.max(4, Math.round((c.total / maxVal) * CHART_H));
+    const y = TOP_PAD + CHART_H - barH;
+    const shortName = c.nom.length > 10 ? c.nom.slice(0, 9) + "…" : c.nom;
+    return `
+      <g>
+        <rect x="${x}" y="${y}" width="${BAR_W}" height="${barH}" fill="#000091" rx="3" opacity=".85">
+          <title>${escapeHtml(c.nom)} : ${c.total}</title>
+        </rect>
+        <text x="${x + BAR_W/2}" y="${y - 4}" text-anchor="middle" font-size="10" font-weight="700" fill="#000091">${c.total}</text>
+        <text x="${x + BAR_W/2}" y="${TOP_PAD + CHART_H + 14}" text-anchor="end"
+          font-size="9.5" fill="#555" transform="rotate(-40 ${x + BAR_W/2} ${TOP_PAD + CHART_H + 14})">
+          ${escapeHtml(shortName)}
+        </text>
+      </g>
+    `;
+  }).join("");
+
+  // Lignes de grille
+  const gridLines = [0, 0.25, 0.5, 0.75, 1].map(frac => {
+    const y = TOP_PAD + Math.round(CHART_H * (1 - frac));
+    const val = Math.round(maxVal * frac);
+    return `
+      <line x1="${LEFT_PAD - 4}" y1="${y}" x2="${totalW}" y2="${y}" stroke="#eee" stroke-width="1"/>
+      <text x="${LEFT_PAD - 6}" y="${y + 4}" text-anchor="end" font-size="9" fill="#aaa">${val}</text>
+    `;
+  }).join("");
+
+  container.innerHTML = `
+    <div class="chart-wrap">
+      <svg width="${totalW}" height="${svgH}" style="overflow:visible;display:block">
+        ${gridLines}
+        ${bars}
+        <line x1="${LEFT_PAD}" y1="${TOP_PAD}" x2="${LEFT_PAD}" y2="${TOP_PAD + CHART_H}" stroke="#ccc" stroke-width="1"/>
+        <line x1="${LEFT_PAD}" y1="${TOP_PAD + CHART_H}" x2="${totalW}" y2="${TOP_PAD + CHART_H}" stroke="#ccc" stroke-width="1"/>
+      </svg>
+      ${data.length < communeList.length ? `<p style="font-size:.72rem;color:#888;margin-top:.5rem">Affichage limité aux 30 communes avec le plus d'actes.</p>` : ""}
+    </div>
+  `;
+}
+
+/* ══════════════════════════════════════
+   BADGE STATUT COMMUNE
+══════════════════════════════════════ */
+function updateSelBadge() {
+  const badge = $("communeSelBadge");
+  if (!badge) return;
+  badge.className = "sel-badge";
+  badge.textContent = "";
+  if (!state.selectedCommune) return;
+  // Période consultée selon l'onglet actif (pas forcément le trimestre courant)
+  const annee = state.tab === "dashboard" ? state.dashYear  : state.saisieYear;
+  const mois  = state.tab === "dashboard" ? state.dashMonth : state.saisieMonth;
+  const sel   = getStatutForPeriod(state.selectedCommune.id, annee, mois);
+  if (!sel || !SHOW_SELECTIONS.has(sel)) return;
+  badge.textContent = sel;
+  const cls = sel === "Fixe" ? "sel-badge--fixe" : sel === "Ciblée" ? "sel-badge--ciblee" : "sel-badge--rotation";
+  badge.classList.add("visible", cls);
+}
+
+function updateArrBadge() {
+  const badge = $("communeArrBadge");
+  if (!badge) return;
+  const arr = state.selectedCommune?.arr;
+  if (arr) {
+    badge.textContent = arr;
+    badge.classList.add("visible");
+  } else {
+    badge.textContent = "";
+    badge.classList.remove("visible");
+  }
+}
+
+/* ══════════════════════════════════════
+   LOG SIDEBAR
+══════════════════════════════════════ */
+function updateLogBadge() {
+  const badge = $("logBadge");
+  if (!badge) return;
+  badge.textContent = state.logCount;
+  badge.classList.toggle("visible", state.logCount > 0);
+}
+
+function renderLogList() {
+  const list = $("logList");
+  if (!list) return;
+
+  if (state.logs.length === 0) {
+    list.innerHTML = `<div class="sidebar__empty">Aucune opération pour le moment.</div>`;
+    return;
+  }
+
+  const html = state.logs.map((log, idx) => {
+    const dt = DOC_TYPES.find(d => d.key === log.type);
+    const label = dt ? dt.code : log.type;
+    const sign  = log.delta > 0 ? "+" : "-";
+    const iconCls = log.delta > 0 ? "log-item__icon--plus" : "log-item__icon--minus";
+    const time = formatTime(log.timestamp);
+    const moisStr = moisLabel(log.mois, log.annee);
+    const communeStr = log.communeNom || "";
+    return `
+      <div class="log-item">
+        <div class="log-item__icon ${iconCls}">${sign}${Math.abs(log.delta)}</div>
+        <div class="log-item__body">
+          <div class="log-item__desc">${escapeHtml(label)}${communeStr ? ` — <span style="font-weight:400;color:#666">${escapeHtml(communeStr)}</span>` : ""}</div>
+          <div class="log-item__meta">${escapeHtml(moisStr)} · ${escapeHtml(time)}</div>
+        </div>
+        <button class="log-item__rollback" data-idx="${idx}" type="button" title="Annuler cette opération">
+          <i class="fa-solid fa-rotate-left" aria-hidden="true"></i> Annuler
+        </button>
+      </div>
+    `;
+  }).join("");
+
+  list.innerHTML = html;
+
+  list.querySelectorAll(".log-item__rollback").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const idx = parseInt(btn.dataset.idx, 10);
+      const log = state.logs[idx];
+      if (!log) return;
+      btn.disabled = true;
+      await rollbackLog(log);
+    });
+  });
+}
+
+/* ══════════════════════════════════════
+   COMMUNE SEARCH
+══════════════════════════════════════ */
+function filterCommunes(q) {
+  const nq = norm(q);
+  const isNum = /^\d{3,}$/.test(q.trim());
+
+  return state.communes
+    .map(c => {
+      const nn = norm(c.nom);
+      const ni = norm(c.insee);
+      let score = 0;
+      if (isNum) {
+        if (ni === nq) score = 100;
+        else if (ni.startsWith(nq)) score = 80;
+        else if (ni.includes(nq)) score = 50;
+        else return null;
+      } else {
+        if (nn === nq) score = 100;
+        else if (nn.startsWith(nq)) score = 80;
+        else if (nn.includes(nq)) score = 50;
+        else return null;
+      }
+      return { c, score };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.score - a.score || a.c.nom.localeCompare(b.c.nom, "fr"))
+    .slice(0, MAX_COMMUNE_RESULTS)
+    .map(x => x.c);
+}
+
+function openCommuneDropdown(results) {
+  const panel = $("communeDd");
+  if (!panel) return;
+  const input = $("communeInput");
+
+  if (results.length === 0) {
+    panel.innerHTML = `<div class="dd-empty">Aucune commune trouvée</div>`;
+  } else {
+    panel.innerHTML = results.map(c => `
+      <div class="dd-option" role="option" data-id="${c.id}" tabindex="0">
+        ${c.arr ? `<span class="dd-option__arr">${escapeHtml(c.arr)}</span>` : ""}
+        <span class="dd-option__name">${escapeHtml(c.nom)}</span>
+      </div>
+    `).join("");
+
+    panel.querySelectorAll(".dd-option").forEach(opt => {
+      opt.addEventListener("mousedown", e => {
+        e.preventDefault();
+        const id = parseInt(opt.dataset.id, 10);
+        const commune = state.communesById.get(id);
+        if (commune) selectCommune(commune);
+      });
+      opt.addEventListener("keydown", e => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          const id = parseInt(opt.dataset.id, 10);
+          const commune = state.communesById.get(id);
+          if (commune) selectCommune(commune);
+        }
+      });
+    });
+  }
+
+  panel.classList.add("open");
+  input?.setAttribute("aria-expanded", "true");
+}
+
+function closeCommuneDropdown() {
+  const panel = $("communeDd");
+  if (panel) panel.classList.remove("open");
+  $("communeInput")?.setAttribute("aria-expanded", "false");
+}
+
+async function selectCommune(commune) {
+  state.selectedCommune = commune;
+  const input = $("communeInput");
+  if (input) input.value = commune.nom;
+  $("communeClearBtn")?.classList.add("visible");
+  closeCommuneDropdown();
+
+  // En mode dashboard, basculer automatiquement sur la commune
+  if (state.tab === "dashboard") {
+    state.dashScope = "commune";
+  }
+
+  // Afficher loading dans mainZone
+  const zone = $("mainZone");
+  if (zone) zone.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:center;padding:3rem;gap:1rem;color:#555;">
+      <i class="fa-solid fa-spinner fa-spin" style="font-size:1.5rem;color:#000091;" aria-hidden="true"></i>
+      Chargement des données…
+    </div>
+  `;
+
+  // Charger données décompte de cette commune
+  await loadDecompteForCommune(commune.id);
+
+  // Mettre à jour état
+  const row = state.decompteRows.find(r => r.annee === state.saisieYear && r.mois === state.saisieMonth);
+  state.currentRowId    = row ? row.id : null;
+  state.currentCounters = getCounters(row);
+
+  // Badges statut + arrondissement
+  updateSelBadge();
+  updateArrBadge();
+
+  // Render
+  renderApp();
+  renderLogList();
+}
+
+function clearCommune() {
+  state.selectedCommune  = null;
+  state.decompteRows     = [];
+  state.currentRowId     = null;
+  state.currentCounters  = {};
+  state.dashScope        = "all";
+
+  const input = $("communeInput");
+  if (input) { input.value = ""; input.focus(); }
+  $("communeClearBtn")?.classList.remove("visible");
+  closeCommuneDropdown();
+  updateSelBadge();
+  updateArrBadge();
+  renderApp();
+}
+
+/* ══════════════════════════════════════
+   INIT
+══════════════════════════════════════ */
+async function init() {
+  grist.ready({ requiredAccess: "full" });
+
+  // Chargements parallèles
+  await Promise.all([
+    loadCommunes(),
+    loadStatuts(),
+    loadAllLogs(),
+    loadAllDecompte(),
+  ]);
+
+  // Rendu initial
+  renderApp();
+  renderLogList();
+
+  // Commune input
+  const communeInput = $("communeInput");
+  const debouncedSearch = debounce(q => {
+    const results = filterCommunes(q);
+    if (results.length > 0 || q.length > 0) openCommuneDropdown(results);
+    else closeCommuneDropdown();
+  }, DEBOUNCE_DELAY_MS);
+
+  communeInput?.addEventListener("input", e => debouncedSearch(e.target.value));
+  communeInput?.addEventListener("focus", e => {
+    if (e.target.value.length > 0) debouncedSearch(e.target.value);
+  });
+  communeInput?.addEventListener("blur", () => {
+    setTimeout(closeCommuneDropdown, BLUR_DELAY_MS);
+  });
+  communeInput?.addEventListener("keydown", e => {
+    if (e.key === "Escape") { closeCommuneDropdown(); communeInput.blur(); }
+  });
+
+  $("communeClearBtn")?.addEventListener("click", clearCommune);
+
+  // Onglets principaux — reset champ recherche au changement d'onglet
+  document.querySelectorAll(".app-tab").forEach(btn => {
+    btn.addEventListener("click", () => {
+      state.tab = btn.dataset.tab;
+      clearCommune();
+    });
+  });
+
+  // Sidebar
+  $("btnToggleSidebar")?.addEventListener("click", () => {
+    state.sidebarOpen = !state.sidebarOpen;
+    $("logSidebar")?.classList.toggle("open", state.sidebarOpen);
+    $("appMain")?.classList.toggle("sidebar-open", state.sidebarOpen);
+  });
+  $("btnCloseSidebar")?.addEventListener("click", () => {
+    state.sidebarOpen = false;
+    $("logSidebar")?.classList.remove("open");
+    $("appMain")?.classList.remove("sidebar-open");
+  });
+
+  // Binding Grist : réagit à la sélection d'une ligne dans la table DECOMPTE
+  bindGristSelection();
+}
+
+/* ══════════════════════════════════════
+   GRIST SELECTION BINDING
+══════════════════════════════════════ */
+function bindGristSelection() {
+  grist.onRecord((record) => {
+    if (!record) return;
+
+    let communeId = record[DECOMPTE_COLS.Commune];
+    if (Array.isArray(communeId)) communeId = communeId[1];
+    communeId = parseInt(communeId, 10);
+
+    if (!communeId || isNaN(communeId)) return;
+
+    const commune = state.communesById.get(communeId);
+    if (!commune) return;
+
+    if (state.selectedCommune?.id === communeId) return;
+
+    selectCommune(commune);
+  });
+}
+
+/* ══════════════════════════════════════
+   POINT D'ENTRÉE
+══════════════════════════════════════ */
+init();
+
+</script>
+</body>
+</html>

@@ -1,0 +1,5489 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+  <!-- DSFR 1.14 -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@gouvfr/dsfr@1.14/dist/dsfr.min.css">
+  <script type="module" src="https://cdn.jsdelivr.net/npm/@gouvfr/dsfr@1.14/dist/dsfr.module.min.js"></script>
+
+  <!-- FontAwesome 6.5.1 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+  <!-- Grist plugin API -->
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+
+  <style>
+    /* ================= LAYOUT ET PALETTE HARMONISÉS ================= */
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+    }
+
+    body {
+      background: #f0f0f0;
+      font-family: Marianne, arial, sans-serif;
+      font-size: 0.875rem;
+      color: #1e1e1e;
+      min-height: 100vh;
+    }
+
+    .app-shell {
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .app-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .app-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      background: #f0f0f0;
+    }
+
+    /* ================= HEADER HARMONISÉ ================= */
+    .app-header {
+      background: #000091;
+      padding: 0 1.25rem;
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+      flex-shrink: 0;
+      height: 3.25rem;
+    }
+
+    .app-header__logo {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #fff;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding-right: 1rem;
+      border-right: 1px solid rgba(255,255,255,.2);
+      margin-right: 1rem;
+      flex-shrink: 0;
+    }
+
+    .app-header__logo i {
+      font-size: 1.1rem;
+    }
+
+    .app-header__title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      flex: 1;
+      gap: 0.75rem;
+    }
+
+    .app-header__badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.2rem 0.6rem;
+      background: rgba(255, 192, 61, 0.25);
+      border: 1px solid rgba(255, 192, 61, 0.5);
+      border-radius: 3px;
+      color: #fff;
+      font-size: 0.7rem;
+      font-weight: 700;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    /* Tabs dans le header */
+    .app-tabs {
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+      margin-left: auto;
+    }
+    .app-tab {
+      background: #000091 !important;
+      border: none;
+      color: rgba(255, 255, 255, 0.65);
+      padding: 0 1.1rem;
+      cursor: pointer;
+      font-size: 0.82rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      border-bottom: 3px solid transparent;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+      white-space: nowrap;
+      -webkit-appearance: none;
+      appearance: none;
+      height: 100%;
+    }
+    .app-tab:hover { color: #fff; background: #1c1cae !important; }
+    .app-tab.active { color: #fff; border-bottom-color: #fff; background: rgba(255, 255, 255, 0.12) !important; }
+
+    /* Tab panels */
+    .app-tab-panel {
+      display: none;
+    }
+    .app-tab-panel.active {
+      display: block;
+    }
+
+    /* Mode badge et help */
+    .mode-zone {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.5rem 0;
+      flex-wrap: wrap;
+    }
+
+    .mode-help {
+      font-size: 0.8rem;
+      color: #666;
+      font-style: italic;
+      margin-bottom: 0;
+    }
+
+    .mono { font-variant-numeric: tabular-nums; }
+    .req { color: var(--text-default-error); font-weight: 700; }
+
+    /* Réduction de la taille des labels et inputs */
+    .fr-label { font-size: 0.875rem; }
+    .fr-input, .fr-select {
+      font-size: 0.875rem;
+      border-color: #000091 !important;
+      background: #f5f5fe !important;
+      border-radius: 0.375rem !important;
+      transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+    }
+    .fr-input:focus, .fr-select:focus {
+      background: #fff !important;
+      border-color: #000091 !important;
+      outline: 2px solid #000091;
+      outline-offset: 2px;
+    }
+    .fr-fieldset__legend { font-size: 0.9375rem; }
+
+    /* Textarea styling */
+    textarea.fr-input {
+      resize: vertical;
+      min-height: 4.5rem;
+      line-height: 1.5;
+    }
+
+    /* Sections avec style card DSFR */
+    .form-section {
+      background: #fff;
+      border: 2px solid #e5e5e5;
+      border-radius: 0.75rem;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    .form-section:hover {
+      border-color: #000091;
+      box-shadow: 0 4px 16px rgba(0,0,145,.12);
+    }
+    .form-section__title {
+      font-size: 1.125rem;
+      font-weight: 700;
+      color: var(--text-title-grey);
+      margin-bottom: 1rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--border-default-grey);
+    }
+    .section-icon {
+      margin-right: 0.75rem;
+      color: var(--text-action-high-blue-france);
+      font-size: 1.25rem;
+      vertical-align: middle;
+    }
+
+    /* ensure hidden inline messages never render */
+    .fr-error-text[hidden], .fr-warning-text[hidden] { display: none !important; }
+    .fr-error-text, .fr-warning-text { margin-bottom: 0; }
+
+    /* Ligne commune : label à gauche, corps (input+infos+tag) à droite */
+    .commune-inline-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .commune-inline-label {
+      flex-shrink: 0;
+      width: 6.5rem;          /* même largeur que les labels de champs */
+      padding-top: 0.45rem;   /* aligner verticalement avec l'input */
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--text-title-grey);
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      cursor: pointer;
+    }
+    .commune-inline-label .controle-subsection__icon {
+      font-size: 0.9rem;
+    }
+    .commune-inline-body {
+      flex: 1;
+      min-width: 0;
+    }
+    @media (max-width: 768px) {
+      .commune-inline-row { flex-direction: column; }
+      .commune-inline-label { width: auto; padding-top: 0; }
+    }
+
+    /* Ligne commune : input 1/3 + tags à droite */
+    .commune-oneline {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+    }
+    .commune-oneline__input {
+      width: 50%;
+      flex-shrink: 0;
+      position: relative;
+    }
+
+    /* Tag stratégie dans la zone droite */
+    /* Tags Oui/Non dans les titres de section */
+    .strat-tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.2rem 0.6rem;
+      border-radius: 2px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      line-height: 1.4;
+      white-space: nowrap;
+    }
+    .strat-tag--oui {
+      background: #FEE2E2;
+      color: #991B1B;
+      border: 1px solid #FCA5A5;
+    }
+    .strat-tag--non {
+      background: #DCFCE7;
+      color: #166534;
+      border: 1px solid #86EFAC;
+    }
+    /* Zone de tags à droite dans un titre de section */
+    .section-title-tags {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      flex-shrink: 0;
+      font-weight: 400; /* reset le font-weight du h3 */
+    }
+    /* Badges dans le champ commune (arrondissement + logements) */
+    .commune-input-badges {
+      display: none;
+      align-items: center;
+      gap: 0.25rem;
+      position: absolute;
+      right: 2.5rem; /* laisser place au bouton clear */
+      top: 50%;
+      transform: translateY(-50%);
+      pointer-events: none;
+    }
+    .commune-input-wrap.has-arr .commune-input-badges { display: flex; }
+    .commune-arr-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.15rem 0.45rem;
+      border-radius: 2px;
+      background: var(--background-contrast-blue-france);
+      border: 1px solid var(--border-default-grey);
+      color: var(--text-title-grey);
+      font-size: 0.75rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .commune-arr-badge--log {
+      display: none;
+      background: #DBEAFE;
+      border-color: #BFDBFE;
+      color: #1E40AF;
+    }
+    .commune-arr-badge--log.is-visible { display: inline-flex; }
+    .commune-arr-badge--sel {
+      display: none;
+    }
+    .commune-arr-badge--sel.is-visible { display: inline-flex; }
+    .commune-arr-badge--sel.sel-fixe    { background: #EFE0FF; border-color: #D8B4FE; color: #6B21A8; }
+    .commune-arr-badge--sel.sel-ciblee  { background: #FFF0D9; border-color: #FDE68A; color: #92400E; }
+    .commune-arr-badge--sel.sel-rotation{ background: #FDE8FC; border-color: #F0ABFC; color: #86198F; }
+    /* Quand badges visibles : décaler le padding-right de l'input */
+    .commune-input-wrap.has-arr .commune-input {
+      padding-right: 10rem; /* sel + log + arr + clear */
+    }
+
+    /* Wrapper input+clear du champ commune */
+    .commune-input-wrap {
+      position: relative;
+    }
+
+    /* Input commune : même style que field-styled mais avec padding-right pour le bouton clear */
+    .commune-input {
+      width: 100%;
+      height: 2.5rem;
+      padding: 0 2.5rem 0 0.875rem;
+      border: 2px solid var(--border-plain-blue-france);
+      border-radius: 0.375rem;
+      background: var(--background-contrast-blue-france);
+      font-size: 0.875rem;
+      color: var(--text-title-grey);
+      font-weight: 500;
+      box-sizing: border-box;
+      box-shadow: none;
+      transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+    }
+    .commune-input:hover {
+      background: var(--background-contrast-blue-france-hover);
+    }
+    .commune-input:focus {
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(0, 0, 145, 0.2);
+      border-color: var(--text-action-high-blue-france);
+      background: white;
+    }
+    .commune-input::placeholder {
+      color: var(--text-mention-grey);
+      font-style: italic;
+      font-weight: 400;
+    }
+    /* Quand une commune est saisie/sélectionnée : même style que la valeur des dropdowns */
+    .commune-input:not(:placeholder-shown) {
+      color: var(--text-action-high-blue-france);
+      font-weight: 700;
+      font-size: 0.875rem;
+    }
+
+    /* Masquer définitivement le hint communeMeta */
+    #communeMeta { display: none !important; }
+
+    /* Dropdown communes */
+    .dd { position: relative; }
+
+    /* Bouton clear pour le champ commune */
+    .commune-clear-btn {
+      position: absolute;
+      right: 0.5rem;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 2rem;
+      height: 2rem;
+      border: none;
+      background: transparent;
+      color: var(--text-mention-grey);
+      cursor: pointer;
+      border-radius: 50%;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      font-size: 1rem;
+    }
+    .commune-clear-btn:hover {
+      background: var(--background-contrast-grey);
+      color: var(--text-action-high-blue-france);
+    }
+    .commune-clear-btn:active {
+      background: var(--background-contrast-grey-hover);
+    }
+    .commune-search-wrapper:has(#communeInput:not(:placeholder-shown)) .commune-clear-btn {
+      display: flex;
+    }
+    .dd-panel {
+      position: absolute;
+      z-index: 9999;
+      top: calc(100% + .25rem);
+      left: 0;
+      right: 0;
+      max-height: 320px;
+      overflow: auto;
+      background: var(--background-default-grey);
+      border: 1px solid var(--border-default-grey);
+      border-radius: .5rem;
+      box-shadow: var(--raised-shadow);
+      display: none;
+    }
+    .dd-item {
+      width: 100%;
+      text-align: left;
+      padding: .625rem .875rem;
+      display: flex;
+      align-items: center;
+      gap: .625rem;
+      border: 0;
+      background: transparent;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+    .dd-item:hover,
+    .dd-item:focus {
+      background: var(--background-contrast-info-hover);
+      outline: none;
+    }
+    .dd-empty {
+      padding: .75rem;
+      color: var(--text-mention-grey);
+      font-style: italic;
+    }
+    /* Corps texte de l'item commune */
+    .dd-item-body {
+      flex: 1;
+      min-width: 0;
+    }
+    .dd-title {
+      font-weight: 600;
+      font-size: 0.875rem;
+    }
+    .dd-sub {
+      font-size: 0.8125rem;
+      color: var(--text-mention-grey);
+    }
+    /* Badge arrondissement dans la liste (même style que type-dd__item-badge) */
+    .dd-arr-badge {
+      min-width: 2.5rem;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    /* Coche commune sélectionnée */
+    .dd-item-check {
+      margin-left: auto;
+      font-weight: 700;
+      color: var(--text-action-high-blue-france);
+      flex-shrink: 0;
+    }
+
+    /* Logements alignés à droite dans le dropdown — même hauteur/largeur que dd-arr-badge */
+    .dd-item-logements {
+      min-width: 2.5rem;
+      height: 1.5rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-left: auto;
+      flex-shrink: 0;
+      font-weight: 600;
+      font-size: 0.8125rem;
+      border-radius: 3px;
+      background: #DBEAFE;
+      border: 1px solid #BFDBFE;
+      color: #1E40AF;
+      white-space: nowrap;
+      text-align: center;
+    }
+
+    /* Sous-infos (sélection + réglementation) sans les logements */
+    .dd-sub-info {
+      font-size: 0.8125rem;
+      color: var(--text-mention-grey);
+    }
+
+    /* Sous-sections dans Contrôle de légalité */
+    .controle-subsection {
+      margin-bottom: 1.5rem;
+    }
+    .controle-subsection__title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text-title-grey);
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .controle-subsection__icon {
+      color: var(--text-action-high-blue-france);
+      font-size: 1.125rem;
+    }
+
+    /* Grid 2 colonnes pour les items motif/objet */
+    .motif-grid-2col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      column-gap: 1.5rem;
+      row-gap: 0;
+    }
+    /* Les messages d'erreur s'étendent sur toute la largeur */
+    .motif-grid-2col > p {
+      grid-column: 1 / -1;
+    }
+    @media (max-width: 576px) {
+      .motif-grid-2col {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Placeholder pour contenu à venir */
+    .controle-subsection .fr-hint-text {
+      color: var(--text-mention-grey);
+      font-style: italic;
+      padding: 1rem;
+      background: var(--background-alt-grey);
+      border-radius: 0.25rem;
+      text-align: center;
+    }
+
+    /* Amélioration des checkboxes motifs avec hints */
+    .motif-item {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      padding: 0.75rem;
+      border: 1px solid var(--border-default-grey);
+      border-radius: 0.25rem;
+      margin-bottom: 0.5rem;
+      transition: background-color 0.2s ease, border-color 0.2s ease;
+    }
+    .motif-item > .fr-error-text {
+      width: 100%;
+      margin: 0;
+      font-size: 0.75rem;
+    }
+    .motif-item:hover {
+      background-color: var(--background-alt-grey);
+    }
+    .motif-item.is-checked {
+      background-color: var(--background-contrast-info);
+      border-color: var(--border-plain-blue-france);
+    }
+    .motif-item.has-error {
+      border-color: var(--border-plain-error);
+      background-color: var(--background-contrast-error);
+    }
+    .motif-item__checkbox {
+      flex-shrink: 0;
+    }
+    .motif-item__content {
+      flex: 1;
+      min-width: 0;
+    }
+    .motif-item__label {
+      font-weight: 600;
+      margin-bottom: 0;
+      cursor: pointer;
+    }
+    .motif-item__hint {
+      font-size: 0.8125rem;
+      color: var(--text-mention-grey);
+      margin-top: 0.25rem;
+      display: none;
+    }
+    .motif-item.is-checked .motif-item__hint {
+      display: block;
+    }
+
+    /* Input nb logements inline (Taille du projet) */
+    .motif-item__taille-input {
+      display: none;
+      align-items: center;
+      gap: 0.35rem;
+      margin-left: auto;
+      flex-shrink: 0;
+    }
+    .motif-item.is-checked .motif-item__taille-input {
+      display: flex;
+    }
+    .motif-item__taille-input input[type="number"] {
+      width: 3.5rem;
+      padding: 0.15rem 0.3rem;
+      border: 1px solid var(--border-default-grey);
+      border-radius: 0.25rem;
+      font-size: 0.8125rem;
+      font-family: inherit;
+      color: var(--text-default-grey);
+      background: var(--background-default-grey);
+      -moz-appearance: textfield;
+    }
+    .motif-item__taille-input input[type="number"]::-webkit-inner-spin-button,
+    .motif-item__taille-input input[type="number"]::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+    }
+    .motif-item__taille-input input[type="number"]:focus {
+      outline: 2px solid var(--border-plain-blue-france);
+      outline-offset: 1px;
+    }
+    .motif-item__taille-input .taille-unit {
+      font-size: 0.8125rem;
+      color: var(--text-mention-grey);
+      white-space: nowrap;
+    }
+    .taille-seuil-hint {
+      font-size: 0.75rem;
+      font-weight: 400;
+      color: var(--text-mention-grey);
+      white-space: nowrap;
+    }
+    .taille-seuil-hint:empty { display: none; }
+
+    /* Label avec badge code (style dropdown Type/Type2) */
+    .motif-item__label--badge {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0;
+      cursor: pointer;
+      line-height: 1.4;
+    }
+    .motif-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.15rem 0.4rem;
+      border-radius: 0.25rem;
+      background: var(--background-contrast-blue-france);
+      color: var(--text-action-high-blue-france);
+      font-size: 0.75rem;
+      font-weight: 700;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: background 0.15s, color 0.15s;
+    }
+    /* Badge seul (Signalé, Aléatoire, Site classé) : texte légèrement plus grand */
+    .motif-badge--sm {
+      font-size: 0.8125rem;
+      padding: 0.15rem 0.5rem;
+    }
+    /* Quand coché : badge bleu plein */
+    .motif-item.is-checked .motif-badge {
+      background: var(--text-action-high-blue-france);
+      color: white;
+    }
+
+    /* Informations commune en lecture seule */
+    .commune-info-container {
+      padding: 1.5rem;
+      background: var(--background-contrast-info);
+      border-radius: 0.5rem;
+      border: 1px solid var(--border-default-grey);
+    }
+    .commune-info-row {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+    .commune-info-row:last-child {
+      margin-bottom: 0;
+    }
+    .commune-info-row--centered {
+      gap: 1rem;
+    }
+    .commune-info-item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      min-width: 0;
+    }
+    .commune-info-item--tag {
+      flex-direction: row;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .commune-info-item__label {
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: var(--text-mention-grey);
+      text-transform: uppercase;
+      letter-spacing: 0.025em;
+      white-space: nowrap;
+    }
+    .commune-info-item__value {
+      font-size: 0.9375rem;
+      color: var(--text-title-grey);
+      font-weight: 500;
+    }
+    .commune-info-item__value.is-empty {
+      color: var(--text-mention-grey);
+      font-style: italic;
+    }
+
+    /* Responsive pour petits écrans */
+    @media (max-width: 768px) {
+      .commune-info-container {
+        padding: 1rem;
+      }
+      .commune-info-row {
+        gap: 0.75rem;
+        flex-direction: column;
+        align-items: center;
+      }
+      .commune-info-item {
+        width: 100%;
+        align-items: center;
+        text-align: center;
+      }
+      .commune-tag {
+        font-size: 0.8125rem;
+        padding: 0.2rem 0.6rem;
+      }
+    }
+
+    /* Infos commune compactes (sans labels) */
+    .commune-info-compact {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      padding: 0.75rem 1rem;
+      background: var(--background-contrast-blue-france);
+      border: 1px solid var(--border-plain-blue-france);
+      border-radius: 0.375rem;
+      min-height: 2.5rem;
+      justify-content: center;
+    }
+    .commune-info-line {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.375rem;
+      align-items: center;
+    }
+    .commune-tag--nom {
+      font-size: 0.9375rem;
+      font-weight: 700;
+    }
+
+    /* Tags pour Logements et Sélection */
+    .commune-tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.25rem 0.75rem;
+      border-radius: 1rem;
+      font-size: 0.875rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .commune-tag--green {
+      background-color: #D1FAE5;
+      color: #065F46;
+    }
+    .commune-tag--red {
+      background-color: #FEE2E2;
+      color: #991B1B;
+    }
+    .commune-tag--blue {
+      background-color: #DBEAFE;
+      color: #1E40AF;
+    }
+    .commune-tag--blue-dark {
+      background-color: #93C5FD;
+      color: #1E3A8A;
+    }
+    .commune-tag--arr {
+      background-color: white;
+      color: var(--text-title-grey);
+      border: 1px solid var(--border-default-grey);
+    }
+    /* Tags sélection trimestrielle */
+    .commune-tag--fixe {
+      background-color: #EFE0FF;
+      color: #6B21A8;
+    }
+    .commune-tag--ciblee {
+      background-color: #FFF0D9;
+      color: #92400E;
+    }
+    .commune-tag--rotation {
+      background-color: #FDE8FC;
+      color: #86198F;
+    }
+
+    /* Tags pour réponse Oui/Non dans section enjeux */
+    .enjeu-status-tag {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.5rem 1.5rem;
+      border-radius: 1.5rem;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+
+    /* Radios Oui/Non inline dans les motif-item */
+    .motif-item__radios {
+      display: none;
+      align-items: center;
+      gap: 0.375rem;
+      margin-left: auto;
+      flex-shrink: 0;
+    }
+    .motif-item.is-checked .motif-item__radios {
+      display: flex;
+    }
+    .motif-radio {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.15rem 0.6rem;
+      border: 1px solid var(--border-default-grey);
+      border-radius: 2rem;
+      cursor: pointer;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-mention-grey);
+      background: var(--background-default-grey);
+      transition: all 0.15s ease;
+      user-select: none;
+      white-space: nowrap;
+    }
+    .motif-radio:hover {
+      border-color: var(--border-default-blue-france);
+      color: var(--text-action-high-blue-france);
+    }
+    .motif-radio.is-oui {
+      background: #FEE2E2;
+      border-color: #FCA5A5;
+      color: #991B1B;
+    }
+    .motif-radio.is-non {
+      background: #DCFCE7;
+      border-color: #86EFAC;
+      color: #166534;
+    }
+    .motif-radio input[type="radio"] {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .commune-info-placeholder {
+      text-align: center;
+      color: var(--text-mention-grey);
+      font-style: italic;
+      padding: 0.75rem 1rem;
+      background: var(--background-contrast-blue-france);
+      border-radius: 0.375rem;
+      border: 1px solid var(--border-plain-blue-france);
+      min-height: 2.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+
+    /* ACTION BAND: normal flow, full width (not sticky/fixed) */
+    .actions-band {
+      margin-top: 1rem;
+      padding: 1rem 0;
+      border-top: 2px solid var(--border-default-grey);
+      background: transparent;
+      width: 100vw;
+      margin-left: calc(50% - 50vw);
+      margin-right: calc(50% - 50vw);
+    }
+    .actions-inner {
+      padding-left: 1rem;
+      padding-right: 1rem;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    /* Boutons améliorés */
+    .action-btn {
+      padding: 0.75rem 2rem;
+      font-size: 1rem;
+      font-weight: 600;
+      border-radius: 0.5rem;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      min-width: 140px;
+      justify-content: center;
+    }
+
+    /* Bouton principal (Créer/Mettre à jour) */
+    .action-btn--primary {
+      background: linear-gradient(135deg, #000091 0%, #1212FF 100%);
+      color: white;
+      box-shadow: 0 4px 12px rgba(0, 0, 145, 0.2);
+      font-size: 1.0625rem;
+      padding: 0.875rem 2.5rem;
+      text-transform: none;
+    }
+    .action-btn--primary:hover:not(:disabled) {
+      background: linear-gradient(135deg, #1212FF 0%, #000091 100%);
+      box-shadow: 0 6px 16px rgba(0, 0, 145, 0.3);
+      transform: translateY(-1px);
+    }
+    .action-btn--primary:active:not(:disabled) {
+      transform: translateY(0);
+      box-shadow: 0 2px 8px rgba(0, 0, 145, 0.2);
+    }
+    .action-btn--primary:disabled {
+      background: var(--background-disabled-grey);
+      color: var(--text-disabled-grey);
+      box-shadow: none;
+      cursor: not-allowed;
+    }
+
+    /* Bouton secondaire (Réinitialiser) */
+    .action-btn--secondary {
+      background: transparent;
+      color: var(--text-default-grey);
+      border: 1px solid var(--border-default-grey);
+      font-size: 0.9375rem;
+      padding: 0.75rem 1.5rem;
+    }
+    .action-btn--secondary:hover:not(:disabled) {
+      background: var(--background-contrast-grey);
+      border-color: var(--border-default-blue-france);
+      color: var(--text-action-high-blue-france);
+    }
+    .action-btn--secondary:active:not(:disabled) {
+      background: var(--background-contrast-grey-hover);
+    }
+    .action-btn--secondary:disabled {
+      background: transparent;
+      color: var(--text-disabled-grey);
+      border-color: var(--border-disabled-grey);
+      cursor: not-allowed;
+    }
+
+    /* Bouton tertiaire (Quitter l'édition) */
+    .action-btn--tertiary {
+      background: transparent;
+      color: var(--text-mention-grey);
+      border: none;
+      padding: 0.75rem 1.5rem;
+      font-size: 0.9375rem;
+    }
+    .action-btn--tertiary:hover:not(:disabled) {
+      background: var(--background-contrast-grey);
+      color: var(--text-default-grey);
+    }
+    .action-btn--tertiary:disabled {
+      color: var(--text-disabled-grey);
+      cursor: not-allowed;
+    }
+
+    /* Loading indicator */
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.9);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+    }
+    .loading-spinner {
+      width: 3rem;
+      height: 3rem;
+      border: 4px solid var(--border-default-grey);
+      border-top-color: var(--background-action-high-blue-france);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Buttons full width */
+    .actions-inner .fr-btns-group {
+      width: 100%;
+      display: flex;
+      gap: .75rem;
+      margin: 0;
+    }
+    .actions-inner .fr-btns-group > button {
+      flex: 1 1 0;
+      justify-content: center;
+    }
+  /* Champs calculés / lecture seule */
+.fr-input.is-readonly {
+  background-color: var(--background-contrast-grey);
+  color: var(--text-mention-grey);
+  cursor: not-allowed;
+}
+.fr-input.is-readonly:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+
+
+    /* Précisions : checkboxes sur une ligne (wrap si besoin) */
+    .prec-inline {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      align-items: center;
+    }
+    .prec-inline .fr-checkbox-group {
+      margin-bottom: 0;
+    }
+
+    /* Espacement réduit pour formulaire compact */
+    .fr-grid-row--gutters > [class*="fr-col-"] {
+      padding-top: 0.5rem;
+      padding-bottom: 0.5rem;
+    }
+    .fr-input-group, .fr-select-group {
+      margin-bottom: 0;
+    }
+
+    /* Custom select dropdown styling - style moderne comme communes */
+    .fr-select {
+      appearance: none;
+      background-color: var(--background-default-grey);
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000091' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 0.75rem center;
+      background-size: 1.125rem;
+      padding-right: 2.75rem;
+      border: 1px solid var(--border-default-grey);
+      border-radius: 0.25rem;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      cursor: pointer;
+    }
+    .fr-select:hover {
+      border-color: var(--border-plain-blue-france);
+    }
+    .fr-select:focus {
+      outline: none;
+      border-color: var(--border-plain-blue-france);
+      box-shadow: 0 0 0 2px rgba(0, 0, 145, 0.1);
+    }
+    .fr-select option {
+      padding: 0.5rem;
+      background-color: var(--background-default-grey);
+    }
+
+    /* Dropdown custom Type/Type2 */
+    .type-dd {
+      position: relative;
+    }
+    .type-dd__btn {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      height: 2.5rem; /* hauteur fixe = référence */
+      padding: 0 0.875rem;
+      border: 1px solid var(--border-plain-blue-france);
+      border-radius: 0.375rem;
+      background: var(--background-contrast-blue-france);
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+      box-shadow: none;
+      box-sizing: border-box;
+    }
+    .type-dd__btn:hover {
+      background: var(--background-contrast-blue-france-hover);
+    }
+    .type-dd__btn:focus {
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(0, 0, 145, 0.2);
+    }
+    .type-dd__btn[aria-expanded="true"] {
+      border-color: var(--text-action-high-blue-france);
+      box-shadow: 0 0 0 2px rgba(0, 0, 145, 0.2);
+    }
+    .type-dd__label {
+      font-size: 0.875rem;
+      font-weight: 700;
+      color: var(--text-action-high-blue-france);
+      letter-spacing: 0.02em;
+      line-height: 1.5;
+    }
+    .type-dd__label--placeholder {
+      font-weight: 400;
+      color: var(--text-mention-grey);
+      font-style: italic;
+    }
+    .type-dd__chevron {
+      flex-shrink: 0;
+      width: 1.125rem;
+      height: 1.125rem;
+      color: var(--text-action-high-blue-france);
+      transition: transform 0.2s ease;
+    }
+    .type-dd__btn[aria-expanded="true"] .type-dd__chevron {
+      transform: rotate(180deg);
+    }
+    .type-dd__panel {
+      position: absolute;
+      z-index: 9999;
+      top: calc(100% + 0.25rem);
+      left: 0;
+      right: 0;
+      background: white;
+      border: 1px solid var(--border-default-grey);
+      border-radius: 0.5rem;
+      box-shadow: var(--raised-shadow);
+      display: none;
+      overflow: hidden;
+    }
+    .type-dd__panel.is-open {
+      display: block;
+    }
+    .type-dd__item {
+      width: 100%;
+      text-align: left;
+      padding: 0.625rem 0.875rem;
+      border: 0;
+      background: transparent;
+      cursor: pointer;
+      font-size: 0.9375rem;
+      font-weight: 600;
+      color: var(--text-title-grey);
+      transition: background 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .type-dd__item:hover {
+      background: var(--background-contrast-info-hover);
+      color: var(--text-action-high-blue-france);
+    }
+    .type-dd__item.is-selected {
+      background: var(--background-contrast-blue-france);
+      color: var(--text-action-high-blue-france);
+    }
+    .type-dd__item.is-selected::after {
+      content: "✓";
+      margin-left: auto;
+      font-weight: 700;
+    }
+    .type-dd__empty {
+      padding: 0.625rem 0.875rem;
+      color: var(--text-mention-grey);
+      font-style: italic;
+      font-size: 0.875rem;
+    }
+    .type-dd__item-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 2rem;
+      padding: 0.125rem 0.375rem;
+      border-radius: 0.25rem;
+      background: var(--background-contrast-blue-france);
+      color: var(--text-action-high-blue-france);
+      font-size: 0.75rem;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .type-dd__item.is-selected .type-dd__item-badge {
+      background: var(--text-action-high-blue-france);
+      color: white;
+    }
+
+    /* Dropdown multi-sélection (Origine/Précisions) */
+    .precs-panel--multi .type-dd__item::after {
+      display: none; /* pas de checkmark auto */
+    }
+    .precs-check-icon {
+      flex-shrink: 0;
+      width: 1.125rem;
+      height: 1.125rem;
+      border: 2px solid var(--border-default-grey);
+      border-radius: 0.25rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .type-dd__item.is-selected .precs-check-icon {
+      background: var(--text-action-high-blue-france);
+      border-color: var(--text-action-high-blue-france);
+      color: white;
+    }
+
+    /* Conteneur date sans pseudo-éléments DSFR (pour ne pas bloquer l'icône calendrier native) */
+    .date-group {
+      /* pas de gap ni margin : on laisse .fr-label gérer via ctrl-group */
+    }
+    /* État erreur pour date-group */
+    .date-group.fr-input-group--error input.field-styled {
+      border-color: var(--border-plain-error);
+    }
+
+    /* Groupe générique ligne 1 : aligne label + contrôle de façon identique */
+    .ctrl-group {
+      display: flex;
+      flex-direction: column;
+    }
+    .ctrl-group .fr-label {
+      margin-bottom: 0.375rem; /* espacement uniforme label → contrôle */
+    }
+
+    /* Restyling champs date : même look que les dropdowns custom */
+    input[type="date"].field-styled {
+      -webkit-appearance: auto; /* restaurer l'icône calendrier native */
+      appearance: auto;
+      width: 100%;
+      height: 2.5rem; /* même hauteur fixe que .type-dd__btn */
+      padding: 0 0.875rem;
+      border: 1px solid var(--border-plain-blue-france);
+      border-radius: 0.375rem;
+      background: var(--background-contrast-blue-france);
+      font-size: 0.875rem;
+      color: var(--text-action-high-blue-france);
+      font-weight: 600;
+      transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+      box-sizing: border-box;
+      cursor: pointer;
+      box-shadow: none;
+    }
+    input[type="date"].field-styled:hover {
+      background: var(--background-contrast-blue-france-hover);
+    }
+    input[type="date"].field-styled:focus {
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(0, 0, 145, 0.2);
+      border-color: var(--text-action-high-blue-france);
+    }
+    input[type="date"].field-styled.is-empty {
+      color: var(--text-mention-grey);
+      font-style: italic;
+      font-weight: 400;
+    }
+    input[type="date"].field-styled.is-empty::-webkit-datetime-edit,
+    input[type="date"].field-styled.is-empty::-webkit-datetime-edit-text,
+    input[type="date"].field-styled.is-empty::-webkit-datetime-edit-month-field,
+    input[type="date"].field-styled.is-empty::-webkit-datetime-edit-day-field,
+    input[type="date"].field-styled.is-empty::-webkit-datetime-edit-year-field {
+      color: var(--text-mention-grey);
+      font-style: italic;
+    }
+
+    /* Restyling champs texte et textarea */
+    input[type="text"].field-styled,
+    textarea.field-styled {
+      width: 100%;
+      padding: 0.625rem 0.875rem;
+      border: 1px solid var(--border-plain-blue-france);
+      border-radius: 0.375rem;
+      background: var(--background-contrast-blue-france);
+      font-size: 0.875rem;
+      color: var(--text-title-grey);
+      font-weight: 500;
+      transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+      box-sizing: border-box;
+      box-shadow: none; /* neutralise tout shadow DSFR résiduel */
+    }
+    input[type="text"].field-styled:hover,
+    textarea.field-styled:hover {
+      background: var(--background-contrast-blue-france-hover);
+    }
+    input[type="text"].field-styled:focus,
+    textarea.field-styled:focus {
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(0, 0, 145, 0.2);
+      border-color: var(--text-action-high-blue-france);
+      background: white;
+    }
+    input[type="text"].field-styled::placeholder,
+    textarea.field-styled::placeholder {
+      color: var(--text-mention-grey);
+      font-style: italic;
+      font-weight: 400;
+    }
+    input[type="text"].field-styled.mono {
+      font-family: monospace;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.025em;
+    }
+
+    /* Hauteur égale entre les 2 colonnes Nom projet / N°acte+N°parcelle */
+    @media (min-width: 48em) {
+      .col-stretch {
+        /* Le fr-col-md-6 est déjà un flex item dans fr-grid-row (align-self: stretch par défaut).
+           On en fait à son tour un conteneur flex colonne pour que les enfants puissent s'étirer. */
+        display: flex !important;
+        flex-direction: column;
+      }
+      .group-stretch {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        margin-bottom: 0;
+      }
+      .textarea-stretch {
+        flex: 1;
+        resize: none;
+        min-height: 0;
+        line-height: 1.5;
+      }
+    }
+    /* Sur mobile : comportement normal avec une hauteur minimale */
+    @media (max-width: 47.99em) {
+      .textarea-stretch {
+        min-height: 5rem;
+        resize: vertical;
+        line-height: 1.5;
+      }
+    }
+
+
+/* Dates (input[type="date"]) : style "placeholder" (état vide) en gris léger + italique
+   NB: les navigateurs n'exposent pas toujours un vrai ::placeholder pour type=date. */
+input[type="date"].is-empty{
+  color: var(--text-mention-grey);
+  font-style: italic;
+}
+input[type="date"].is-empty::-webkit-datetime-edit,
+input[type="date"].is-empty::-webkit-datetime-edit-text,
+input[type="date"].is-empty::-webkit-datetime-edit-month-field,
+input[type="date"].is-empty::-webkit-datetime-edit-day-field,
+input[type="date"].is-empty::-webkit-datetime-edit-year-field{
+  color: var(--text-mention-grey);
+  font-style: italic;
+}
+
+
+/* Alignement horizontal parfait des checkboxes */
+.fr-checkbox-group {
+  display: flex;
+  align-items: center;
+}
+.fr-checkbox-group input[type="checkbox"] {
+  margin-top: 0;
+}
+
+
+/* Layout pour la section enjeux (sous-section 2) */
+.motifs-enjeux-row{
+  width: 100%;
+}
+.motifs-enjeux-col{ width: 100%; }
+.motifs-enjeux-col > .fr-col-12{ width:100%; max-width:none; }
+
+/* Toast notifications modernes en bas de page */
+#toastContainer {
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 400px;
+  max-width: 600px;
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  background: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15), 0 4px 12px rgba(0, 0, 0, 0.1);
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  border-left: 4px solid;
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.toast.toast--closing {
+  animation: slideOut 0.3s ease-in forwards;
+}
+
+@keyframes slideOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+}
+
+.toast--success {
+  border-left-color: #18753C;
+}
+
+.toast--error {
+  border-left-color: #CE0500;
+}
+
+.toast--warning {
+  border-left-color: #B34000;
+}
+
+.toast--info {
+  border-left-color: #0063CB;
+}
+
+.toast__icon {
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 1rem;
+}
+
+.toast--success .toast__icon {
+  background: #B8FEC9;
+  color: #18753C;
+}
+
+.toast--error .toast__icon {
+  background: #FFE9E9;
+  color: #CE0500;
+}
+
+.toast--warning .toast__icon {
+  background: #FFE9E6;
+  color: #B34000;
+}
+
+.toast--info .toast__icon {
+  background: #E8EDFF;
+  color: #0063CB;
+}
+
+.toast__content {
+  flex: 1;
+  min-width: 0;
+}
+
+.toast__title {
+  font-weight: 700;
+  font-size: 1rem;
+  margin: 0 0 0.25rem 0;
+  color: var(--text-title-grey);
+}
+
+.toast__message {
+  font-size: 0.875rem;
+  margin: 0;
+  color: var(--text-mention-grey);
+  line-height: 1.5;
+}
+
+.toast__close {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-mention-grey);
+  padding: 0.25rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.25rem;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.toast__close:hover {
+  background: var(--background-contrast-grey);
+  color: var(--text-title-grey);
+}
+
+@media (max-width: 768px) {
+  #toastContainer {
+    min-width: auto;
+    max-width: calc(100vw - 2rem);
+    left: 1rem;
+    right: 1rem;
+    transform: none;
+  }
+
+  /* Réduire les boutons d'action sur petits écrans */
+  .action-btn {
+    font-size: 0.875rem;
+    padding: 0.625rem 1rem;
+    min-width: auto;
+    gap: 0.375rem;
+  }
+
+  .action-btn--primary {
+    font-size: 0.9375rem;
+    padding: 0.75rem 1.25rem;
+  }
+
+  .action-btn--secondary,
+  .action-btn--tertiary {
+    font-size: 0.875rem;
+    padding: 0.625rem 1rem;
+  }
+}
+
+/* ================= TABLEAU DE BORD ================= */
+
+/* Barre d'outils */
+.dashboard-toolbar {
+  background: #fff;
+  border-bottom: 2px solid var(--border-default-grey);
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  role: region;
+}
+
+.dashboard-toolbar__period {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--text-title-grey);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.dashboard-toolbar__period i {
+  font-size: 1rem;
+  color: var(--text-action-high-blue-france);
+}
+
+/* Sélecteur granularité */
+.vue-selector {
+  display: flex;
+  gap: 0;
+  border-radius: 0.375rem;
+  background: var(--background-alt-grey);
+  padding: 0.25rem;
+  flex-shrink: 0;
+}
+
+.vue-btn {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-mention-grey);
+  cursor: pointer;
+  border-radius: 0.25rem;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.vue-btn:hover {
+  background: #f0f4ff;
+  color: var(--text-action-high-blue-france);
+}
+
+.vue-btn.active {
+  background: #fff;
+  color: var(--text-action-high-blue-france);
+  border-color: var(--border-default-grey);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* Navigation période */
+.dash-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.dash-nav-btn {
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: 1px solid var(--border-default-grey);
+  background: transparent;
+  color: var(--text-title-grey);
+  cursor: pointer;
+  border-radius: 0.375rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  font-size: 0.875rem;
+}
+
+.dash-nav-btn:hover:not(:disabled) {
+  background: #f0f4ff;
+  border-color: var(--text-action-high-blue-france);
+  color: var(--text-action-high-blue-france);
+}
+
+.dash-nav-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.dash-period-label {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--text-title-grey);
+  min-width: 5rem;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* Sélecteur périmètre */
+.scope-bar {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.scope-btn {
+  padding: 0.5rem 1rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border: 1px solid var(--border-default-grey);
+  background: transparent;
+  color: var(--text-title-grey);
+  cursor: pointer;
+  border-radius: 0.375rem;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.scope-btn:hover {
+  background: #f0f4ff;
+  border-color: var(--text-action-high-blue-france);
+  color: var(--text-action-high-blue-france);
+}
+
+.scope-btn.active {
+  background: var(--background-contrast-blue-france);
+  border-color: var(--border-plain-blue-france);
+  color: var(--text-action-high-blue-france);
+  font-weight: 700;
+}
+
+/* Bouton tri */
+.sort-toggle-btn {
+  padding: 0.5rem 1rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border: 1px solid var(--border-default-grey);
+  background: transparent;
+  color: var(--text-title-grey);
+  cursor: pointer;
+  border-radius: 0.375rem;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
+
+.sort-toggle-btn:hover {
+  background: #f0f4ff;
+  border-color: var(--text-action-high-blue-france);
+  color: var(--text-action-high-blue-france);
+}
+
+/* Sous-onglets */
+.sub-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid var(--border-default-grey);
+  background: #fff;
+  margin-bottom: 1.5rem;
+}
+
+.sub-tab {
+  padding: 1rem 1.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border: none;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: var(--text-mention-grey);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
+
+.sub-tab:hover {
+  color: var(--text-action-high-blue-france);
+  background: var(--background-alt-grey);
+}
+
+.sub-tab.active {
+  color: var(--text-action-high-blue-france);
+  border-bottom-color: var(--text-action-high-blue-france);
+}
+
+/* Tableau croisé */
+.croise-wrap {
+  overflow-x: auto;
+  margin-bottom: 2rem;
+}
+
+.croise-table {
+  width: 100%;
+  min-width: 600px;
+  border-collapse: collapse;
+  background: #fff;
+}
+
+.croise-table th {
+  position: sticky;
+  top: 0;
+  padding: 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--background-contrast-blue-france);
+  border: 1px solid var(--border-default-grey);
+  text-align: left;
+}
+
+.croise-table th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--text-action-high-blue-france);
+}
+
+.croise-table th.col-num {
+  text-align: right;
+}
+
+.croise-table td {
+  padding: 0.75rem;
+  font-size: 0.8125rem;
+  border: 1px solid var(--border-default-grey);
+  color: var(--text-title-grey);
+}
+
+.croise-table td:first-child {
+  position: sticky;
+  left: 0;
+  background: var(--background-alt-grey);
+  font-weight: 600;
+  z-index: 1;
+}
+
+.croise-table td.col-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.croise-table td.col-num.zero {
+  color: #ccc;
+  font-weight: 400;
+}
+
+.croise-table tr:last-child td {
+  border-bottom: none;
+}
+
+.croise-table tr.total-row {
+  font-weight: 700;
+  background: #f5f5fe;
+  color: var(--text-action-high-blue-france);
+}
+
+.croise-table tr:hover td:not(:first-child) {
+  background: #f9f9ff;
+}
+
+/* Vue détail */
+.commune-detail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.commune-detail-item {
+  background: #fff;
+  border: 1px solid var(--border-default-grey);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  transition: all 0.15s ease;
+}
+
+.commune-detail-item:hover {
+  border-color: var(--border-plain-blue-france);
+  box-shadow: 0 2px 8px rgba(0, 0, 145, 0.1);
+}
+
+.commune-detail-item__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.commune-detail-item__name {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text-title-grey);
+}
+
+.commune-detail-item__arr {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.5rem;
+  background: var(--background-contrast-blue-france);
+  border: 1px solid var(--border-default-grey);
+  border-radius: 2px;
+  color: var(--text-title-grey);
+  font-weight: 600;
+  margin-left: 0.5rem;
+}
+
+.commune-detail-item__total {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-action-high-blue-france);
+}
+
+.commune-detail-item__breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.detail-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.3rem 0.6rem;
+  background: #f5f5fe;
+  border: 1px solid var(--border-plain-blue-france);
+  border-radius: 3px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-action-high-blue-france);
+  white-space: nowrap;
+}
+
+/* Graphique */
+.chart-wrap {
+  margin-bottom: 2rem;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  padding: 1rem;
+  background: #fff;
+  border-radius: 0.5rem;
+}
+
+.chart-svg {
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+}
+
+
+</style>
+</head>
+
+<body>
+  <div class="app-shell">
+    <div class="app-main">
+      <header class="app-header" role="banner">
+        <div class="app-header__logo">
+          <i class="fa-solid fa-landmark" aria-hidden="true"></i>
+          DDT 31
+        </div>
+        <div class="app-header__title">
+          Contrôle AN/PC
+          <span class="app-header__badge" id="modeBadge">création</span>
+        </div>
+        <nav class="app-tabs" role="tablist" aria-label="Modes">
+          <button class="app-tab active" data-tab="saisie" role="tab" aria-selected="true" type="button">
+            <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i> Saisie
+          </button>
+          <button class="app-tab" data-tab="dashboard" role="tab" aria-selected="false" type="button">
+            <i class="fa-solid fa-chart-column" aria-hidden="true"></i> Tableau de bord
+          </button>
+        </nav>
+      </header>
+
+      <main class="app-content" role="main">
+    <div id="loadingOverlay" class="loading-overlay">
+      <div class="loading-spinner"></div>
+      <p class="fr-text--lg fr-mt-2w">Chargement des données...</p>
+    </div>
+    <div id="alertZone" class="fr-mb-2w"></div>
+
+    <!-- TAB SAISIE -->
+    <div id="tabSaisie" class="app-tab-panel active">
+    <div id="modeZone" class="mode-zone">
+      <span class="mode-help" id="modeHelp"></span>
+    </div>
+
+    <!--
+<section class="fr-accordion fr-mt-2w" aria-label="Tests logique contrôle">
+  <h3 class="fr-accordion__title">
+    <button class="fr-accordion__btn" aria-expanded="false" aria-controls="tests-acc">
+      Tests logique (mini-suite)
+    </button>
+  </h3>
+  <div class="fr-collapse" id="tests-acc">
+    <div id="testsZone" class="fr-mt-1w"></div>
+  </div>
+</section>
+-->
+
+    <!-- SECTION 1: Informations générales -->
+    <section class="form-section" aria-labelledby="section-acte-title">
+      <h2 class="form-section__title" id="section-acte-title">
+        <i class="fa-solid fa-file-alt section-icon" aria-hidden="true"></i>
+        Informations générales
+      </h2>
+      <div class="fr-grid-row fr-grid-row--gutters">
+        <!-- Ligne 1: Type / Précisions / Mois / Année / Date visa / Date réception -->
+        <div class="fr-col-12 fr-col-md-3">
+          <div id="grp-type" class="ctrl-group">
+            <label class="fr-label" for="type-btn">Type <span class="req" aria-hidden="true">*</span></label>
+            <div class="type-dd" id="type-dd">
+              <button type="button" class="type-dd__btn" id="type-btn" aria-haspopup="listbox" aria-expanded="false" aria-controls="type-panel">
+                <span class="type-dd__label type-dd__label--placeholder" id="type-label">—</span>
+                <svg class="type-dd__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              <div class="type-dd__panel" id="type-panel" role="listbox"></div>
+            </div>
+            <p class="fr-error-text fr-mt-1v" id="err-type" hidden></p>
+          </div>
+        </div>
+
+        <div class="fr-col-12 fr-col-md-3">
+          <div id="grp-type2" class="ctrl-group">
+            <label class="fr-label" for="type2-btn">Type 2 <span class="req" aria-hidden="true">*</span></label>
+            <div class="type-dd" id="type2-dd">
+              <button type="button" class="type-dd__btn" id="type2-btn" aria-haspopup="listbox" aria-expanded="false" aria-controls="type2-panel">
+                <span class="type-dd__label type-dd__label--placeholder" id="type2-label">—</span>
+                <svg class="type-dd__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              <div class="type-dd__panel" id="type2-panel" role="listbox"></div>
+            </div>
+            <p class="fr-error-text fr-mt-1v" id="err-type2" hidden></p>
+          </div>
+        </div>
+
+        <div class="fr-col-12 fr-col-md-2">
+          <div id="grp-precisions" class="ctrl-group">
+            <label class="fr-label" for="precs-btn">Origine <span class="req" aria-hidden="true">*</span></label>
+            <div class="type-dd" id="precs-dd">
+              <button type="button" class="type-dd__btn" id="precs-btn" aria-haspopup="listbox" aria-expanded="false" aria-controls="precs-panel">
+                <span class="type-dd__label type-dd__label--placeholder" id="precs-label">—</span>
+                <svg class="type-dd__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              <div class="type-dd__panel precs-panel--multi" id="precs-panel" role="listbox" aria-multiselectable="true"></div>
+            </div>
+            <p class="fr-error-text fr-mt-1v" id="err-prec" hidden></p>
+          </div>
+        </div>
+
+        <div class="fr-col-12 fr-col-md-2">
+          <div class="date-group ctrl-group" id="grp-visaMairie">
+            <label class="fr-label" for="visaMairie">Date visa mairie <span class="req" aria-hidden="true">*</span></label>
+            <input class="field-styled" id="visaMairie" name="visaMairie" type="date">
+            <p class="fr-error-text fr-mt-1v" id="err-visaMairie" hidden></p>
+          </div>
+        </div>
+
+        <div class="fr-col-12 fr-col-md-2">
+          <div class="date-group ctrl-group" id="grp-receptionPref">
+            <label class="fr-label" for="receptionPref">Date réception préf. <span class="req" aria-hidden="true">*</span></label>
+            <input class="field-styled" id="receptionPref" name="receptionPref" type="date">
+            <p class="fr-error-text fr-mt-1v" id="err-receptionPref" hidden></p>
+          </div>
+        </div>
+
+        <!-- Ligne 2: Nom projet (gauche) et N° ACTE + N° Parcelle (droite) - hauteur égale -->
+        <div class="fr-col-12 fr-col-md-6 col-stretch">
+          <div class="fr-input-group group-stretch">
+            <label class="fr-label" for="nomProjet">Nom du projet</label>
+            <textarea class="fr-input field-styled textarea-stretch" id="nomProjet" name="nomProjet"></textarea>
+          </div>
+        </div>
+
+        <div class="fr-col-12 fr-col-md-6 col-stretch">
+          <div class="fr-input-group" id="grp-noacte">
+            <label class="fr-label" for="noActe">N° de l'acte</label>
+            <input class="fr-input field-styled mono" id="noActe" name="noActe" type="text" >
+            <p class="fr-error-text fr-mt-1v" id="err-noacte" hidden></p>
+          </div>
+          <div class="fr-input-group fr-mt-2w" id="grp-nparcelle">
+            <label class="fr-label" for="nParcelle">N° de la parcelle (ou adresse)</label>
+            <input class="fr-input field-styled mono" id="nParcelle" name="nParcelle" type="text" >
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 2: Contrôle de légalité -->
+    <section class="form-section" aria-labelledby="section-controle-title">
+      <h2 class="form-section__title" id="section-controle-title">
+        <i class="fa-solid fa-balance-scale section-icon" aria-hidden="true"></i>
+        Contrôle de légalité
+      </h2>
+
+      <!-- 1. Recherche commune : input 1/3 + tags à droite -->
+      <div class="controle-subsection">
+        <div class="commune-oneline">
+          <div class="commune-oneline__input">
+            <div class="commune-search-wrapper dd" id="grp-commune">
+              <div class="commune-input-wrap" id="communeInputWrap">
+                <input class="field-styled commune-input" id="communeInput" placeholder="Sélectionner une commune..." autocomplete="off">
+                <span class="commune-input-badges" id="communeInputBadges">
+                  <span class="commune-arr-badge commune-arr-badge--sel" id="communeSelBadge"></span>
+                  <span class="commune-arr-badge commune-arr-badge--log" id="communeLogBadge"></span>
+                  <span class="commune-arr-badge" id="communeArrBadge"></span>
+                </span>
+                <button type="button" id="communeClearBtn" class="commune-clear-btn" aria-label="Effacer la commune" title="Effacer">
+                  <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                </button>
+              </div>
+              <div class="dd-panel" id="communeDropdown" role="listbox" aria-label="Suggestions communes"></div>
+              <p class="fr-hint-text" id="communeMeta" hidden></p>
+              <p class="fr-error-text fr-mt-1v" id="err-commune" hidden></p>
+              <p class="fr-error-text fr-mt-1v" id="err-statut" hidden></p>
+            </div>
+          </div>
+          <!-- Zone droite réservée (inutilisée, conservée pour compatibilité) -->
+          <div id="strategieTagZone" hidden></div>
+        </div>
+      </div>
+
+      <!-- 2. Enjeux liés à la commune (2 colonnes) -->
+      <div class="controle-subsection">
+        <h3 class="controle-subsection__title">
+          <i class="fa-solid fa-map-marked-alt controle-subsection__icon" aria-hidden="true"></i>
+          Enjeux liés à la commune
+          <span class="section-title-tags" id="communeTitleTags"></span>
+        </h3>
+        <fieldset class="fr-fieldset" id="fs-motif" aria-labelledby="motif-legend">
+          <legend class="fr-fieldset__legend fr-text--regular" id="motif-legend" hidden>Motifs de sélection</legend>
+          <div class="fr-fieldset__content motif-grid-2col">
+            <div class="motif-item" data-motif="ZI">
+              <div class="motif-item__checkbox">
+                <input type="checkbox" id="motif-zi" class="motif" value="ZI">
+              </div>
+              <label class="fr-label motif-item__label motif-item__label--badge" for="motif-zi">
+                <span class="motif-badge">ZI</span>
+                Zone risque naturel
+              </label>
+            </div>
+            <div class="motif-item" data-motif="PEB">
+              <div class="motif-item__checkbox">
+                <input type="checkbox" id="motif-peb" class="motif" value="PEB">
+              </div>
+              <label class="fr-label motif-item__label motif-item__label--badge" for="motif-peb">
+                <span class="motif-badge">PEB</span>
+                Plan d'exposition au bruit
+              </label>
+            </div>
+            <div class="motif-item" data-motif="RT">
+              <div class="motif-item__checkbox">
+                <input type="checkbox" id="motif-rt" class="motif" value="RT">
+              </div>
+              <label class="fr-label motif-item__label motif-item__label--badge" for="motif-rt">
+                <span class="motif-badge">RT</span>
+                Risques technologiques
+              </label>
+            </div>
+            <div class="motif-item" data-objet="LLS">
+              <div class="motif-item__checkbox">
+                <input type="checkbox" id="objet-lls" class="objet" value="LLS">
+              </div>
+              <label class="fr-label motif-item__label motif-item__label--badge" for="objet-lls">
+                <span class="motif-badge">LLS</span>
+                Mixité sociale — logements
+              </label>
+            </div>
+            <div class="motif-item" data-motif="STEP">
+              <div class="motif-item__checkbox">
+                <input type="checkbox" id="motif-step" class="motif" value="STEP">
+              </div>
+              <label class="fr-label motif-item__label motif-item__label--badge" for="motif-step">
+                <span class="motif-badge">STEP</span>
+                Station d'épuration
+              </label>
+            </div>
+            <p class="fr-error-text fr-mt-1v" id="err-motif" hidden></p>
+          </div>
+        </fieldset>
+      </div>
+
+      <!-- 3. Enjeux liés au projet (2 colonnes) -->
+      <div class="controle-subsection">
+        <h3 class="controle-subsection__title">
+          <i class="fa-solid fa-file-signature controle-subsection__icon" aria-hidden="true"></i>
+          Enjeux liés au projet
+          <span class="section-title-tags" id="projetTitleTags"></span>
+        </h3>
+        <fieldset class="fr-fieldset" id="fs-objet" aria-labelledby="objet-legend">
+          <legend class="fr-fieldset__legend fr-text--regular" id="objet-legend" hidden>Objets d'autorisation</legend>
+          <div class="fr-fieldset__content motif-grid-2col">
+
+            <!-- Colonne gauche : ZN, ZA, EE, Site classé -->
+            <div class="motif-item" data-motif="ZN">
+              <div class="motif-item__checkbox">
+                <input type="checkbox" id="motif-zn" class="motif" value="ZN">
+              </div>
+              <label class="fr-label motif-item__label motif-item__label--badge" for="motif-zn">
+                <span class="motif-badge">ZN</span>
+                Zone naturelle
+              </label>
+            </div>
+
+            <!-- Colonne droite : ERP 1/2/3 -->
+            <div class="motif-item" data-objet="ERP 1/2/3">
+              <div class="motif-item__checkbox">
+                <input type="checkbox" id="objet-erp" class="objet" value="ERP 1/2/3">
+              </div>
+              <label class="fr-label motif-item__label motif-item__label--badge" for="objet-erp">
+                <span class="motif-badge">ERP 1/2/3</span>
+                ERP cat. 1 à 3
+              </label>
+            </div>
+
+            <div class="motif-item" data-motif="ZA">
+              <div class="motif-item__checkbox">
+                <input type="checkbox" id="motif-za" class="motif" value="ZA">
+              </div>
+              <label class="fr-label motif-item__label motif-item__label--badge" for="motif-za">
+                <span class="motif-badge">ZA</span>
+                Zone agricole
+              </label>
+            </div>
+
+            <div class="motif-item" data-objet="ERP 4/5">
+              <div class="motif-item__checkbox">
+                <input type="checkbox" id="objet-erp45" class="objet" value="ERP 4/5">
+              </div>
+              <label class="fr-label motif-item__label motif-item__label--badge" for="objet-erp45">
+                <span class="motif-badge">ERP 4/5</span>
+                ERP cat. 4 et 5
+              </label>
+            </div>
+
+            <div class="motif-item" data-objet="EE">
+              <div class="motif-item__checkbox">
+                <input type="checkbox" id="objet-ee" class="objet" value="EE">
+              </div>
+              <label class="fr-label motif-item__label motif-item__label--badge" for="objet-ee">
+                <span class="motif-badge">EE</span>
+                Évaluation environnementale
+              </label>
+            </div>
+
+            <div class="motif-item" data-objet="Signalé">
+              <div class="motif-item__checkbox">
+                <input type="checkbox" id="objet-signale" class="objet" value="Signalé">
+              </div>
+              <label class="fr-label motif-item__label motif-item__label--badge" for="objet-signale">
+                <span class="motif-badge motif-badge--sm">Signalé</span>
+              </label>
+            </div>
+
+            <div class="motif-item" data-motif="Site classé">
+              <div class="motif-item__checkbox">
+                <input type="checkbox" id="motif-siteclasse" class="motif" value="Site classé">
+              </div>
+              <label class="fr-label motif-item__label motif-item__label--badge" for="motif-siteclasse">
+                <span class="motif-badge motif-badge--sm">Site classé</span>
+                Dans le périmètre d'un site classé
+              </label>
+            </div>
+
+            <div class="motif-item" data-objet="Aléatoire">
+              <div class="motif-item__checkbox">
+                <input type="checkbox" id="objet-aleatoire" class="objet" value="Aléatoire">
+              </div>
+              <label class="fr-label motif-item__label motif-item__label--badge" for="objet-aleatoire">
+                <span class="motif-badge motif-badge--sm">Aléatoire</span>
+              </label>
+            </div>
+
+            <!-- Taille du projet — colonne gauche, pleine largeur sur sa ligne -->
+            <div class="motif-item" data-objet="Taille" style="grid-column: 1;">
+              <div class="motif-item__checkbox">
+                <input type="checkbox" id="objet-taille" class="objet" value="Taille">
+              </div>
+              <div class="motif-item__content">
+                <label class="fr-label motif-item__label motif-item__label--badge" for="objet-taille">
+                  <span class="motif-badge motif-badge--sm">Taille</span>
+                  Taille du projet
+                  <span class="taille-seuil-hint" id="taille-seuil-hint"></span>
+                  <div class="motif-item__taille-input">
+                    <input type="number" id="taille-logements" min="0" max="9999" maxlength="4"
+                      placeholder="0" autocomplete="off">
+                    <span class="taille-unit">logements</span>
+                    <p class="fr-error-text" id="err-taille" hidden style="margin:0"></p>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <p class="fr-error-text fr-mt-1v" id="err-objet" hidden></p>
+          </div>
+        </fieldset>
+      </div>
+
+
+      <!-- enjeuContainer conservé invisible pour compatibilité JS (renderEnjeuQuestions) -->
+      <div id="enjeuContainer" hidden></div>
+    </section>
+
+    <!-- Action band at bottom of page (normal flow) -->
+    <div class="actions-band" role="region" aria-label="Actions formulaire">
+      <div class="actions-inner">
+        <button class="action-btn action-btn--primary" id="btnSave" type="button">
+          <i class="fa-solid fa-check" aria-hidden="true"></i>
+          Créer
+        </button>
+        <button class="action-btn action-btn--secondary" id="btnReset" type="button">
+          <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
+          Réinitialiser
+        </button>
+        <button class="action-btn action-btn--tertiary" id="btnExitEdit" type="button" style="display:none;">
+          Quitter l'édition
+        </button>
+      </div>
+    </div>
+    </div><!-- fin tabSaisie -->
+
+    <!-- TAB TABLEAU DE BORD -->
+    <div id="tabDashboard" class="app-tab-panel">
+      <!-- Barre d'outils -->
+      <div class="dashboard-toolbar" role="region" aria-label="Filtres tableau de bord">
+        <!-- Libellé période -->
+        <div class="dashboard-toolbar__period">
+          <i class="fa-solid fa-calendar" aria-hidden="true"></i>
+          <span>Période:</span>
+        </div>
+
+        <!-- Sélecteur granularité -->
+        <div class="vue-selector" role="group" aria-label="Granularité">
+          <button class="vue-btn active" data-vue="mois" type="button">Mois</button>
+          <button class="vue-btn" data-vue="trimestre" type="button">Trim.</button>
+          <button class="vue-btn" data-vue="annee" type="button">Année</button>
+        </div>
+
+        <!-- Navigation période -->
+        <div class="dash-nav">
+          <button id="btnDashPrev" class="dash-nav-btn" title="Période précédente" type="button">
+            <i class="fa-solid fa-chevron-left"></i>
+          </button>
+          <span class="dash-period-label" id="dashPeriodLabel">Jan 2026</span>
+          <button id="btnDashNext" class="dash-nav-btn" title="Période suivante" type="button">
+            <i class="fa-solid fa-chevron-right"></i>
+          </button>
+        </div>
+
+        <!-- Sélecteur périmètre -->
+        <div class="scope-bar">
+          <button class="scope-btn active" data-scope="all" type="button">Toutes les communes</button>
+          <button class="scope-btn" data-scope="commune" type="button">Commune sélectionnée</button>
+        </div>
+
+        <!-- Recherche commune + Bouton tri -->
+        <div style="display: flex; gap: 1rem; margin-left: auto; align-items: center;">
+          <input type="text" id="dashCommuneInput" class="commune-input"
+                 placeholder="Rechercher une commune…" autocomplete="off" />
+          <div id="dashCommuneDd" class="dd-panel" style="display: none;"></div>
+          <button id="btnDashSort" class="sort-toggle-btn" type="button">
+            <i class="fa-solid fa-arrow-down-a-z"></i> A→Z
+          </button>
+        </div>
+      </div>
+
+      <!-- Sous-onglets -->
+      <div class="sub-tabs" role="tablist" aria-label="Vues">
+        <button class="sub-tab active" data-subtab="croise" role="tab" aria-selected="true" type="button">
+          <i class="fa-solid fa-table"></i> Tableau croisé
+        </button>
+        <button class="sub-tab" data-subtab="detail" role="tab" aria-selected="false" type="button">
+          <i class="fa-solid fa-list"></i> Par commune
+        </button>
+        <button class="sub-tab" data-subtab="chart" role="tab" aria-selected="false" type="button">
+          <i class="fa-solid fa-chart-bar"></i> Graphique
+        </button>
+      </div>
+
+      <!-- Conteneur contenu dynamique -->
+      <div id="dashContent"></div>
+    </div>
+
+      </main>
+    </div>
+  </div>
+
+<script>
+/* ================= CONFIG ================= */
+const TABLE_ACTES = "AN_PC";
+const TABLE_COMMUNES = "Communes";
+const TABLE_STATUT = "Communes_Statut"; // Statut des communes par trimestre
+
+const DEFAULT_TRIMESTRE = "2026-T1";
+const DEFAULT_SELECTION = "Non ciblée";
+const SHOW_SELECTIONS = new Set(["Fixe","Ciblée","Rotation"]);
+
+// Constantes UI/UX
+const DEBOUNCE_DELAY_MS = 300;
+const DROPDOWN_BLUR_DELAY_MS = 150;
+const ANIMATION_CLEANUP_DELAY_MS = 320;
+const MAX_COMMUNE_RESULTS = 25;
+
+const COLS = {
+  Type: "Type",
+  Type2: "Type2",
+  Mois: "Mois",                     // "01".."12"
+  Annee: "Annee",
+  NoActe: "N_ACTE",
+  NParcelle: "N_Parcelle",
+  NomProjet: "Nom_du_projet",
+  Strategies: "Strategie",
+  Field1: "Field1",
+  Field2: "Field2",
+  VisaMairie: "Visa_Mairie",
+  ReceptionPref: "Reception_Pref",
+  Precisions: "Precisions",         // Choice List
+  Motifs: "MN_Motifs_de_selection", // Choice List
+  ObjetAutorisation: "Objet_autorisation", // Choice List - ID de colonne Grist
+  EnjeuOld: "O_Concerne_par_l_enjeu",
+  EnjeuPrefix: "Enjeu_",
+  Controle: "Controle",
+  RaisonControle: "P_Raison_du_controle_ou_non_controle",
+  MAJCS: "MAJCS",
+
+  // Historisation statut commune
+  Trimestre: "Trimestre",
+  SelectionSnapshot: "Selection_commune_au_moment",
+
+  CommuneRef: "Communes",           // Ref -> Communes
+  TailleLogements: "Taille_logements" // Nb logements attendus (Taille du projet)
+};
+
+const ALL_MOTIFS = ["ZI","RT","ZA","ZN","STEP","PEB","Site classé"]; // doit correspondre aux cases à cocher
+const ALL_OBJETS = ["ERP 1/2/3","ERP 4/5","EE","LLS","Signalé","Aléatoire","Taille"]; // doit correspondre aux cases à cocher
+
+// Mapping des labels d'affichage vers les noms de colonnes
+const OBJET_TO_COL = {
+  "ERP 1/2/3": "ERP123",
+  "ERP 4/5": "ERP45",
+  "EE": "EE",
+  "LLS": "LLS",
+  "Signalé": "Signale",
+  "Aléatoire": "Aleatoire",
+  "Taille": "Taille"  // Enjeu_Taille = toujours "Oui" si coché
+};
+
+// Mapping des labels de motifs vers les noms de colonnes simplifiés
+const MOTIF_TO_COL = {
+  "Site classé": "Classe"
+};
+
+// Labels et hints pour chaque item (motifs et objets)
+const ITEM_INFO = {
+  "ZI": { label: "Zone risque naturel", hint: "" },
+  "RT": { label: "Risques technologiques", hint: "" },
+  "ZA": { label: "Zone agricole", hint: "" },
+  "ZN": { label: "Zone naturelle", hint: "" },
+  "STEP": { label: "STEP", hint: "Station d'épuration faisant l'objet de mesures conservatoires" },
+  "PEB": { label: "PEB", hint: "Accroissement de la population exposée au bruit" },
+  "Site classé": { label: "Site classé", hint: "Dans le périmètre d'un site classé" },
+  "ERP 1/2/3": { label: "ERP 1/2/3", hint: "Établissements recevant du public catégories 1 à 3" },
+  "ERP 4/5": { label: "ERP 4/5", hint: "Établissements recevant du public catégories 4 et 5" },
+  "EE": { label: "EE", hint: "Soumis à évaluation environnementale" },
+  "LLS": { label: "LLS", hint: "Respect de la mixité sociale pour la construction de logements" },
+  "Signalé": { label: "Signalé", hint: "Dossier signalé" },
+  "Aléatoire": { label: "Aléatoire", hint: "Sélection aléatoire (exigences nationales)" }
+};
+
+function enjeuColForItem(item) {
+  // Si c'est un motif
+  if (ALL_MOTIFS.includes(item)) {
+    // Vérifier si un mapping existe pour ce motif
+    const colName = MOTIF_TO_COL[item] || item;
+    return `${COLS.EnjeuPrefix}${colName}`;
+  }
+  // Si c'est un objet, mapper vers le nom de colonne
+  if (ALL_OBJETS.includes(item)) {
+    const colName = OBJET_TO_COL[item] || item;
+    return `${COLS.EnjeuPrefix}${colName}`;
+  }
+  // Fallback
+  return `${COLS.EnjeuPrefix}${item}`;
+}
+
+// Retourne le seuil de logements selon l'arrondissement et la commune
+function getSeuilLogements(commune) {
+  const arr = (commune.arr || "").trim();
+  const nom = (commune.nom || "").trim().toLowerCase();
+  if (arr === "Toulouse") {
+    return nom === "toulouse" ? 100 : 75;
+  }
+  if (arr === "Muret") return 20;
+  if (arr === "Saint-Gaudens") return 10;
+  return 75; // fallback
+}
+
+function isProjetConcerneParStrategie() {
+  // Critère 1 : Au moins un motif coché
+  if (countChecked("motif") > 0) return true;
+
+  // Critère 2 : Au moins un objet coché (ERP 4/5 et Taille sont exclus : indolores)
+  const INDOLORES = new Set(["ERP 4/5", "Taille"]);
+  const objetsCochés = getCheckedArray("objet").filter(o => !INDOLORES.has(o));
+  if (objetsCochés.length > 0) return true;
+
+  // Critères commune
+  const communeId = state.selectedCommuneId;
+  if (!communeId) return false;
+
+  const commune = state.communesById.get(communeId);
+  if (!commune) return false;
+
+  // Critère 3 : Sélection = Fixe, Ciblée ou Rotation (depuis Communes_Statut)
+  const selection = getCurrentSelection();
+  if (selection && SHOW_SELECTIONS.has(selection)) {
+    return true;
+  }
+
+  return false;
+}
+
+const COM = {
+  Nom: "Nom commune",
+  INSEE: "Code INSEE",
+  ARR: "Arrondissement",
+  LOG: "Logements",
+  CARTE: "Carte communale",
+  ENJEUX: "Enjeux",
+  HORS_ZI: "Hors_ZI"
+};
+
+// Mapping colonne Enjeux → valeur checkbox (motif)
+const COMMUNE_ENJEUX_MAP = { STEP: "STEP", RT: "RT", PEB: "PEB", LLS: "LLS" };
+
+/* ================= MOIS ================= */
+const MONTH_LABELS = new Map([
+  ["01","Janvier"], ["02","Février"], ["03","Mars"], ["04","Avril"],
+  ["05","Mai"], ["06","Juin"], ["07","Juillet"], ["08","Août"],
+  ["09","Septembre"], ["10","Octobre"], ["11","Novembre"], ["12","Décembre"],
+]);
+function normalizeMonthKey(v) {
+  const s = (v ?? "").toString().trim();
+  if (!s) return "";
+  const n = parseInt(s, 10);
+  if (!Number.isFinite(n) || n < 1 || n > 12) return s;
+  return String(n).padStart(2, "0");
+}
+
+
+/* ================= TRIMESTRE ================= */
+// Calcule le trimestre depuis une date ISO (YYYY-MM-DD) ou un objet Date
+function parseDate(v) {
+  if (!v) return null;
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function computeTrimestreFromDate(dateStr) {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return "";
+  const y = d.getFullYear();
+  const t = Math.floor(d.getMonth() / 3) + 1;
+  return `${y}-T${t}`;
+}
+
+// Conservé pour compatibilité (payload Grist stocke encore Mois/Annee calculés côté Grist)
+function computeTrimestreFromYM(annee, mois) {
+  const y = (annee ?? "").toString().trim();
+  const m = normalizeMonthKey(mois);
+  if (!y || !m) return "";
+  const mm = parseInt(m, 10);
+  if (!Number.isFinite(mm) || mm < 1 || mm > 12) return "";
+  const t = Math.floor((mm - 1) / 3) + 1;
+  return `${y}-T${t}`;
+}
+function statutKey(communeId, trimestre) {
+  return `${communeId}|${trimestre}`;
+}
+function getStatutSelection(communeId, trimestre, dateStr) {
+  if (!communeId || !trimestre) return "";
+  const statut = state.statutsByKey.get(statutKey(communeId, trimestre));
+  if (!statut) return "";
+
+  // Vérifier plage de dates si colonnes Début/Fin existent
+  if (statut.debut || statut.fin) {
+    const d = parseDate(dateStr);
+    if (!d) return "";
+    if (statut.debut && d < statut.debut) return "";
+    if (statut.fin && d > statut.fin) return "";
+  }
+
+  return statut.selection || "";
+}
+function getSelectionForPayload(payload) {
+  const communeId = payload?.[COLS.CommuneRef];
+  const receptionPref = payload?.[COLS.ReceptionPref];
+  const trimestre = computeTrimestreFromDate(receptionPref);
+  const explicit = getStatutSelection(communeId, trimestre, receptionPref);
+  const selection = explicit || DEFAULT_SELECTION;
+  return { communeId, trimestre, selection, found: !!explicit };
+}
+
+/**
+ * Récupère la sélection actuelle basée sur la commune sélectionnée et l'année/mois du formulaire
+ */
+function getCurrentSelection() {
+  const communeId = state.selectedCommuneId;
+  if (!communeId) return "";
+
+  const receptionPref = $("receptionPref")?.value;
+  const trimestre = computeTrimestreFromDate(receptionPref) || DEFAULT_TRIMESTRE;
+
+  return getStatutSelection(communeId, trimestre, receptionPref) || "";
+}
+
+/* ================= HELPERS ================= */
+const $ = (id) => document.getElementById(id);
+
+/**
+ * Debounce: retarde l'exécution d'une fonction jusqu'à ce que le délai soit écoulé sans nouvel appel
+ * @param {Function} fn - Fonction à debouncer
+ * @param {number} delay - Délai en ms
+ * @returns {Function} - Fonction debouncée
+ */
+function debounce(fn, delay) {
+  let timeoutId = null;
+  return function(...args) {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => fn.apply(this, args), delay);
+  };
+}
+
+
+
+function syncDateEmptyState(){
+  ["visaMairie","receptionPref"].forEach((id)=>{
+    const el = $(id);
+    if (!el) return;
+    const isEmpty = !el.value;
+    el.classList.toggle("is-empty", isEmpty);
+  });
+}
+
+function escapeHtml(s) {
+  return (s ?? "").toString()
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/\//g, '&#x2F;')
+    .replace(/`/g, '&#x60;');
+}
+
+let toastCounter = 0;
+
+function showToast(kind, title, description, duration = 5000) {
+  const container = document.getElementById("toastContainer");
+  if (!container) return;
+
+  const toastId = `toast-${++toastCounter}`;
+
+  const iconMap = {
+    success: "fa-circle-check",
+    error: "fa-circle-xmark",
+    warning: "fa-triangle-exclamation",
+    info: "fa-circle-info"
+  };
+
+  const icon = iconMap[kind] || iconMap.info;
+
+  const toast = document.createElement("div");
+  toast.className = `toast toast--${kind}`;
+  toast.id = toastId;
+  toast.setAttribute("role", "alert");
+  toast.setAttribute("aria-live", "polite");
+
+  // Convertir les sauts de ligne en <br> pour l'affichage HTML
+  const descriptionHtml = description
+    ? escapeHtml(description).replace(/\n/g, '<br>')
+    : '';
+
+  toast.innerHTML = `
+    <div class="toast__icon">
+      <i class="fa-solid ${icon}" aria-hidden="true"></i>
+    </div>
+    <div class="toast__content">
+      <div class="toast__title">${escapeHtml(title || "")}</div>
+      ${descriptionHtml ? `<div class="toast__message">${descriptionHtml}</div>` : ''}
+    </div>
+    <button class="toast__close" type="button" aria-label="Fermer la notification">
+      <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+    </button>
+  `;
+
+  container.appendChild(toast);
+
+  // Bouton fermer
+  const closeBtn = toast.querySelector(".toast__close");
+  closeBtn.addEventListener("click", () => closeToast(toastId));
+
+  // Auto-fermeture après duration (sauf pour les erreurs qui restent)
+  if (kind !== "error" && duration > 0) {
+    setTimeout(() => closeToast(toastId), duration);
+  }
+
+  return toastId;
+}
+
+function closeToast(toastId) {
+  const toast = document.getElementById(toastId);
+  if (!toast) return;
+
+  toast.classList.add("toast--closing");
+  setTimeout(() => {
+    if (toast.parentNode) {
+      toast.parentNode.removeChild(toast);
+    }
+  }, 300); // Durée de l'animation de sortie
+}
+
+function showAlert(kind, title, description) {
+  // Utiliser les toasts au lieu de l'ancienne alerte
+  showToast(kind, title, description);
+}
+
+function clearAlert() {
+  // Vider l'ancienne zone d'alerte si elle existe encore
+  const zone = document.getElementById("alertZone");
+  if (zone) zone.innerHTML = "";
+}
+
+function showSuccessPersistent(title, description, { scrollToTop = true } = {}) {
+  showToast("success", title, description, 12000); // Success reste 12 secondes
+  if (scrollToTop) {
+    try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch {}
+  }
+}
+
+function setBusy(busy) {
+  const btnSave = $("btnSave");
+  $("btnReset").disabled = busy;
+  $("btnExitEdit").disabled = busy;
+  btnSave.disabled = busy;
+
+  const text = busy ? "Enregistrement…" : (state.mode === "edit" ? "Mettre à jour" : "Créer");
+  const icon = busy ? '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>' : '<i class="fa-solid fa-check" aria-hidden="true"></i>';
+  btnSave.innerHTML = `${icon} ${text}`;
+}
+
+/* Inline DSFR messages */
+function setInlineMsg(id, msg) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = msg || "";
+  el.toggleAttribute("hidden", !msg);
+}
+function setFieldGroupState(groupEl, state) {
+  if (!groupEl) return;
+  groupEl.classList.remove("fr-input-group--error", "fr-select-group--error", "fr-fieldset--error");
+  if (state !== "error") return;
+  if (groupEl.classList.contains("fr-fieldset")) groupEl.classList.add("fr-fieldset--error");
+  else if (groupEl.classList.contains("fr-select-group")) groupEl.classList.add("fr-select-group--error");
+  else groupEl.classList.add("fr-input-group--error");
+}
+function setAriaInvalid(controlEl, isInvalid) {
+  if (!controlEl) return;
+  if (isInvalid) controlEl.setAttribute("aria-invalid", "true");
+  else controlEl.removeAttribute("aria-invalid");
+}
+function focusFirstInvalid() {
+  const first = document.querySelector('[aria-invalid="true"]');
+  if (first) first.focus({ preventScroll: false });
+}
+
+function clearAllInline() {
+  ["err-type","err-type2","err-visaMairie","err-receptionPref","err-commune","err-statut","err-prec","err-motif","err-objet","err-noacte"]
+    .forEach(id => setInlineMsg(id, ""));
+  setFieldGroupState($("grp-type"), null);
+  setFieldGroupState($("grp-visaMairie"), null);
+  setFieldGroupState($("grp-receptionPref"), null);
+  setFieldGroupState($("grp-commune"), null);
+  setFieldGroupState($("grp-noacte"), null);
+  setFieldGroupState($("grp-precisions"), null);
+  setFieldGroupState($("fs-motif"), null);
+  setFieldGroupState($("fs-objet"), null);
+  clearEnjeuInlineAll();
+
+  // type-dd est un custom dropdown, pas d'ariaInvalid natif
+  setAriaInvalid($("visaMairie"), false);
+  setAriaInvalid($("receptionPref"), false);
+  setAriaInvalid($("communeInput"), false);
+  setAriaInvalid($("noActe"), false);
+  $("precs-btn")?.removeAttribute("aria-invalid");
+}
+
+function getCheckedArray(cls) {
+  return [...document.querySelectorAll("." + cls + ":checked")].map(e => e.value);
+}
+function setCheckedFromArray(cls, arr) {
+  const set = new Set((arr || []).map(x => (x ?? "").toString()));
+  document.querySelectorAll("." + cls).forEach(cb => cb.checked = set.has(cb.value));
+}
+function countChecked(cls) {
+  return [...document.querySelectorAll("." + cls + ":checked")].length;
+}
+
+function getRadio(name) {
+  return document.querySelector(`input[name="${name}"]:checked`)?.value || null;
+}
+function setRadio(name, value) {
+  document.querySelectorAll(`input[name="${name}"]`).forEach(r => r.checked = (r.value === value));
+}
+function clearRadio(name) {
+  document.querySelectorAll(`input[name="${name}"]`).forEach(r => r.checked = false);
+}
+
+/* ================= ENJEU PAR MOTIF ================= */
+function readEnjeuFromDom() {
+  const out = {};
+  const allItems = [...ALL_MOTIFS, ...ALL_OBJETS];
+  for (const item of allItems) {
+    if (item === "ERP 4/5" || item === "Taille") {
+      // Indolores : pas de radio, toujours Oui si cochés
+      const cb = document.querySelector(`input.objet[value="${item}"]`);
+      if (cb && cb.checked) out[item] = "Oui";
+      continue;
+    }
+    const v = getRadio(`enjeu_${item}`);
+    if (v === "Oui" || v === "Non") out[item] = v;
+  }
+  return out;
+}
+
+function clearEnjeuInlineAll() {
+  // Efface tous les messages d'erreur "enjeu" (dynamique)
+  document.querySelectorAll('[id^="err-enjeu-"]').forEach(el => setInlineMsg(el.id, ""));
+  // Effacer les classes has-error des .motif-item (radios inline)
+  document.querySelectorAll(".motif-item.has-error").forEach(item => item.classList.remove("has-error"));
+}
+
+/**
+ * Met à jour les tags dans le titre "Enjeux liés à la commune" :
+ * [Rotation] → Oui/Non, la commune est concernée
+ * Logique : commune sélectionnée ET (Fixe/Ciblée/Rotation OU au moins un enjeu-commune = Oui)
+ */
+function updateCommuneTitleTags() {
+  const zone = $("communeTitleTags");
+  if (!zone) return;
+  zone.innerHTML = "";
+
+  if (!state.selectedCommuneId) return;
+
+  // Vérifier si la commune est Fixe/Ciblée/Rotation (tag affiché dans le champ input)
+  const commune = state.communesById.get(state.selectedCommuneId);
+  let selConcerne = false;
+  if (commune) {
+    const trNow = computeTrimestreFromDate($("receptionPref").value) || DEFAULT_TRIMESTRE;
+    const selRaw = getStatutSelection(commune.id, trNow, $("receptionPref").value) || "";
+    if (selRaw && SHOW_SELECTIONS.has(selRaw)) {
+      selConcerne = true;
+    }
+  }
+
+  // Enjeux commune : ZI, RT, STEP, PEB, LLS — au moins un répondu "Oui"
+  const COMMUNE_ITEMS = ["ZI","RT","STEP","PEB","LLS"];
+  const enjeuCommuneOui = COMMUNE_ITEMS.some(item => getRadio(`enjeu_${item}`) === "Oui");
+
+  const communeConcernee = selConcerne || enjeuCommuneOui;
+  const tag = document.createElement("span");
+  tag.className = communeConcernee ? "strat-tag strat-tag--oui" : "strat-tag strat-tag--non";
+  tag.textContent = communeConcernee ? "→ Oui, la commune est concernée" : "→ Non, la commune n'est pas concernée";
+  zone.appendChild(tag);
+}
+
+/**
+ * Met à jour le tag dans le titre "Enjeux liés au projet" :
+ * → Oui/Non, le projet est concerné
+ * Logique : au moins un enjeu-projet = Oui (hors ERP 4/5)
+ *   + Taille si coché ET valeur saisie ≥ logements commune
+ */
+function updateProjetTitleTag() {
+  const zone = $("projetTitleTags");
+  if (!zone) return;
+  zone.innerHTML = "";
+
+  if (!state.selectedCommuneId) return;
+
+  // Enjeux projet avec radio Oui/Non
+  const PROJET_ITEMS = ["ZN","ZA","EE","Site classé","ERP 1/2/3","Signalé","Aléatoire"];
+  const enjeuProjetOui = PROJET_ITEMS.some(item => getRadio(`enjeu_${item}`) === "Oui");
+
+  // Taille : coché ET valeur saisie ≥ logements commune
+  let tailleOui = false;
+  const tailleCoché = getCheckedArray("objet").includes("Taille");
+  if (tailleCoché) {
+    const tailleVal = parseInt($("taille-logements").value, 10);
+    const commune = state.communesById.get(state.selectedCommuneId);
+    const seuilLog = commune ? getSeuilLogements(commune) : Infinity;
+    if (!isNaN(tailleVal) && tailleVal >= seuilLog) tailleOui = true;
+  }
+
+  const projetConcerne = enjeuProjetOui || tailleOui;
+  const tag = document.createElement("span");
+  tag.className = projetConcerne ? "strat-tag strat-tag--oui" : "strat-tag strat-tag--non";
+  tag.textContent = projetConcerne ? "→ Oui, le projet est concerné" : "→ Non, le projet n'est pas concerné";
+  zone.appendChild(tag);
+}
+
+/** Alias pour compatibilité — appelée depuis renderEnjeuQuestions */
+function updateStrategieTag() {
+  updateCommuneTitleTags();
+  updateProjetTitleTag();
+}
+
+function renderEnjeuQuestions(selectedMotifs, valuesByMotif = {}) {
+  // Mettre à jour le tag stratégie dans la zone commune (haut du formulaire)
+  updateStrategieTag();
+
+  // Les radios Oui/Non sont maintenant directement dans les .motif-item (via initMotifItemRadios)
+  // Cette fonction ne gère plus que le tag Oui/Non dans la barre commune
+
+  // Restaurer les valeurs dans les radios inline si valuesByMotif fourni
+  if (Object.keys(valuesByMotif).length > 0) {
+    restoreMotifItemRadios(valuesByMotif);
+  }
+}
+
+function norm(s) {
+  return (s ?? "").toString().toLowerCase()
+    .normalize("NFD").replace(/\p{Diacritic}/gu, "")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+function pickCol(tableObj, candidates) {
+  const keys = Object.keys(tableObj);
+  for (const c of candidates) if (keys.includes(c)) return c;
+  const normMap = new Map(keys.map(k => [norm(k), k]));
+  for (const c of candidates) {
+    const hit = normMap.get(norm(c));
+    if (hit) return hit;
+  }
+  return null;
+}
+
+function cleanStr(v) {
+  return (v ?? "").toString().trim()
+    .replace(/^\s*[\[,]/, "")
+    .replace(/[\],]\s*$/, "")
+    .trim();
+}
+function joinDots(parts) {
+  return parts.map(cleanStr).filter(Boolean).join(" • ");
+}
+
+/* ChoiceList Grist */
+function toGristList(arr) {
+  const a = (arr || []).map(x => (x ?? "").toString().trim()).filter(Boolean);
+  return a.length ? ["L", ...a] : null;
+}
+function fromGristList(v) {
+  if (Array.isArray(v)) return (v[0] === "L" ? v.slice(1) : v).map(x => (x ?? "").toString()).filter(Boolean);
+  return (v || "").toString().split(/[;,]\s*/).filter(Boolean);
+}
+
+
+
+/* ================= CONTROLE LOGIC ================= */
+function selectionHasAny(selectionStr, wanted) {
+  const s = (selectionStr || "").toString().toLowerCase();
+  return wanted.some(w => s.includes(w.toLowerCase()));
+}
+
+function isNonEmptyChoiceList(v) {
+  // Grist choice list usually stored as ["L", ...values] or sometimes as a string "a; b"
+  if (Array.isArray(v)) return v.length > 1;
+  return fromGristList(v).length > 0;
+}
+
+/**
+ * Applique la logique de contrôle SANS ÉCRASER une valeur déjà renseignée dans la table.
+ *
+ * RÈGLES DE DÉCISION :
+ * 1. Si commune = Ciblée/Fixe/Rotation → Contrôle=Oui, Raison="Commune aléatoire"
+ * 2. Sinon si Enjeu_ZI=Oui ET Motifs contient ZI → Contrôle=Oui, Raison="En ZI"
+ * 3. Sinon si Enjeu_ZI=Non ET Motifs contient ZI → Contrôle=Non, Raison="Pas en ZI"
+ * 4. Sinon (pas de ZI dans Motifs) → Contrôle=Non, Raison="Sans impact"
+ *
+ * COMPORTEMENT :
+ * - En création : applique toujours les règles ci-dessus
+ * - En édition : n'écrit Controle/Raison QUE SI la cellule est vide (null/""/liste vide)
+ *   → Préserve les décisions manuelles de l'utilisateur
+ *
+ * @param {Object} payload - Données du formulaire à sauvegarder
+ * @param {Object|null} existingRecord - Enregistrement existant (null en création)
+ * @returns {Object} - Payload enrichi avec Controle et RaisonControle
+ */
+function applyControleLogicNonEcrasant(payload, existingRecord) {
+  const inEdit = !!(existingRecord && existingRecord.id);
+
+  // Détection "déjà renseigné"
+  const existingControle = inEdit ? existingRecord[COLS.Controle] : null;
+  const existingRaison = inEdit ? existingRecord[COLS.RaisonControle] : null;
+
+  const controleAlreadySet = inEdit && typeof existingControle === "boolean";
+  const raisonAlreadySet = inEdit && isNonEmptyChoiceList(existingRaison);
+
+  // Si les deux sont déjà renseignés, on ne touche à rien.
+  if (controleAlreadySet && raisonAlreadySet) return payload;
+
+  const communeId = payload[COLS.CommuneRef];
+  const commune = (typeof communeId === "number") ? state.communesById.get(communeId) : null;
+
+  // Sélection = statut trimestriel si table Communes_Statut existe, sinon fallback legacy (Communes.Selection)
+  let selection = "";
+  if (state.statutsByKey.size) {
+    selection = getSelectionForPayload(payload).selection || "";
+  } else {
+    selection = (commune?.selection || "").toString();
+  }
+
+  const motifs = fromGristList(payload[COLS.Motifs]);
+  const enjeuZI = (payload[enjeuColForItem("ZI")] ?? payload[COLS.EnjeuOld] ?? "").toString();
+  const hasZI = motifs.includes("ZI");
+
+  let controle = false;
+  let raison = "Sans impact";
+
+  if (selectionHasAny(selection, ["Ciblée", "Fixe", "Rotation"])) {
+    controle = true;
+    raison = "Commune aléatoire";
+  } else if (enjeuZI === "Oui" && hasZI) {
+    controle = true;
+    raison = "En ZI";
+  } else if (enjeuZI === "Non" && hasZI) {
+    controle = false;
+    raison = "Pas en ZI";
+  } else if (!hasZI) {
+    controle = false;
+    raison = "Sans impact";
+  }
+
+  // Écriture non-écrasante (au champ)
+  if (!controleAlreadySet) payload[COLS.Controle] = controle;
+
+  // Tu as précisé que c'est une Choice List → format ["L", ...]
+  if (!raisonAlreadySet) payload[COLS.RaisonControle] = raison;
+
+  return payload;
+}
+
+
+function computeControleDecision(payload) {
+  const communeId = payload[COLS.CommuneRef];
+  const commune = (typeof communeId === "number") ? state.communesById.get(communeId) : null;
+
+  // Sélection = statut trimestriel si table Communes_Statut existe, sinon fallback legacy (Communes.Selection)
+  let selection = "";
+  if (state.statutsByKey.size) {
+    selection = getSelectionForPayload(payload).selection || "";
+  } else {
+    selection = (commune?.selection || "").toString();
+  }
+
+  const motifs = fromGristList(payload[COLS.Motifs]);
+  const enjeuZI = (payload[enjeuColForItem("ZI")] ?? payload[COLS.EnjeuOld] ?? "").toString();
+  const hasZI = motifs.includes("ZI");
+
+  let controle = false;
+  let raison = "Sans impact";
+  let regle = "Motif ne contient pas ZI";
+
+  if (selectionHasAny(selection, ["Ciblée", "Fixe", "Rotation"])) {
+    controle = true;
+    raison = "Commune aléatoire";
+    regle = "Commune sélectionnée (Ciblée/Fixe/Rotation)";
+  } else if (enjeuZI === "Oui" && hasZI) {
+    controle = true;
+    raison = "En ZI";
+    regle = "Enjeu=Oui & Motif contient ZI";
+  } else if (enjeuZI === "Non" && hasZI) {
+    controle = false;
+    raison = "Pas en ZI";
+    regle = "Enjeu=Non & Motif contient ZI";
+  } else if (!hasZI) {
+    controle = false;
+    raison = "Sans impact";
+    regle = "Motif ne contient pas ZI";
+  }
+
+  return { controle, raison, regle, selection, enjeu: enjeuZI, motifs };
+}
+
+function updateControlePreview() {
+  try {
+    const payload = buildPayload();
+    const d = computeControleDecision(payload);
+
+    const elR = document.getElementById("raisonCalc");
+    const elC = document.getElementById("controleCalc");
+
+    if (elR) elR.value = d.raison || "";
+    if (elC) elC.value = d.controle ? "Oui (contrôle)" : "Non (pas de contrôle)";
+  } catch {}
+}
+
+
+function renderTests(results) {
+  const zone = document.getElementById("testsZone");
+  if (!zone) return;
+
+  const okCount = results.filter(r => r.ok).length;
+  const total = results.length;
+  const allOk = okCount === total;
+
+  const cls = allOk ? "fr-alert--success" : "fr-alert--warning";
+  const title = allOk ? "Tous les tests passent" : `${total - okCount} test(s) en échec`;
+
+  const rows = results.map(r => `
+    <tr>
+      <td>${escapeHtml(r.name)}</td>
+      <td>${r.ok ? "✅" : "❌"}</td>
+      <td class="mono">${escapeHtml(JSON.stringify(r.got))}</td>
+      <td class="mono">${escapeHtml(JSON.stringify(r.exp))}</td>
+    </tr>
+  `).join("");
+
+  zone.innerHTML = `
+    <div class="fr-alert ${cls}" role="status">
+      <h3 class="fr-alert__title">${escapeHtml(title)}</h3>
+      <p>${escapeHtml(`OK: ${okCount}/${total}`)}</p>
+    </div>
+
+    <div class="fr-table fr-table--layout-fixed fr-mt-1w">
+      <table>
+        <thead>
+          <tr>
+            <th>Cas</th>
+            <th>Résultat</th>
+            <th>Obtenu</th>
+            <th>Attendu</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function runControleLogicTests() {
+  // On simule uniquement les données nécessaires : "selection" des communes.
+  const fakeCommunes = [
+    { id: 101, selection: "Ciblée" },
+    { id: 102, selection: "Fixe" },
+    { id: 103, selection: "Rotation" },
+    { id: 104, selection: "Autre" },
+    { id: 105, selection: "" }
+  ];
+
+  const backup = new Map(state.communesById);
+  const backupStatuts = new Map(state.statutsByKey);
+  state.statutsByKey.clear();
+  fakeCommunes.forEach(c => state.communesById.set(c.id, c));
+
+  const mkPayload = ({ communeId, enjeuZI, motifs }) => ({
+    [COLS.CommuneRef]: communeId,
+    [enjeuColForItem("ZI")]: enjeuZI,
+    [COLS.Motifs]: ["L", ...(motifs || [])]
+  });
+
+  const cases = [
+    {
+      name: "R1: commune Ciblée -> contrôle Oui / Commune aléatoire",
+      payload: mkPayload({ communeId: 101, enjeuZI: "Non", motifs: ["ZN"] }),
+      exp: { controle: true, raison: "Commune aléatoire" }
+    },
+    {
+      name: "R1: commune Fixe -> contrôle Oui / Commune aléatoire",
+      payload: mkPayload({ communeId: 102, enjeuZI: "Oui", motifs: ["ZI"] }),
+      exp: { controle: true, raison: "Commune aléatoire" }
+    },
+    {
+      name: "R2: enjeu Oui + ZI -> contrôle Oui / En ZI",
+      payload: mkPayload({ communeId: 105, enjeuZI: "Oui", motifs: ["ZI"] }),
+      exp: { controle: true, raison: "En ZI" }
+    },
+    {
+      name: "R3: enjeu Non + ZI -> contrôle Non / Pas en ZI",
+      payload: mkPayload({ communeId: 105, enjeuZI: "Non", motifs: ["ZI"] }),
+      exp: { controle: false, raison: "Pas en ZI" }
+    },
+    {
+      name: "R4: pas ZI -> contrôle Non / Sans impact",
+      payload: mkPayload({ communeId: 104, enjeuZI: "Oui", motifs: ["ZN"] }),
+      exp: { controle: false, raison: "Sans impact" }
+    }
+  ];
+
+  const results = cases.map(tc => {
+    const d = computeControleDecision(tc.payload);
+    const got = { controle: d.controle, raison: d.raison };
+    const exp = tc.exp;
+    const ok = (got.controle === exp.controle) && (got.raison === exp.raison);
+    return { name: tc.name, ok, got, exp };
+  });
+
+  // restore
+  state.communesById = backup;
+  state.statutsByKey = backupStatuts;
+
+  renderTests(results);
+}
+
+
+
+/* Écriture */
+async function addOneRecord(tableName, fields) {
+  if (!grist?.docApi?.applyUserActions) throw new Error("docApi.applyUserActions indisponible.");
+  await grist.docApi.applyUserActions([["AddRecord", tableName, null, fields]]);
+}
+async function updateOneRecord(tableName, rowId, fields) {
+  if (!grist?.docApi?.applyUserActions) throw new Error("docApi.applyUserActions indisponible.");
+  await grist.docApi.applyUserActions([["UpdateRecord", tableName, rowId, fields]]);
+}
+
+/* ================= STATE ================= */
+const state = {
+  currentRecord: null,
+mode: "create",
+  currentRowId: null,
+  communes: [],
+  communesById: new Map(),
+  communesByNom: new Map(),
+  communesByInsee: new Map(),
+  actesNoActeIndex: new Map(),
+  selectedCommuneId: null,
+  choices: { type: [], type2: [], annee: [] },
+  typeValue: "",   // valeur sélectionnée pour Type
+  type2Value: "",  // valeur sélectionnée pour Type2
+  statutsByKey: new Map(), // key = `${communeId}|${trimestre}` => selection
+  actesColSet: new Set(), // colonnes existantes dans AN_PC
+  communeAutoChecked: new Set(), // checkboxes motif auto-cochées par la commune courante
+
+  // Dashboard
+  dashTab: "croise",           // "croise" | "detail" | "chart"
+  dashVue: "mois",             // "mois" | "trimestre" | "annee"
+  dashMonth: new Date().getMonth() + 1,
+  dashYear: new Date().getFullYear(),
+  dashScope: "all",            // "all" | "commune"
+  dashSort: "alpha",           // "alpha" | "total"
+  dashSelectedCommune: null,   // objet commune sélectionnée
+  allANPCRows: [],             // Toutes les données AN_PC chargées
+  anpcDataLoaded: false,       // Flag pour éviter rechargements multiples
+
+  statutsStatus: "unknown",
+  envErrors: [],
+  envWarnings: [],
+  envOk: true
+};
+
+function setMode(mode, rowId=null) {
+  state.mode = mode;
+  state.currentRowId = rowId;
+
+  $("modeBadge").textContent = mode === "edit" ? "édition" : "création";
+  $("modeHelp").textContent = (mode === "edit")
+    ? `Ligne sélectionnée (id=${rowId}).`
+    : "";
+
+  const btnSave = $("btnSave");
+  const text = (mode === "edit") ? "Mettre à jour" : "Créer";
+  btnSave.innerHTML = `<i class="fa-solid fa-check" aria-hidden="true"></i> ${text}`;
+  $("btnExitEdit").style.display = (mode === "edit") ? "inline-block" : "none";
+}
+
+/* Chargement des choices Type depuis Grist */
+// Charge les choices d'une colonne Choice depuis les métadonnées Grist
+// et les stocke dans state.choices[stateKey]
+async function loadChoicesFromMetadata(colId, stateKey) {
+  const tables = await grist.docApi.fetchTable("_grist_Tables");
+  const cols = await grist.docApi.fetchTable("_grist_Tables_column");
+
+  const tableIdCol = pickCol(tables, ["tableId"]);
+  const parentIdCol = pickCol(cols, ["parentId"]);
+  const colIdCol2 = pickCol(cols, ["colId"]);
+  const widgetOptionsCol = pickCol(cols, ["widgetOptions"]);
+  if (!tableIdCol || !parentIdCol || !colIdCol2 || !widgetOptionsCol) return;
+
+  const idx = tables[tableIdCol].findIndex(v => (v ?? "").toString() === TABLE_ACTES);
+  if (idx < 0) return;
+  const tableMetaRowId = tables.id[idx];
+
+  const target = norm(colId);
+  for (let i = 0; i < cols.id.length; i++) {
+    if (cols[parentIdCol]?.[i] !== tableMetaRowId) continue;
+    const cid = (cols[colIdCol2]?.[i] ?? "").toString();
+    if (norm(cid) !== target) continue;
+
+    const woRaw = cols[widgetOptionsCol]?.[i];
+    if (!woRaw) break;
+    try {
+      const wo = typeof woRaw === "string" ? JSON.parse(woRaw) : woRaw;
+      const choices = wo?.choices;
+      state.choices[stateKey] = Array.isArray(choices) ? choices.map(x => x?.toString()).filter(Boolean) : [];
+    } catch {}
+    break;
+  }
+}
+
+function populateSelect(selectId, stateKey) {
+  const sel = $(selectId);
+  if (!sel) return;
+  sel.innerHTML = "";
+  const ph = document.createElement("option");
+  ph.value = "";
+  ph.textContent = "—";
+  sel.appendChild(ph);
+
+  for (const t of (state.choices[stateKey] || [])) {
+    const opt = document.createElement("option");
+    opt.value = t;
+    opt.textContent = t;
+    sel.appendChild(opt);
+  }
+}
+
+// Labels d'affichage pour les valeurs Grist
+const TYPE_LABELS = {
+  "PC": "Permis de construire",
+  "PA": "Permis d'aménager",
+  "PD": "Permis de démolir",
+  "DP": "Déclaration préalable"
+};
+const TYPE2_LABELS = {
+  "I": "Permis initial",
+  "M": "Permis modificatif",
+  "T": "Transfert de permis",
+  "P": "Prorogation du permis"
+};
+// Valeurs par défaut
+const TYPE2_DEFAULT = "I";
+
+// Dropdown custom pour Type / Type2
+// ddId : id du wrapper (.type-dd), stateKey : "typeValue" | "type2Value", choicesKey : "type" | "type2", labelsMap : objet de mapping valeur->label
+
+function initTypeDd(ddId, stateKey, choicesKey, labelsMap = {}) {
+  const dd = $(ddId);
+  if (!dd) return;
+  const btn = dd.querySelector(".type-dd__btn");
+  const panel = dd.querySelector(".type-dd__panel");
+  const labelEl = dd.querySelector(".type-dd__label");
+
+  function getLabel(val) {
+    return labelsMap[val] || val;
+  }
+
+  function setValue(val) {
+    state[stateKey] = val;
+    if (val) {
+      labelEl.textContent = getLabel(val);
+      labelEl.classList.remove("type-dd__label--placeholder");
+    } else {
+      labelEl.textContent = "—";
+      labelEl.classList.add("type-dd__label--placeholder");
+    }
+    // Mettre à jour l'état is-selected dans le panel
+    panel.querySelectorAll(".type-dd__item").forEach(item => {
+      item.classList.toggle("is-selected", item.dataset.value === val);
+    });
+  }
+
+  function buildPanel() {
+    panel.innerHTML = "";
+    const choices = state.choices[choicesKey] || [];
+    if (!choices.length) {
+      const empty = document.createElement("div");
+      empty.className = "type-dd__empty";
+      empty.textContent = "Aucun choix disponible";
+      panel.appendChild(empty);
+      return;
+    }
+    choices.forEach(choice => {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "type-dd__item";
+      item.dataset.value = choice;
+      // Afficher le label complet avec la valeur brute en badge
+      const badge = document.createElement("span");
+      badge.className = "type-dd__item-badge";
+      badge.textContent = choice;
+      const text = document.createElement("span");
+      text.textContent = labelsMap[choice] || choice;
+      item.appendChild(badge);
+      item.appendChild(text);
+      if (choice === state[stateKey]) item.classList.add("is-selected");
+      item.addEventListener("click", () => {
+        setValue(choice);
+        closePanel();
+      });
+      panel.appendChild(item);
+    });
+  }
+
+  function openPanel() {
+    buildPanel();
+    panel.classList.add("is-open");
+    btn.setAttribute("aria-expanded", "true");
+  }
+
+  function closePanel() {
+    panel.classList.remove("is-open");
+    btn.setAttribute("aria-expanded", "false");
+  }
+
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const isOpen = panel.classList.contains("is-open");
+    // Fermer tous les autres dropdowns type
+    document.querySelectorAll(".type-dd__panel.is-open").forEach(p => {
+      p.classList.remove("is-open");
+      p.closest(".type-dd")?.querySelector(".type-dd__btn")?.setAttribute("aria-expanded", "false");
+    });
+    if (!isOpen) openPanel();
+  });
+
+  // Fermer en cliquant ailleurs
+  document.addEventListener("click", () => closePanel(), { capture: false });
+
+  // API publique : lire/écrire la valeur
+  dd._setValue = setValue;
+  dd._getValue = () => state[stateKey];
+}
+
+function getTypeDdValue(ddId) {
+  return $(ddId)?._getValue?.() ?? "";
+}
+function setTypeDdValue(ddId, val) {
+  $(ddId)?._setValue?.(val ?? "");
+}
+
+/* Dropdown multi-sélection pour Origine (ChoiceList) */
+const PRECS_CHOICES = ["@CTES", "Carte communale", "Papier"];
+
+function initPrecsMultiDd() {
+  const dd = $("precs-dd");
+  if (!dd) return;
+  const btn = dd.querySelector(".type-dd__btn");
+  const panel = dd.querySelector(".type-dd__panel");
+  const labelEl = dd.querySelector(".type-dd__label");
+
+  // État local : Set des valeurs sélectionnées
+  let selected = new Set();
+
+  function updateLabel() {
+    const arr = [...selected];
+    if (arr.length === 0) {
+      labelEl.textContent = "—";
+      labelEl.classList.add("type-dd__label--placeholder");
+    } else {
+      labelEl.textContent = arr.join(", ");
+      labelEl.classList.remove("type-dd__label--placeholder");
+    }
+  }
+
+  function buildPanel() {
+    panel.innerHTML = "";
+    PRECS_CHOICES.forEach(choice => {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "type-dd__item" + (selected.has(choice) ? " is-selected" : "");
+      item.dataset.value = choice;
+      item.setAttribute("role", "option");
+      item.setAttribute("aria-selected", selected.has(choice) ? "true" : "false");
+
+      // Checkbox visuelle
+      const chk = document.createElement("span");
+      chk.className = "precs-check-icon";
+      chk.setAttribute("aria-hidden", "true");
+      if (selected.has(choice)) chk.textContent = "✓";
+
+      const text = document.createElement("span");
+      text.textContent = choice;
+
+      item.appendChild(chk);
+      item.appendChild(text);
+
+      item.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (selected.has(choice)) {
+          selected.delete(choice);
+          item.classList.remove("is-selected");
+          item.setAttribute("aria-selected", "false");
+          chk.textContent = "";
+        } else {
+          selected.add(choice);
+          item.classList.add("is-selected");
+          item.setAttribute("aria-selected", "true");
+          chk.textContent = "✓";
+        }
+        updateLabel();
+        // Clear erreur si au moins une valeur sélectionnée
+        if (selected.size > 0) {
+          setInlineMsg("err-prec", "");
+          setFieldGroupState($("grp-precisions"), null);
+        }
+      });
+      panel.appendChild(item);
+    });
+  }
+
+  function openPanel() {
+    buildPanel();
+    panel.classList.add("is-open");
+    btn.setAttribute("aria-expanded", "true");
+  }
+
+  function closePanel() {
+    panel.classList.remove("is-open");
+    btn.setAttribute("aria-expanded", "false");
+  }
+
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const isOpen = panel.classList.contains("is-open");
+    // Fermer tous les autres dropdowns ouverts
+    document.querySelectorAll(".type-dd__panel.is-open").forEach(p => {
+      p.classList.remove("is-open");
+      p.closest(".type-dd")?.querySelector(".type-dd__btn")?.setAttribute("aria-expanded", "false");
+    });
+    if (!isOpen) openPanel();
+  });
+
+  document.addEventListener("click", () => closePanel(), { capture: false });
+
+  // API publique
+  dd._getValues = () => [...selected];
+  dd._setValues = (arr) => {
+    selected = new Set((arr || []).map(x => (x ?? "").toString()).filter(Boolean));
+    updateLabel();
+  };
+}
+
+function getPrecsValues() {
+  return $("precs-dd")?._getValues?.() ?? [];
+}
+function setPrecsValues(arr) {
+  $("precs-dd")?._setValues?.(arr ?? []);
+}
+
+/* Defaults */
+function applyCreateDefaults() {
+  setTypeDdValue("type-dd", state.choices.type[0] || "");
+  setTypeDdValue("type2-dd", TYPE2_DEFAULT);
+  setPrecsValues(["@CTES"]);
+
+  document.querySelectorAll("input.motif").forEach(cb => cb.checked = false);
+  document.querySelectorAll("input.objet").forEach(cb => cb.checked = false);
+  // Aucun motif par défaut (ZA retiré des valeurs pré-cochées)
+
+  renderEnjeuQuestions([]);
+}
+
+function resetForm() {
+  $("noActe").value = "";
+  $("nParcelle").value = "";
+  $("nomProjet").value = "";
+  $("visaMairie").value = "";
+  $("receptionPref").value = "";
+  syncDateEmptyState();
+
+  $("communeInput").value = "";
+  $("communeMeta").textContent = "";
+  state.selectedCommuneId = null;
+  hideCommuneDropdown();
+  displayCommuneInfo(null);
+  state.communeAutoChecked.clear();
+
+  applyCreateDefaults();
+  const tailleInput = $("taille-logements");
+  if (tailleInput) tailleInput.value = "";
+  clearAllInline();
+  updateMotifItemStyles();
+  resetMotifItemRadios();
+}
+
+/* Communes */
+function cleanSelection(v) {
+  // Gère les cas : null, "", "Fixe", ["L", "Fixe"], "L, Fixe"
+  if (v == null) return "";
+
+  // Si c'est un tableau (Choice List format), prendre le 2e élément
+  if (Array.isArray(v)) {
+    if (v.length >= 2 && v[0] === "L") {
+      return String(v[1]).trim();
+    }
+    return "";
+  }
+
+  // Si c'est une chaîne
+  let s = String(v).trim();
+
+  // Retirer le préfixe "L," si présent
+  s = s.replace(/^L,\s*/i, "");
+
+  // Nettoyer les espaces autour des virgules (au cas où)
+  s = s.replace(/\s*,\s*/g, ", ");
+  s = s.replace(/,\s*$/g, "");
+
+  return s.trim();
+}
+function formatLogements(v) {
+  const s = cleanStr(v);
+  if (!s) return "";
+  // Extraire le nombre, afficher "20+" sans le mot "logements"
+  const match = s.match(/^(\d+)/);
+  if (match) return `${match[1]}+`;
+  return s;
+}
+
+async function loadCommunes() {
+  const r = await grist.docApi.fetchTable(TABLE_COMMUNES);
+
+  const colNom  = pickCol(r, [COM.Nom, "Nom_commune"]);
+  const colInsee = pickCol(r, [COM.INSEE, "Code_INSEE"]);
+  const colArr  = pickCol(r, [COM.ARR]);
+  const colLog  = pickCol(r, [COM.LOG]);
+  const colSel  = pickCol(r, ["Selection", "Sélection", "Sélection ?"]); // optionnel (ancien champ)
+  const colEnj  = pickCol(r, [COM.ENJEUX]);                               // optionnel (ChoiceList)
+  const colHorsZI = pickCol(r, [COM.HORS_ZI]);                            // optionnel (Bool)
+
+  const colRegl = pickCol(r, ["Reglementation", "Réglementation", "Reglementation_"]); // optionnel
+
+  if (!colNom || !colInsee || !colArr || !colLog) {
+    throw new Error("Colonnes Communes manquantes (Nom commune / Code INSEE / Arrondissement / Logements).");
+  }
+
+  state.communes = [];
+  state.communesById.clear();
+  state.communesByNom.clear();
+
+  r.id.forEach((id, i) => {
+    const nom = cleanStr(r[colNom]?.[i]);
+    if (!nom) return;
+
+    const insee = cleanStr(r[colInsee]?.[i]);
+    const arr = cleanStr(r[colArr]?.[i]);
+    const logementsFmt = formatLogements(r[colLog]?.[i]);
+    const reglementation = cleanStr(r[colRegl]?.[i]);
+    const enjeux = colEnj ? fromGristList(r[colEnj]?.[i]) : [];
+    const horsZI = colHorsZI ? Boolean(r[colHorsZI]?.[i]) : true; // true par défaut = hors ZI (pas de pré-cochage)
+
+    const c = {
+      id,
+      nom,
+      insee,
+      arr,
+      logementsFmt,
+      reglementation,
+      enjeux,
+      horsZI,
+      nameNorm: norm(nom),
+      inseeNorm: (insee || "").toString().trim(),
+    };
+
+    // Note: c.selection n'est plus stocké ici car il dépend du trimestre (vient de Communes_Statut)
+    c.display = joinDots([c.nom, c.insee, c.arr, c.logementsFmt, c.reglementation]);
+
+    // Métadonnées affichées une fois la commune sélectionnée
+    c.metaSelected = joinDots([c.insee, c.arr, c.logementsFmt, c.reglementation]);
+
+    state.communes.push(c);
+    state.communesById.set(id, c);
+    state.communesByNom.set(nom, c);
+    if (c.insee) state.communesByInsee.set(String(c.insee), c);
+  });
+}
+
+
+
+function normalizeCommuneId(v) {
+  // Accept rowId number, ["L", ...] not expected, or [rowId, label], or plain commune name/INSEE
+  if (v == null) return null;
+  if (typeof v === "number") return v;
+  if (Array.isArray(v)) {
+    // Grist may return [rowId, label] or sometimes [rowId]
+    const a0 = v[0];
+    if (typeof a0 === "number") return a0;
+    if (typeof a0 === "string") return normalizeCommuneId(a0);
+  }
+  if (typeof v === "string") {
+    const s = v.trim();
+    if (!s) return null;
+
+    // Try exact name
+    let c = state.communesByNom.get(s);
+    if (c) return c.id;
+
+    // Try INSEE
+    c = state.communesByInsee.get(s);
+    if (c) return c.id;
+
+    // Case-insensitive name match
+    const sl = s.toLowerCase();
+    for (const [nom, cc] of state.communesByNom.entries()) {
+      if (String(nom).toLowerCase() === sl) return cc.id;
+    }
+    // Case-insensitive INSEE match
+    for (const [insee, cc] of state.communesByInsee.entries()) {
+      if (String(insee).toLowerCase() === sl) return cc.id;
+    }
+  }
+  return null;
+}
+
+/* Statut communes par trimestre */
+async function loadStatuts() {
+  state.statutsByKey.clear();
+  state.statutsStatus = "unknown";
+
+  let r;
+  try {
+    r = await grist.docApi.fetchTable(TABLE_STATUT);
+  } catch (e) {
+    // Table absente : pas de statut trimestriel disponible
+    console.warn(`Table ${TABLE_STATUT} introuvable.`, e);
+    state.statutsStatus = "missing_table";
+    return;
+  }
+
+  const colCommune = pickCol(r, ["Commune", "Communes", "CommuneRef"]);
+  const colTrim = pickCol(r, ["Trimestre", "Trimestre_acte", "Trimestre acte"]);
+  const colSel = pickCol(r, ["Selection", "Sélection", "Sélection ?", "Selection ?"]);
+  const colDebut = pickCol(r, ["Debut", "Début", "Date_debut", "Date_début"]);
+  const colFin = pickCol(r, ["Fin", "Date_fin"]);
+
+  if (!colCommune || !colTrim || !colSel) {
+    console.warn(`Colonnes manquantes dans ${TABLE_STATUT} (Commune/Trimestre/Selection).`);
+    state.statutsStatus = "missing_columns";
+    return;
+  }
+
+  r.id.forEach((id, i) => {
+    const communeRaw = r[colCommune]?.[i];
+    const communeId = normalizeCommuneId(communeRaw);
+    const trimestre = cleanStr(r[colTrim]?.[i]);
+    const selection = cleanSelection(r[colSel]?.[i]);
+    if (typeof communeId !== "number") return;
+    if (!trimestre || !selection) return;
+
+    const statut = {
+      selection: selection,
+      debut: colDebut ? parseDate(r[colDebut]?.[i]) : null,
+      fin: colFin ? parseDate(r[colFin]?.[i]) : null
+    };
+
+    state.statutsByKey.set(statutKey(communeId, trimestre), statut);
+  });  state.statutsStatus = "ok";
+}
+
+/* Dropdown UI */
+function showCommuneDropdown(items) {
+  const panel = $("communeDropdown");
+  panel.innerHTML = "";
+
+  if (!items.length) {
+    const empty = document.createElement("div");
+    empty.className = "dd-empty";
+    empty.textContent = "Aucune commune trouvée.";
+    panel.appendChild(empty);
+    panel.style.display = "block";
+    return;
+  }
+
+  const trNow = computeTrimestreFromDate($("receptionPref").value) || DEFAULT_TRIMESTRE;
+
+  for (const c of items) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "dd-item";
+
+    // Badge arrondissement à gauche (comme le badge code dans Type/Type2)
+    if (c.arr) {
+      const badge = document.createElement("span");
+      badge.className = "type-dd__item-badge dd-arr-badge";
+      badge.textContent = c.arr;
+      btn.appendChild(badge);
+    }
+
+    // Colonne centrale : nom + sous-ligne (logements, sélection)
+    const body = document.createElement("div");
+    body.className = "dd-item-body";
+
+    // Nom de la commune
+    const t = document.createElement("span");
+    t.className = "dd-title";
+    t.textContent = c.nom;
+    body.appendChild(t);
+
+    // Sous-infos (sélection + réglementation, sans logements)
+    let selNow = "";
+    if (trNow) {
+      const found = getStatutSelection(c.id, trNow, $("receptionPref").value);
+      if (found && SHOW_SELECTIONS.has(found)) selNow = found;
+    }
+    const subParts = [selNow, c.reglementation].filter(Boolean);
+
+    if (subParts.length) {
+      const s = document.createElement("span");
+      s.className = "dd-sub-info";
+      s.textContent = " • " + subParts.join(" • ");
+      body.appendChild(s);
+    }
+
+    btn.appendChild(body);
+
+    // Logements alignés à droite
+    if (c.logementsFmt) {
+      const logSpan = document.createElement("span");
+      logSpan.className = "dd-item-logements";
+      logSpan.textContent = c.logementsFmt;
+      btn.appendChild(logSpan);
+    }
+
+    // Coche si commune actuellement sélectionnée
+    if (c.id === state.selectedCommuneId) {
+      const check = document.createElement("span");
+      check.className = "dd-item-check";
+      check.textContent = "✓";
+      btn.appendChild(check);
+    }
+
+    btn.addEventListener("click", () => { selectCommune(c); });
+    panel.appendChild(btn);
+  }
+
+  panel.style.display = "block";
+}
+function hideCommuneDropdown() { $("communeDropdown").style.display = "none"; }
+
+function displayCommuneInfo(c) {
+  const arrBadge = $("communeArrBadge");
+  const logBadge = $("communeLogBadge");
+  const selBadge = $("communeSelBadge");
+  const wrap = $("communeInputWrap");
+
+  if (wrap) {
+    if (c && c.arr) {
+      // Badge arrondissement
+      if (arrBadge) arrBadge.textContent = c.arr;
+      // Badge logements (à gauche de l'arr)
+      const logementsRaw = (c.logementsFmt || "").trim();
+      if (logBadge) {
+        if (logementsRaw && logementsRaw !== "—") {
+          logBadge.textContent = logementsRaw;
+          logBadge.classList.add("is-visible");
+        } else {
+          logBadge.textContent = "";
+          logBadge.classList.remove("is-visible");
+        }
+      }
+      // Badge sélection (Fixe / Ciblée / Rotation) à gauche des logements
+      if (selBadge) {
+        const trNow = computeTrimestreFromDate($("receptionPref").value) || DEFAULT_TRIMESTRE;
+        const selRaw = getStatutSelection(c.id, trNow, $("receptionPref").value) || "";
+        selBadge.classList.remove("is-visible", "sel-fixe", "sel-ciblee", "sel-rotation");
+        if (selRaw && SHOW_SELECTIONS.has(selRaw)) {
+          selBadge.textContent = selRaw;
+          if (selRaw === "Fixe")     selBadge.classList.add("is-visible", "sel-fixe");
+          else if (selRaw === "Ciblée")   selBadge.classList.add("is-visible", "sel-ciblee");
+          else if (selRaw === "Rotation") selBadge.classList.add("is-visible", "sel-rotation");
+        } else {
+          selBadge.textContent = "";
+        }
+      }
+      wrap.classList.add("has-arr");
+    } else {
+      if (arrBadge) arrBadge.textContent = "";
+      if (logBadge) { logBadge.textContent = ""; logBadge.classList.remove("is-visible"); }
+      if (selBadge) { selBadge.textContent = ""; selBadge.classList.remove("is-visible", "sel-fixe", "sel-ciblee", "sel-rotation"); }
+      wrap.classList.remove("has-arr");
+    }
+  }
+
+  // Seuil logements dans le label "Taille du projet"
+  const tailleHint = $("taille-seuil-hint");
+  if (tailleHint) {
+    if (c) {
+      const seuil = getSeuilLogements(c);
+      tailleHint.textContent = `(seuil : ≥ ${seuil} logements)`;
+    } else {
+      tailleHint.textContent = "";
+    }
+  }
+
+  // Mettre à jour les tags dans les titres de section
+  updateCommuneTitleTags();
+  updateProjetTitleTag();
+}
+
+function selectCommune(c) {
+  $("communeInput").value = c.nom;
+  state.selectedCommuneId = c.id;
+  $("communeMeta").textContent = c.metaSelected || joinDots([c.insee, c.arr, c.logementsFmt, c.reglementation]);
+  // Ajoute le statut trimestriel si disponible
+  const receptionPref = $("receptionPref").value;
+  const trNow = computeTrimestreFromDate(receptionPref);
+  if (trNow) {
+    const selNow = getStatutSelection(c.id, trNow, receptionPref);
+    if (selNow && SHOW_SELECTIONS.has(selNow)) {
+      $("communeMeta").textContent = joinDots([$("communeMeta").textContent, `${selNow} (${trNow})`]);
+    }
+  }
+  hideCommuneDropdown();
+
+  setInlineMsg("err-commune", "");
+  setInlineMsg("err-statut", "");
+  setFieldGroupState($("grp-commune"), null);
+  setAriaInvalid($("communeInput"), false);
+
+  // Afficher les informations de la commune sélectionnée
+  displayCommuneInfo(c);
+
+  // Reset sélectif : décocher uniquement les cases auto-cochées par la commune précédente
+  state.communeAutoChecked.forEach(val => {
+    const cb = document.querySelector(`.motif[value="${CSS.escape(val)}"], .objet[value="${CSS.escape(val)}"]`);
+    if (cb) cb.checked = false;
+  });
+  state.communeAutoChecked.clear();
+
+  // Pré-cocher les cases définies dans Communes.Enjeux (STEP, RT, PEB, LLS)
+  // Cherche dans .motif ET .objet car LLS est un objet
+  if (c.enjeux && c.enjeux.length) {
+    c.enjeux.forEach(enjeu => {
+      const val = COMMUNE_ENJEUX_MAP[enjeu];
+      if (!val) return;
+      const cb = document.querySelector(`.motif[value="${CSS.escape(val)}"], .objet[value="${CSS.escape(val)}"]`);
+      if (cb && !cb.checked) {
+        cb.checked = true;
+        state.communeAutoChecked.add(val);
+      }
+    });
+    updateMotifItemStyles();
+  }
+
+  // Pré-cocher ZI si Hors_ZI === false
+  if (c.horsZI === false) {
+    const cbZI = document.querySelector(`.motif[value="ZI"]`);
+    if (cbZI && !cbZI.checked) {
+      cbZI.checked = true;
+      state.communeAutoChecked.add("ZI");
+      updateMotifItemStyles();
+    }
+  }
+
+  // Rafraîchir l'affichage des enjeux (peut changer selon critères commune)
+  const motifs = getCheckedArray("motif");
+  const objets = getCheckedArray("objet");
+  const allItems = [...motifs, ...objets];
+  const keep = readEnjeuFromDom();
+  renderEnjeuQuestions(allItems, keep);
+
+  // refresh calculated preview (commune change)
+  updateControlePreview();
+
+}
+
+
+/* INSEE-first search */
+function scoreCommune(c, q, qNorm) {
+  const insee = (c.inseeNorm || "");
+  const nameN = c.nameNorm || "";
+  const qDigits = q.replace(/\D+/g, "");
+  const isInseeQuery = qDigits.length >= 2 && qDigits.length <= 5 && qDigits === q.trim();
+
+  if (isInseeQuery) {
+    if (insee === qDigits) return 0;
+    if (insee.startsWith(qDigits)) return 1;
+    if (nameN.startsWith(qNorm)) return 2;
+    if (nameN.includes(qNorm)) return 3;
+    if (insee.includes(qDigits)) return 4;
+    return 99;
+  } else {
+    if (nameN === qNorm) return 0;
+    if (nameN.startsWith(qNorm)) return 1;
+    if (nameN.includes(qNorm)) return 2;
+    if (insee.startsWith(qDigits)) return 3;
+    if (insee.includes(qDigits)) return 4;
+    return 99;
+  }
+}
+
+function filterCommunes(q) {
+  const raw = (q || "").trim();
+  if (!raw) return [];
+  const qNorm = norm(raw);
+
+  const scored = [];
+  for (const c of state.communes) {
+    const sc = scoreCommune(c, raw, qNorm);
+    if (sc === 99) continue;
+    scored.push([sc, c]);
+  }
+
+  scored.sort((a, b) => {
+    if (a[0] !== b[0]) return a[0] - b[0];
+    return a[1].nom.localeCompare(b[1].nom, "fr");
+  });
+
+  return scored.slice(0, MAX_COMMUNE_RESULTS).map(x => x[1]);
+}
+
+// Debounced version pour éviter trop d'appels lors de la frappe
+const debouncedCommuneSearch = debounce(() => {
+  const raw = $("communeInput").value;
+  const exact = state.communesByNom.get(raw.trim());
+  if (exact) { selectCommune(exact); return; }
+  state.selectedCommuneId = null;
+  $("communeMeta").textContent = "";
+  displayCommuneInfo(null);
+  updateStrategieTag();
+  showCommuneDropdown(filterCommunes(raw));
+  updateControlePreview();
+}, DEBOUNCE_DELAY_MS);
+
+$("communeInput").addEventListener("input", debouncedCommuneSearch);
+$("communeInput").addEventListener("focus", () => {
+  const raw = $("communeInput").value;
+  const list = filterCommunes(raw);
+  if (list.length) showCommuneDropdown(list);
+});
+$("communeInput").addEventListener("blur", () => {
+  setTimeout(() => hideCommuneDropdown(), DROPDOWN_BLUR_DELAY_MS);
+});
+
+// Bouton clear pour la commune
+$("communeClearBtn").addEventListener("click", () => {
+  $("communeInput").value = "";
+  $("communeMeta").textContent = "";
+  state.selectedCommuneId = null;
+  hideCommuneDropdown();
+  displayCommuneInfo(null);
+
+  // Décocher les cases auto-cochées par la commune
+  state.communeAutoChecked.forEach(val => {
+    const cb = document.querySelector(`.motif[value="${CSS.escape(val)}"], .objet[value="${CSS.escape(val)}"]`);
+    if (cb) cb.checked = false;
+  });
+  state.communeAutoChecked.clear();
+  updateMotifItemStyles();
+
+  // Nettoyer les erreurs
+  setInlineMsg("err-commune", "");
+  setInlineMsg("err-statut", "");
+  setFieldGroupState($("grp-commune"), null);
+  setAriaInvalid($("communeInput"), false);
+
+  // Rafraîchir l'affichage des enjeux
+  const motifs = getCheckedArray("motif");
+  const objets = getCheckedArray("objet");
+  const allItems = [...motifs, ...objets];
+  const keep = readEnjeuFromDom();
+  renderEnjeuQuestions(allItems, keep);
+
+  // Mettre le focus sur l'input
+  $("communeInput").focus();
+});
+
+
+/* Colonnes existantes dans AN_PC (pour gérer les ajouts optionnels sans casser le widget) */
+async function loadActesColSet() {
+  const r = await grist.docApi.fetchTable(TABLE_ACTES);
+  state.actesColSet = new Set(Object.keys(r).filter(k => k !== "id"));
+}
+function hasActesCol(colId) {
+  return state.actesColSet?.has(colId);
+}
+
+/* Index N° ACTE */
+async function buildActesIndex() {
+  const r = await grist.docApi.fetchTable(TABLE_ACTES);
+  const colNoActe = pickCol(r, [COLS.NoActe, "N_ACTE", "NoActe", "No_ACTE"]);
+  if (!colNoActe) throw new Error("Colonne N_ACTE introuvable dans AN_PC.");
+
+  state.actesNoActeIndex.clear();
+  r.id.forEach((rowId, i) => {
+    const v = cleanStr(r[colNoActe]?.[i]);
+    if (!v) return;
+    const arr = state.actesNoActeIndex.get(v) || [];
+    arr.push(rowId);
+    state.actesNoActeIndex.set(v, arr);
+  });
+}
+
+/* Inline validation */
+async function validateFormInline() {
+  clearAllInline();
+
+  const type = getTypeDdValue("type-dd").trim();
+  const type2 = getTypeDdValue("type2-dd").trim();
+  const visaMairie = $("visaMairie").value.trim();
+  const receptionPref = $("receptionPref").value.trim();
+
+  let ok = true;
+
+  if (!type) {
+    ok = false;
+    setInlineMsg("err-type", "Champ obligatoire");
+    setFieldGroupState($("grp-type"), "error");
+    $("type-btn")?.setAttribute("aria-invalid", "true");
+  }
+
+  if (!type2) {
+    ok = false;
+    setInlineMsg("err-type2", "Champ obligatoire");
+    setFieldGroupState($("grp-type2"), "error");
+    $("type2-btn")?.setAttribute("aria-invalid", "true");
+  }
+
+  if (!visaMairie) {
+    ok = false;
+    setInlineMsg("err-visaMairie", "Champ obligatoire");
+    setFieldGroupState($("grp-visaMairie"), "error");
+    setAriaInvalid($("visaMairie"), true);
+  }
+
+  if (!receptionPref) {
+    ok = false;
+    setInlineMsg("err-receptionPref", "Champ obligatoire");
+    setFieldGroupState($("grp-receptionPref"), "error");
+    setAriaInvalid($("receptionPref"), true);
+  }
+
+  if (!state.selectedCommuneId) {
+    ok = false;
+    setInlineMsg("err-commune", "Veuillez sélectionner une commune dans la liste");
+    setFieldGroupState($("grp-commune"), "error");
+    setAriaInvalid($("communeInput"), true);
+  } else if (state.statutsByKey.size) {
+    const tr = computeTrimestreFromDate(receptionPref);
+    const sel = getStatutSelection(state.selectedCommuneId, tr, receptionPref);
+    if (!sel) {
+      setInlineMsg("err-statut", "");
+    }
+  }
+
+  const precValues = getPrecsValues();
+  if (precValues.length === 0) {
+    ok = false;
+    setInlineMsg("err-prec", "Veuillez sélectionner une origine");
+    setFieldGroupState($("grp-precisions"), "error");
+    $("precs-btn")?.setAttribute("aria-invalid", "true");
+  }
+
+  // Validation des enjeux : seulement si le projet est concerné
+  const INDOLORES_VALID = new Set(["ERP 4/5", "Taille"]); // pas de radio Oui/Non
+  if (isProjetConcerneParStrategie()) {
+    const motifs = getCheckedArray("motif");
+    const objets = getCheckedArray("objet");
+    const allItems = [...motifs, ...objets];
+
+    for (const item of allItems) {
+      if (INDOLORES_VALID.has(item)) continue; // pas de radio pour ces items
+      const v = getRadio(`enjeu_${item}`);
+      if (!v) {
+        ok = false;
+        // Cibler le .motif-item correspondant (les radios sont maintenant inline)
+        const motifItem = document.querySelector(`.motif-item[data-motif="${CSS.escape(item)}"]`) ||
+                          document.querySelector(`.motif-item[data-objet="${CSS.escape(item)}"]`);
+        if (motifItem) {
+          motifItem.classList.add("has-error");
+          const err = $(`err-enjeu-${enjeuId(item)}`);
+          if (err) {
+            err.textContent = "Veuillez choisir Oui ou Non";
+            err.hidden = false;
+          }
+        }
+      }
+    }
+  }
+
+  // Validation Taille : si cochée, le nombre de logements est obligatoire
+  const tailleCoché = getCheckedArray("objet").includes("Taille");
+  if (tailleCoché) {
+    const tailleVal = parseInt($("taille-logements").value, 10);
+    if (isNaN(tailleVal) || $("taille-logements").value.trim() === "") {
+      ok = false;
+      setInlineMsg("err-taille", "Obligatoire si Taille est cochée");
+      $("taille-logements").style.borderColor = "var(--border-plain-error)";
+    }
+  }
+
+  const noActe = cleanStr($("noActe").value);
+  if (noActe) {
+    const hits = state.actesNoActeIndex.get(noActe) || [];
+    const clash = hits.some(id => state.mode === "create" ? true : (id !== state.currentRowId));
+    if (clash) {
+      ok = false;
+      setInlineMsg("err-noacte", "Ce N° ACTE existe déjà");
+      setFieldGroupState($("grp-noacte"), "error");
+      setAriaInvalid($("noActe"), true);
+    }
+  }
+
+  return ok;
+}
+
+function buildResume(payload) {
+  const lines = [];
+
+  // Reconstruire MAJCS selon la formule Grist
+  const controle = payload[COLS.Controle];
+
+  // Fonction helper pour convertir l'arrondissement en code court
+  function getArrondissementCode(arr) {
+    if (arr === 'Toulouse') return 'T';
+    if (arr === 'Muret') return 'M';
+    if (arr === 'Saint-Gaudens') return 'SG';
+    return arr || '??'; // Fallback si non reconnu
+  }
+
+  if (controle) {
+    // Si Controle = True : reconstruire le format "mois/année_arrondissement(...)"
+    const dateStr = payload[COLS.ReceptionPref];
+    let mois = "??";
+    let annee = "??";
+    if (dateStr) {
+      const d = new Date(dateStr);
+      if (!isNaN(d.getTime())) {
+        mois = String(d.getMonth() + 1).padStart(2, "0");
+        annee = String(d.getFullYear()).slice(-2);
+      }
+    }
+
+    const communeId = payload[COLS.CommuneRef];
+    const commune = communeId && state.communesById.has(communeId)
+      ? state.communesById.get(communeId)
+      : null;
+
+    const arrCode = getArrondissementCode(commune?.arr);
+    const suffixe = "(...)"; // Toujours (...) car calculé par Grist
+
+    const majcs = `${mois}/${annee}${arrCode}${suffixe}`;
+    lines.push(majcs);
+
+    // Nom de la commune sur une ligne séparée
+    if (commune?.nom) {
+      lines.push(commune.nom);
+    }
+  } else {
+    // Si Controle = False : afficher "MAJCS" comme placeholder
+    lines.push("MAJCS");
+
+    // Nom de la commune sur une ligne séparée
+    const communeId = payload[COLS.CommuneRef];
+    if (communeId && state.communesById.has(communeId)) {
+      const commune = state.communesById.get(communeId);
+      if (commune?.nom) {
+        lines.push(commune.nom);
+      }
+    }
+  }
+
+  return lines.join("\n");
+}
+
+/* Payload */
+function buildPayload() {
+  const prec = getPrecsValues(); // ChoiceList multi-sélection
+  const motifs = getCheckedArray("motif");
+  const objets = getCheckedArray("objet");
+
+  // Colonnes Enjeu_* : inclure motifs ET objets
+  const INDOLORES = new Set(["ERP 4/5", "Taille"]); // toujours Oui si cochés, pas de radio
+  const allItems = [...motifs, ...objets];
+  const enjeuCols = Object.fromEntries(
+    [...ALL_MOTIFS, ...ALL_OBJETS].map(item => {
+      const isSelected = allItems.includes(item);
+      let v = null;
+      if (isSelected) {
+        v = INDOLORES.has(item) ? "Oui" : getRadio(`enjeu_${item}`);
+      }
+      return [enjeuColForItem(item), v];
+    })
+  );
+
+  // Nb logements attendus (Taille du projet)
+  const tailleCoché = objets.includes("Taille");
+  const tailleVal = tailleCoché ? (parseInt($("taille-logements").value, 10) || null) : null;
+
+  const payload = {
+    [COLS.Type]: getTypeDdValue("type-dd") || null,
+    [COLS.Type2]: getTypeDdValue("type2-dd") || null,
+    [COLS.NoActe]: cleanStr($("noActe").value) || null,
+    [COLS.NParcelle]: cleanStr($("nParcelle").value) || null,
+    [COLS.NomProjet]: cleanStr($("nomProjet").value) || null,
+    [COLS.VisaMairie]: $("visaMairie").value || null,
+    [COLS.ReceptionPref]: $("receptionPref").value || null,
+    [COLS.Precisions]: toGristList(prec),
+    [COLS.Motifs]: toGristList(motifs),
+    [COLS.ObjetAutorisation]: toGristList(objets),
+    ...enjeuCols,
+    // Compat (ancienne colonne) : renseignée uniquement si un seul motif est sélectionné
+    [COLS.EnjeuOld]: (motifs.length === 1 ? getRadio(`enjeu_${motifs[0]}`) : null),
+    [COLS.CommuneRef]: state.selectedCommuneId,
+    [COLS.TailleLogements]: tailleVal
+  };
+
+  // Ajouts optionnels (si les colonnes existent dans AN_PC)
+  const selInfo = getSelectionForPayload(payload);
+  if (hasActesCol(COLS.Trimestre)) payload[COLS.Trimestre] = selInfo.trimestre || null;
+  if (hasActesCol(COLS.SelectionSnapshot)) payload[COLS.SelectionSnapshot] = selInfo.selection || null;
+
+  return payload;
+}
+
+
+/* Save */
+async function save() {
+  // Vérifs environnement (tables/colonnes)
+  checkEnvironment();
+  if (!state.envOk) {
+    showAlert("error", "Configuration incomplète", "Le widget ne peut pas enregistrer tant que les erreurs de configuration ne sont pas corrigées (voir les messages en haut).");
+    return;
+  }
+  setBusy(true);
+  try {
+    await buildActesIndex();
+
+    const ok = await validateFormInline();
+    if (!ok) {
+      showAlert("error", "Formulaire incomplet", "Merci de corriger les champs indiqués en rouge.");
+      focusFirstInvalid();
+      return;
+    }
+
+    let payload = buildPayload();
+    payload = applyControleLogicNonEcrasant(payload, state.currentRecord);
+
+    // Sauvegarder le mode AVANT la sauvegarde (car Grist peut déclencher onRecord après)
+    const wasCreateMode = (state.mode === "create");
+
+    // Construire le résumé avec MAJCS reconstruit
+    const resume = buildResume(payload);
+
+    if (wasCreateMode) {
+      await addOneRecord(TABLE_ACTES, payload);
+      showSuccessPersistent("Contrôle créé", resume);
+      resetForm();
+      setMode("create", null);
+    } else {
+      await updateOneRecord(TABLE_ACTES, state.currentRowId, payload);
+      showSuccessPersistent("Contrôle mis à jour", resume);
+    }
+  } catch (e) {
+    console.error(e);
+    const msg = (e?.message || String(e));
+    if (/access|forbidden|permission|denied|unauthorized/i.test(msg)) {
+      showAlert("error", "Accès insuffisant", "Dans les options du widget, mets ‘Full access’ puis recharge.");
+    } else {
+      showAlert("error", "Erreur", msg);
+    }
+  } finally {
+    setBusy(false);
+  }
+}
+
+$("btnSave").addEventListener("click", save);
+$("btnReset").addEventListener("click", () => { resetForm(); state.currentRecord = null; setMode("create", null); });
+$("btnExitEdit").addEventListener("click", () => { state.currentRecord = null; setMode("create", null); resetForm(); });
+
+/* Auto-clear inline errors on user action */
+function wireInlineAutoClear() {
+  // Les dropdowns type/type2 clearent les erreurs via leur panel (géré dans initTypeDd)
+  $("type-dd").querySelector(".type-dd__panel").addEventListener("click", () => { setInlineMsg("err-type",""); setFieldGroupState($("grp-type"), null); $("type-btn")?.removeAttribute("aria-invalid"); });
+  $("type2-dd").querySelector(".type-dd__panel").addEventListener("click", () => { setInlineMsg("err-type2",""); setFieldGroupState($("grp-type2"), null); $("type2-btn")?.removeAttribute("aria-invalid"); });
+  $("visaMairie").addEventListener("change", () => { setInlineMsg("err-visaMairie",""); setFieldGroupState($("grp-visaMairie"), null); setAriaInvalid($("visaMairie"), false); });
+  $("receptionPref").addEventListener("change", () => { setInlineMsg("err-receptionPref",""); setFieldGroupState($("grp-receptionPref"), null); setAriaInvalid($("receptionPref"), false); setInlineMsg("err-statut",""); if (state.selectedCommuneId) { const c = state.communesById.get(state.selectedCommuneId); if (c) selectCommune(c); } });
+
+  $("noActe").addEventListener("input", () => { setInlineMsg("err-noacte",""); setFieldGroupState($("grp-noacte"), null); setAriaInvalid($("noActe"), false); });
+  $("taille-logements").addEventListener("input", () => { setInlineMsg("err-taille",""); $("taille-logements").style.borderColor = ""; updateProjetTitleTag(); });
+
+  // L'auto-clear de err-prec est géré dans initPrecsMultiDd (via click sur les items)
+
+  document.querySelectorAll("input.motif").forEach(cb => cb.addEventListener("change", (e) => {
+    if (countChecked("motif") > 0) { setInlineMsg("err-motif",""); setFieldGroupState($("fs-motif"), null); }
+
+    // Lire les réponses avant mise à jour des styles (pour conserver les valeurs des items encore cochés)
+    const keepAll = readEnjeuFromDom();
+    // Mettre à jour les styles (réinitialise les radios des items décochés)
+    updateMotifItemStyles();
+
+    // Récupérer tous les items cochés (après mise à jour)
+    const motifs = getCheckedArray("motif");
+    const objets = getCheckedArray("objet");
+    const allItems = [...motifs, ...objets];
+    // Ne conserver que les valeurs des items toujours cochés
+    const keep = Object.fromEntries(allItems.filter(i => keepAll[i]).map(i => [i, keepAll[i]]));
+    renderEnjeuQuestions(allItems, keep);
+
+    // Nettoyer les erreurs enjeu
+    clearEnjeuInlineAll();
+  }));
+
+  $("communeInput").addEventListener("input", () => {
+    setInlineMsg("err-commune", "");
+    setInlineMsg("err-statut", "");
+    setFieldGroupState($("grp-commune"), null);
+    setAriaInvalid($("communeInput"), false);
+  });
+
+  // Gestion des objets d'autorisation
+  document.querySelectorAll("input.objet").forEach(cb => cb.addEventListener("change", (e) => {
+    // Lire les réponses avant mise à jour des styles (pour conserver les valeurs des items encore cochés)
+    const keepAll = readEnjeuFromDom();
+    // Mettre à jour les styles (réinitialise les radios des items décochés)
+    updateMotifItemStyles();
+
+    // Récupérer tous les items cochés (après mise à jour)
+    const motifs = getCheckedArray("motif");
+    const objets = getCheckedArray("objet");
+    const allItems = [...motifs, ...objets];
+    // Ne conserver que les valeurs des items toujours cochés
+    const keep = Object.fromEntries(allItems.filter(i => keepAll[i]).map(i => [i, keepAll[i]]));
+    renderEnjeuQuestions(allItems, keep);
+
+    // Nettoyer les erreurs enjeu
+    clearEnjeuInlineAll();
+  }));
+}
+
+/**
+ * Normalise une clé item en ID HTML valide (sans espaces ni caractères spéciaux).
+ * Ex: "ERP 1/2/3" → "ERP-1-2-3"
+ */
+function enjeuId(key) {
+  return key.replace(/[^a-zA-Z0-9_-]/g, "-");
+}
+
+/**
+ * Injecte les radios Oui/Non inline dans chaque .motif-item.
+ * Appelée une seule fois à l'init. Les radios sont cachées par CSS
+ * et s'affichent uniquement quand .motif-item.is-checked.
+ */
+function initMotifItemRadios() {
+  document.querySelectorAll(".motif-item").forEach(item => {
+    // Récupérer le nom de l'item depuis data-motif ou data-objet
+    const itemKey = item.dataset.motif || item.dataset.objet;
+    if (!itemKey) return;
+
+    // ERP 4/5 et Taille sont indolores : pas de radio Oui/Non, toujours Oui en sauvegarde
+    if (itemKey === "ERP 4/5" || itemKey === "Taille") return;
+
+    // Ne pas dupliquer si déjà présent
+    if (item.querySelector(".motif-item__radios")) return;
+
+    const idKey = enjeuId(itemKey); // ID HTML valide (sans espaces/slashes)
+
+    const radiosDiv = document.createElement("div");
+    radiosDiv.className = "motif-item__radios";
+
+    for (const val of ["Non", "Oui"]) {
+      const lbl = document.createElement("label");
+      lbl.className = "motif-radio";
+      lbl.setAttribute("for", `enjeu-${idKey}-${val.toLowerCase()}`);
+      const inp = document.createElement("input");
+      inp.type = "radio";
+      inp.id = `enjeu-${idKey}-${val.toLowerCase()}`;
+      inp.name = `enjeu_${itemKey}`; // name garde la clé originale (ex: "enjeu_ERP 1/2/3")
+      inp.value = val;
+      lbl.appendChild(inp);
+      lbl.appendChild(document.createTextNode(val));
+
+      inp.addEventListener("change", () => {
+        if (!inp.checked) return;
+        // Mettre à jour les classes visuelles
+        radiosDiv.querySelectorAll(".motif-radio").forEach(l => {
+          l.classList.remove("is-oui", "is-non");
+        });
+        lbl.classList.add(val === "Oui" ? "is-oui" : "is-non");
+        // Effacer l'erreur inline si présente
+        setInlineMsg(`err-enjeu-${idKey}`, "");
+        updateStrategieTag();
+        updateControlePreview();
+      });
+
+      radiosDiv.appendChild(lbl);
+    }
+
+    item.appendChild(radiosDiv);
+
+    // Ajouter un élément d'erreur inline (caché par défaut, prend toute la largeur grâce au CSS)
+    if (!item.querySelector(`[id="err-enjeu-${idKey}"]`)) {
+      const errP = document.createElement("p");
+      errP.className = "fr-error-text";
+      errP.id = `err-enjeu-${idKey}`;
+      errP.hidden = true;
+      item.appendChild(errP);
+    }
+  });
+}
+
+/**
+ * Réinitialise tous les radios inline des .motif-item (décocher + supprimer classes visuelles).
+ */
+function resetMotifItemRadios() {
+  document.querySelectorAll(".motif-item__radios").forEach(radiosDiv => {
+    radiosDiv.querySelectorAll("input[type='radio']").forEach(inp => { inp.checked = false; });
+    radiosDiv.querySelectorAll(".motif-radio").forEach(lbl => lbl.classList.remove("is-oui", "is-non"));
+  });
+}
+
+/**
+ * Restaure les valeurs Oui/Non dans les radios inline des .motif-item.
+ * Réinitialise d'abord tous les radios, puis applique les valeurs fournies.
+ * @param {Object} valuesByItem - ex: { "ZI": "Oui", "ERP 1/2/3": "Non" }
+ */
+function restoreMotifItemRadios(valuesByItem) {
+  // 1. Tout réinitialiser
+  resetMotifItemRadios();
+
+  // 2. Restaurer les valeurs
+  for (const [itemKey, val] of Object.entries(valuesByItem)) {
+    if (val !== "Oui" && val !== "Non") continue;
+    // Chercher le .motif-item avec data-motif ou data-objet correspondant
+    const item = document.querySelector(`.motif-item[data-motif="${CSS.escape(itemKey)}"]`) ||
+                 document.querySelector(`.motif-item[data-objet="${CSS.escape(itemKey)}"]`);
+    if (!item) continue;
+    const radiosDiv = item.querySelector(".motif-item__radios");
+    if (!radiosDiv) continue;
+    // Cocher le bon radio
+    const inp = radiosDiv.querySelector(`input[value="${val}"]`);
+    if (!inp) continue;
+    inp.checked = true;
+    // Mettre à jour les classes visuelles
+    const lbl = inp.closest(".motif-radio");
+    if (lbl) lbl.classList.add(val === "Oui" ? "is-oui" : "is-non");
+  }
+}
+
+function wireControlePreview() {
+  // Champs qui impactent la logique
+  document.querySelectorAll("input.motif").forEach(cb => cb.addEventListener("change", updateControlePreview));
+  // Enjeu par motif : updateControlePreview() est déclenché via délégation dans renderEnjeuQuestions()
+  $("communeInput").addEventListener("input", updateControlePreview);
+}
+
+function updateMotifItemStyles() {
+  // Met à jour les classes CSS des items motif et objet en fonction de l'état checked
+  document.querySelectorAll("input.motif, input.objet").forEach(cb => {
+    const item = cb.closest(".motif-item");
+    if (item) {
+      const wasChecked = item.classList.contains("is-checked");
+      item.classList.toggle("is-checked", cb.checked);
+      // Si l'item vient d'être décoché, réinitialiser ses radios Oui/Non
+      if (wasChecked && !cb.checked) {
+        const radiosDiv = item.querySelector(".motif-item__radios");
+        if (radiosDiv) {
+          radiosDiv.querySelectorAll("input[type='radio']").forEach(inp => { inp.checked = false; });
+          radiosDiv.querySelectorAll(".motif-radio").forEach(lbl => lbl.classList.remove("is-oui", "is-non"));
+        }
+        item.classList.remove("has-error");
+        const errP = item.querySelector("[id^='err-enjeu-']");
+        if (errP) { errP.hidden = true; errP.textContent = ""; }
+      }
+    }
+  });
+}
+
+/* Edit mode */
+function bindSelection() {
+  grist.onRecord((record) => {
+    try {
+      if (!record || !record.id) return;
+
+      state.currentRecord = record;
+
+      // Détecter si c'est un nouvel enregistrement (ligne vide dans Grist)
+      // Un enregistrement est considéré comme nouveau si tous les champs clés sont vides
+      const isNewRecord = !record[COLS.Type] &&
+                          !record[COLS.ReceptionPref] &&
+                          !record[COLS.CommuneRef];
+
+      if (isNewRecord) {
+        setMode("create", null);
+      } else {
+        setMode("edit", record.id);
+      }
+
+      clearAllInline();
+
+      setTypeDdValue("type-dd", record[COLS.Type] ?? "");
+      setTypeDdValue("type2-dd", record[COLS.Type2] ?? "");
+
+      $("noActe").value = record[COLS.NoActe] ?? "";
+      $("nParcelle").value = record[COLS.NParcelle] ?? "";
+      $("nomProjet").value = record[COLS.NomProjet] ?? "";
+      $("visaMairie").value = record[COLS.VisaMairie] ?? "";
+      $("receptionPref").value = record[COLS.ReceptionPref] ?? "";
+      syncDateEmptyState();
+
+      const precList = fromGristList(record[COLS.Precisions]);
+      setPrecsValues(precList);
+
+      // Les données viennent de MN_Motifs_de_selection et Objet autorisation (Choice Lists)
+
+      // Charger les sélections depuis les Choice Lists
+      const motifsSel = fromGristList(record[COLS.Motifs]);
+      const objetsSel = fromGristList(record[COLS.ObjetAutorisation]);
+
+      setCheckedFromArray("motif", motifsSel);
+      setCheckedFromArray("objet", objetsSel);
+
+      updateMotifItemStyles();
+
+      // Restaurer le nb de logements attendus (Taille du projet)
+      const tailleInput = $("taille-logements");
+      if (tailleInput) {
+        const tailleVal = record[COLS.TailleLogements];
+        tailleInput.value = (tailleVal != null && tailleVal !== "") ? tailleVal : "";
+      }
+
+      // Lors du chargement d'un enregistrement existant
+      const allItems = [...motifsSel, ...objetsSel];
+      const valuesByItem = {};
+      for (const item of allItems) {
+        const v = record[enjeuColForItem(item)];
+        if (v === "Oui" || v === "Non") {
+          valuesByItem[item] = v;
+        }
+      }
+      // Migration legacy pour ancienne colonne
+      const legacyEnjeu = record[COLS.EnjeuOld];
+      if ((legacyEnjeu === "Oui" || legacyEnjeu === "Non") && motifsSel.length > 0) {
+        for (const m of motifsSel) {
+          if (!valuesByItem[m]) valuesByItem[m] = legacyEnjeu;
+        }
+      }
+      renderEnjeuQuestions(allItems, valuesByItem);
+
+      const rawCommune = record[COLS.CommuneRef];
+
+      if (typeof rawCommune === "number" && state.communesById.has(rawCommune)) {
+        selectCommune(state.communesById.get(rawCommune));
+      } else if (typeof rawCommune === "string") {
+        const byName = state.communesByNom.get(rawCommune.trim());
+        if (byName) selectCommune(byName);
+        else {
+          $("communeInput").value = rawCommune.trim();
+          $("communeMeta").textContent = "";
+          state.selectedCommuneId = null;
+          displayCommuneInfo(null);
+          updateStrategieTag();
+        }
+      } else if (Array.isArray(rawCommune)) {
+        const maybeId = rawCommune.find(x => typeof x === "number");
+        const maybeLabel = rawCommune.find(x => typeof x === "string");
+        if (typeof maybeId === "number" && state.communesById.has(maybeId)) selectCommune(state.communesById.get(maybeId));
+        else if (typeof maybeLabel === "string" && state.communesByNom.has(maybeLabel.trim())) selectCommune(state.communesByNom.get(maybeLabel.trim()));
+        else {
+          $("communeInput").value = (maybeLabel || "").toString().trim();
+          $("communeMeta").textContent = "";
+          state.selectedCommuneId = null;
+          displayCommuneInfo(null);
+          updateStrategieTag();
+        }
+      } else {
+        $("communeInput").value = "";
+        $("communeMeta").textContent = "";
+        state.selectedCommuneId = null;
+        displayCommuneInfo(null);
+        updateStrategieTag();
+      }
+
+      hideCommuneDropdown();
+
+      updateControlePreview();
+    } catch (e) {
+      console.error("onRecord error:", e);
+      showAlert("error", "Erreur sélection", (e?.message || e));
+    }
+  });
+}
+
+
+function setSaveEnabled(enabled, reason="") {
+  const btn = $("btnSave");
+  if (!btn) return;
+  btn.disabled = !enabled;
+  btn.setAttribute("aria-disabled", (!enabled).toString());
+  if (!enabled && reason) btn.title = reason;
+  if (enabled) btn.title = "";
+}
+
+function renderEnvIssues() {
+  // Clear previous
+  const zone = $("alertZone");
+  if (!zone) return;
+  // Remove only env alerts we add (marked)
+  [...zone.querySelectorAll("[data-env-issue='1']")].forEach(n => n.remove());
+
+  const issues = [];
+  state.envErrors.forEach(t => issues.push({level:"error", title:"Configuration requise", text:t}));
+  state.envWarnings.forEach(t => issues.push({level:"warning", title:"À vérifier", text:t}));
+
+  issues.reverse().forEach(it => {
+    const cls = it.level === "error" ? "fr-alert--error" : "fr-alert--warning";
+    const el = document.createElement("div");
+    el.className = `fr-alert ${cls} fr-alert--sm fr-mb-1w`;
+    el.setAttribute("data-env-issue","1");
+    el.innerHTML = `<p class="fr-alert__title">${escapeHtml(it.title)}</p><p>${escapeHtml(it.text)}</p>`;
+    zone.prepend(el);
+  });
+}
+
+function checkEnvironment() {
+  state.envErrors = [];
+  state.envWarnings = [];
+  state.envOk = true;
+
+  // 1) Table Communes_Statut
+  if (state.statutsStatus !== "ok") {
+    state.envErrors.push(`La table "${TABLE_STATUT}" n'est pas prête (statut: ${state.statutsStatus}). Elle doit contenir des colonnes Commune + Trimestre + Selection. Les communes sans ligne explicite pour un trimestre seront considérées "${DEFAULT_SELECTION}" par défaut.`);
+  }
+
+  // 2) Colonnes AN_PC nécessaires au widget
+  const requiredActes = [COLS.CommuneRef, COLS.ReceptionPref];
+  requiredActes.forEach(c => {
+    if (!state.actesColSet?.has(c)) state.envErrors.push(`Colonne "${c}" manquante dans "${TABLE_ACTES}".`);
+  });
+
+  // 3) Colonnes snapshot (recommandées)
+  if (!state.actesColSet?.has(COLS.Trimestre)) {
+    state.envWarnings.push(`Colonne "${COLS.Trimestre}" absente dans "${TABLE_ACTES}" : le widget ne pourra pas stocker le trimestre de l'acte.`);
+  }
+  if (!state.actesColSet?.has(COLS.SelectionSnapshot)) {
+    state.envWarnings.push(`Colonne "${COLS.SelectionSnapshot}" absente dans "${TABLE_ACTES}" : le widget ne pourra pas figer Fixe/Ciblée/Rotation au moment de la saisie.`);
+  }
+
+  state.envOk = state.envErrors.length === 0;
+  renderEnvIssues();
+  setSaveEnabled(state.envOk, state.envOk ? "" : "Configuration incomplète (voir messages en haut).");
+}
+
+
+/* Init */
+/* ================= TAB MANAGEMENT ================= */
+/* ================= DASHBOARD: WIRING ÉVÉNEMENTS ================= */
+function initDashboardWiring() {
+  // Vue-selector (Mois/Trim/Année)
+  document.querySelectorAll(".vue-btn").forEach(btn => {
+    btn.removeEventListener("click", vueButtonClickHandler);
+    btn.addEventListener("click", vueButtonClickHandler);
+  });
+
+  function vueButtonClickHandler(e) {
+    const btn = e.currentTarget;
+    // Réinitialiser les class active
+    document.querySelectorAll(".vue-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+
+    state.dashVue = btn.dataset.vue;
+    state.dashMonth = new Date().getMonth() + 1;
+    state.dashYear = new Date().getFullYear();
+    renderDashboard();
+  }
+
+  // Navigation période (prev/next)
+  const btnPrev = $("btnDashPrev");
+  const btnNext = $("btnDashNext");
+
+  btnPrev?.removeEventListener("click", btnPrevHandler);
+  btnNext?.removeEventListener("click", btnNextHandler);
+
+  btnPrev?.addEventListener("click", btnPrevHandler);
+  btnNext?.addEventListener("click", btnNextHandler);
+
+  function btnPrevHandler() {
+    navigateDashboardPeriod(-1);
+  }
+
+  function btnNextHandler() {
+    navigateDashboardPeriod(+1);
+  }
+
+  // Scope (Toutes/Commune)
+  document.querySelectorAll(".scope-btn").forEach(btn => {
+    btn.removeEventListener("click", scopeButtonClickHandler);
+    btn.addEventListener("click", scopeButtonClickHandler);
+  });
+
+  function scopeButtonClickHandler(e) {
+    const btn = e.currentTarget;
+    document.querySelectorAll(".scope-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+
+    state.dashScope = btn.dataset.scope;
+    if (state.dashScope === "commune" && !state.dashSelectedCommune) {
+      // Sélectionner la première commune avec données
+      const firstCommune = state.communes.find(c => {
+        return state.allANPCRows.some(row => row.communeId === c.id);
+      });
+      if (firstCommune) state.dashSelectedCommune = firstCommune;
+    }
+    renderDashboard();
+  }
+
+  // Recherche commune
+  const dashInput = $("dashCommuneInput");
+  if (dashInput) {
+    dashInput.removeEventListener("input", communeInputHandler);
+    dashInput.removeEventListener("focus", communeFocusHandler);
+    dashInput.removeEventListener("blur", communeBlurHandler);
+
+    dashInput.addEventListener("input", debounce(communeInputHandler, 250));
+    dashInput.addEventListener("focus", communeFocusHandler);
+    dashInput.addEventListener("blur", communeBlurHandler);
+  }
+
+  function communeInputHandler(e) {
+    const q = e.target.value.trim();
+    if (q) {
+      const filtered = filterDashboardCommunes(q);
+      renderDashboardCommuneDropdown(filtered);
+    } else {
+      $("dashCommuneDd").style.display = "none";
+    }
+  }
+
+  function communeFocusHandler() {
+    if (dashInput.value.trim()) {
+      const filtered = filterDashboardCommunes(dashInput.value.trim());
+      renderDashboardCommuneDropdown(filtered);
+    }
+  }
+
+  function communeBlurHandler() {
+    // Délai pour laisser le temps au click sur dropdown
+    setTimeout(() => {
+      $("dashCommuneDd").style.display = "none";
+    }, 150);
+  }
+
+  // Tri (A→Z / Par total)
+  const btnSort = $("btnDashSort");
+  if (btnSort) {
+    btnSort.removeEventListener("click", sortButtonClickHandler);
+    btnSort.addEventListener("click", sortButtonClickHandler);
+  }
+
+  function sortButtonClickHandler() {
+    state.dashSort = state.dashSort === "alpha" ? "total" : "alpha";
+
+    // Mettre à jour le texte du bouton
+    const icon = state.dashSort === "alpha" ? "fa-arrow-down-a-z" : "fa-arrow-down-9-1";
+    const text = state.dashSort === "alpha" ? "A→Z" : "Par total";
+    btnSort.innerHTML = `<i class="fa-solid ${icon}"></i> ${text}`;
+
+    renderDashboard();
+  }
+
+  // Sous-onglets (croisé/détail/graphique)
+  document.querySelectorAll(".sub-tab").forEach(btn => {
+    btn.removeEventListener("click", subTabClickHandler);
+    btn.addEventListener("click", subTabClickHandler);
+  });
+
+  function subTabClickHandler(e) {
+    const btn = e.currentTarget;
+    document.querySelectorAll(".sub-tab").forEach(b => {
+      b.classList.remove("active");
+      b.setAttribute("aria-selected", "false");
+    });
+    btn.classList.add("active");
+    btn.setAttribute("aria-selected", "true");
+
+    state.dashTab = btn.dataset.subtab;
+    renderDashboardSubtabs();
+  }
+}
+
+async function initAppTabs() {
+  const tabs = document.querySelectorAll(".app-tab");
+  const panels = document.querySelectorAll(".app-tab-panel");
+
+  tabs.forEach(tab => {
+    tab.addEventListener("click", async () => {
+      const tabName = tab.getAttribute("data-tab");
+
+      // Charger données AN_PC si on switch au dashboard
+      if (tabName === "dashboard" && !state.anpcDataLoaded) {
+        try {
+          await loadAllANPCData();
+          // Initialiser wiring dashboard
+          initDashboardWiring();
+          // Rendre le dashboard
+          renderDashboard();
+        } catch (e) {
+          console.error("Error initializing dashboard:", e);
+        }
+      }
+
+      // Désactiver tous les tabs et panels
+      tabs.forEach(t => {
+        t.classList.remove("active");
+        t.setAttribute("aria-selected", "false");
+      });
+      panels.forEach(p => p.classList.remove("active"));
+
+      // Activer le tab et panel sélectionnés
+      tab.classList.add("active");
+      tab.setAttribute("aria-selected", "true");
+
+      const panel = document.getElementById(`tab${tabName.charAt(0).toUpperCase() + tabName.slice(1)}`);
+      if (panel) {
+        panel.classList.add("active");
+      }
+    });
+  });
+}
+
+/* ================= DASHBOARD: CHARGEMENT DONNÉES ================= */
+async function loadAllANPCData() {
+  if (state.anpcDataLoaded) return; // Éviter rechargement multiple
+
+  try {
+    const r = await grist.docApi.fetchTable(TABLE_ACTES);
+
+    // Récupérer les colonnes
+    const colMajcs = pickCol(r, ["MAJCS"]);
+    const colCommune = pickCol(r, ["Commune"]);
+    const colArr = pickCol(r, ["Arrondissement"]);
+    const colLogements = pickCol(r, ["Logements"]);
+    const colType = pickCol(r, ["Type"]);
+    const colType2 = pickCol(r, ["Type2"]);
+    const colMotif = pickCol(r, ["MN_Motifs_de_selection"]);
+    const colObjet = pickCol(r, ["Objet_autorisation"]);
+    const colVisa = pickCol(r, ["Visa_Mairie"]);
+    const colReceptionPref = pickCol(r, ["Reception_Pref"]);
+
+    state.allANPCRows = r.id.map((id, i) => {
+      const communeRaw = r[colCommune]?.[i];
+      const communeId = normalizeCommuneId(communeRaw);
+      const receptionPrefRaw = r[colReceptionPref]?.[i];
+
+      return {
+        id: id,
+        majcs: 1, // Chaque ligne = 1 MAJCS
+        communeId: communeId,
+        communeName: state.communes.find(c => c.id === communeId)?.nom || "?",
+        arr: r[colArr]?.[i],
+        logements: r[colLogements]?.[i],
+        type: cleanStr(r[colType]?.[i]),
+        type2: cleanStr(r[colType2]?.[i]),
+        motif: cleanStr(r[colMotif]?.[i]),
+        objet: cleanStr(r[colObjet]?.[i]),
+        visaMairie: r[colVisa]?.[i],
+        receptionPref: parseDate(receptionPrefRaw),
+      };
+    }).filter(row => row.communeId && row.receptionPref); // Filtrer rows invalides
+
+    state.anpcDataLoaded = true;
+    console.log(`Loaded ${state.allANPCRows.length} AN_PC rows`);
+  } catch (e) {
+    console.error("Error loading AN_PC data:", e);
+    state.anpcDataLoaded = false;
+    throw e;
+  }
+}
+
+/* ================= DASHBOARD: GESTION PÉRIODE ================= */
+function getDashboardPeriodLabel() {
+  const months = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"];
+  const m = state.dashMonth;
+  const y = state.dashYear;
+
+  if (state.dashVue === "mois") {
+    return `${months[m - 1]} ${y}`;
+  } else if (state.dashVue === "trimestre") {
+    const t = Math.floor((m - 1) / 3) + 1;
+    return `T${t} ${y}`;
+  } else {
+    return `${y}`;
+  }
+}
+
+function navigateDashboardPeriod(delta) {
+  if (state.dashVue === "mois") {
+    let month = state.dashMonth + delta;
+    let year = state.dashYear;
+    if (month < 1) { month = 12; year--; }
+    else if (month > 12) { month = 1; year++; }
+    state.dashMonth = month;
+    state.dashYear = year;
+  } else if (state.dashVue === "trimestre") {
+    let t = Math.floor((state.dashMonth - 1) / 3) + 1;
+    t += delta;
+    if (t < 1) { t = 4; state.dashYear--; }
+    else if (t > 4) { t = 1; state.dashYear++; }
+    state.dashMonth = (t - 1) * 3 + 1;
+  } else {
+    state.dashYear += delta;
+  }
+  renderDashboard();
+}
+
+function isDashAtCurrentPeriod() {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+
+  if (state.dashVue === "mois") {
+    return state.dashYear === currentYear && state.dashMonth === currentMonth;
+  } else if (state.dashVue === "trimestre") {
+    const currentT = Math.floor((currentMonth - 1) / 3) + 1;
+    const dashT = Math.floor((state.dashMonth - 1) / 3) + 1;
+    return state.dashYear === currentYear && dashT === currentT;
+  } else {
+    return state.dashYear === currentYear;
+  }
+}
+
+function getRowsForPeriod(allRows) {
+  return allRows.filter(row => {
+    if (!row.receptionPref) return false;
+    const m = row.receptionPref.getMonth() + 1;
+    const y = row.receptionPref.getFullYear();
+
+    if (state.dashVue === "mois") {
+      return y === state.dashYear && m === state.dashMonth;
+    } else if (state.dashVue === "trimestre") {
+      const t = Math.floor((state.dashMonth - 1) / 3) + 1;
+      const tStart = (t - 1) * 3 + 1;
+      const tEnd = t * 3;
+      return y === state.dashYear && m >= tStart && m <= tEnd;
+    } else {
+      return y === state.dashYear;
+    }
+  });
+}
+
+/* ================= DASHBOARD: RECHERCHE COMMUNE ================= */
+function norm(str) {
+  if (!str) return "";
+  return str.toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function filterDashboardCommunes(q) {
+  const nq = norm(q);
+  const isNum = /^\d{3,}$/.test(q.trim());
+
+  // Récupérer communes avec données AN_PC
+  const communesWithData = new Set();
+  state.allANPCRows.forEach(row => {
+    if (row.communeId) communesWithData.add(row.communeId);
+  });
+
+  return state.communes
+    .filter(c => communesWithData.has(c.id))
+    .map(c => {
+      const nn = norm(c.nom);
+      const ni = norm((c.insee || "").toString());
+      let score = 0;
+
+      if (isNum) {
+        if (ni === nq) score = 100;
+        else if (ni.startsWith(nq)) score = 80;
+        else if (ni.includes(nq)) score = 50;
+        else return null;
+      } else {
+        if (nn === nq) score = 100;
+        else if (nn.startsWith(nq)) score = 80;
+        else if (nn.includes(nq)) score = 50;
+        else return null;
+      }
+      return { c, score };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.score - a.score || a.c.nom.localeCompare(b.c.nom, "fr"))
+    .slice(0, 25)
+    .map(x => x.c);
+}
+
+function renderDashboardCommuneDropdown(results) {
+  const panel = $("dashCommuneDd");
+  panel.innerHTML = "";
+
+  if (!results.length) {
+    const empty = document.createElement("div");
+    empty.className = "dd-empty";
+    empty.textContent = "Aucune commune trouvée.";
+    panel.appendChild(empty);
+    panel.style.display = "block";
+    return;
+  }
+
+  results.forEach(c => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "dd-item";
+
+    if (c.arr) {
+      const badge = document.createElement("span");
+      badge.className = "type-dd__item-badge dd-arr-badge";
+      badge.textContent = c.arr;
+      btn.appendChild(badge);
+    }
+
+    const body = document.createElement("div");
+    body.className = "dd-item-body";
+    const t = document.createElement("span");
+    t.className = "dd-title";
+    t.textContent = c.nom;
+    body.appendChild(t);
+    btn.appendChild(body);
+
+    btn.addEventListener("click", () => {
+      state.dashSelectedCommune = c;
+      $("dashCommuneInput").value = c.nom;
+      panel.style.display = "none";
+      renderDashboard();
+    });
+
+    panel.appendChild(btn);
+  });
+
+  panel.style.display = "block";
+}
+
+/* ================= DASHBOARD: AGRÉGATION DONNÉES ================= */
+function aggregateANPCByCommune(filteredRows) {
+  const byCommune = new Map();
+
+  // Récupérer tous les types et type2 uniques
+  const allTypes = new Set();
+  const allType2s = new Set();
+  state.allANPCRows.forEach(row => {
+    if (row.type) allTypes.add(row.type);
+    if (row.type2) allType2s.add(row.type2);
+  });
+
+  filteredRows.forEach(row => {
+    const communeId = row.communeId;
+    if (!communeId) return;
+    const commune = state.communes.find(c => c.id === communeId);
+    if (!commune) return;
+
+    if (!byCommune.has(communeId)) {
+      byCommune.set(communeId, {
+        id: communeId,
+        nom: commune.nom,
+        arr: commune.arr,
+        majcs: 0,
+        logements: 0,
+        visaMairie: 0,
+        typeCount: {},
+        type2Count: {},
+        motifCount: {},
+      });
+
+      // Initialiser tous les types/type2 à 0
+      allTypes.forEach(t => { byCommune.get(communeId).typeCount[t] = 0; });
+      allType2s.forEach(t => { byCommune.get(communeId).type2Count[t] = 0; });
+    }
+
+    const entry = byCommune.get(communeId);
+    entry.majcs += row.majcs;
+    if (row.logements) entry.logements += row.logements;
+    if (row.visaMairie) entry.visaMairie++;
+    if (row.type) entry.typeCount[row.type]++;
+    if (row.type2) entry.type2Count[row.type2]++;
+    if (row.motif) entry.motifCount[row.motif] = (entry.motifCount[row.motif] || 0) + 1;
+  });
+
+  // Convertir Map en array, filtrer communes vides, trier
+  let communeList = Array.from(byCommune.values()).filter(c => c.majcs > 0);
+
+  communeList.sort((a, b) => {
+    if (state.dashSort === "alpha") {
+      return a.nom.localeCompare(b.nom, "fr");
+    } else {
+      return b.majcs - a.majcs;
+    }
+  });
+
+  return communeList;
+}
+
+/* ================= DASHBOARD: RENDUS ================= */
+function renderDashboardCroiseTable(container, communeList) {
+  // Récupérer tous les types et type2
+  const allTypes = new Set();
+  const allType2s = new Set();
+  communeList.forEach(c => {
+    Object.keys(c.typeCount).forEach(t => allTypes.add(t));
+    Object.keys(c.type2Count).forEach(t => allType2s.add(t));
+  });
+
+  const typeArray = Array.from(allTypes).sort();
+  const type2Array = Array.from(allType2s).sort();
+
+  // Header
+  let html = '<div class="croise-wrap"><table class="croise-table"><thead><tr>';
+  html += '<th>Commune</th>';
+  html += '<th class="col-num">MAJCS</th>';
+  typeArray.forEach(t => {
+    html += `<th class="col-num" title="${t}">${t}</th>`;
+  });
+  type2Array.forEach(t => {
+    html += `<th class="col-num" title="${t}">${t}</th>`;
+  });
+  html += '<th class="col-num">Logements</th>';
+  html += '<th class="col-num">Visa Mairie</th>';
+  html += '</tr></thead><tbody>';
+
+  // Rows communes
+  const totals = {
+    majcs: 0,
+    type: {},
+    type2: {},
+    logements: 0,
+    visa: 0,
+  };
+
+  communeList.forEach(c => {
+    html += '<tr>';
+    html += `<td><strong>${c.nom}</strong></td>`;
+    html += `<td class="col-num"><strong>${c.majcs}</strong></td>`;
+
+    typeArray.forEach(t => {
+      const count = c.typeCount[t] || 0;
+      html += `<td class="col-num ${count === 0 ? 'zero' : ''}">${count > 0 ? count : '—'}</td>`;
+      totals.type[t] = (totals.type[t] || 0) + count;
+    });
+
+    type2Array.forEach(t => {
+      const count = c.type2Count[t] || 0;
+      html += `<td class="col-num ${count === 0 ? 'zero' : ''}">${count > 0 ? count : '—'}</td>`;
+      totals.type2[t] = (totals.type2[t] || 0) + count;
+    });
+
+    html += `<td class="col-num">${c.logements > 0 ? c.logements : '—'}</td>`;
+    html += `<td class="col-num">${c.visaMairie > 0 ? c.visaMairie : '—'}</td>`;
+    html += '</tr>';
+
+    totals.majcs += c.majcs;
+    totals.logements += c.logements;
+    totals.visa += c.visaMairie;
+  });
+
+  // Row TOTAL
+  html += '<tr class="total-row">';
+  html += '<td><strong>TOTAL</strong></td>';
+  html += `<td class="col-num"><strong>${totals.majcs}</strong></td>`;
+  typeArray.forEach(t => {
+    html += `<td class="col-num"><strong>${totals.type[t] || 0}</strong></td>`;
+  });
+  type2Array.forEach(t => {
+    html += `<td class="col-num"><strong>${totals.type2[t] || 0}</strong></td>`;
+  });
+  html += `<td class="col-num"><strong>${totals.logements}</strong></td>`;
+  html += `<td class="col-num"><strong>${totals.visa}</strong></td>`;
+  html += '</tr></tbody></table></div>';
+
+  container.innerHTML = html;
+}
+
+function renderDashboardDetailTable(container, communeList) {
+  let html = '<div class="commune-detail-list">';
+
+  communeList.forEach(c => {
+    html += '<div class="commune-detail-item">';
+    html += '<div class="commune-detail-item__header">';
+    html += `<span><span class="commune-detail-item__name">${c.nom}</span>`;
+    if (c.arr) html += `<span class="commune-detail-item__arr">${c.arr}</span>`;
+    html += '</span>';
+    html += `<div class="commune-detail-item__total">${c.majcs}</div>`;
+    html += '</div>';
+
+    // Chips
+    html += '<div class="commune-detail-item__breakdown">';
+
+    // Type
+    Object.entries(c.typeCount).forEach(([type, count]) => {
+      if (count > 0) {
+        html += `<span class="detail-chip">${type}: ${count}</span>`;
+      }
+    });
+
+    // Type2
+    Object.entries(c.type2Count).forEach(([type2, count]) => {
+      if (count > 0) {
+        html += `<span class="detail-chip">${type2}: ${count}</span>`;
+      }
+    });
+
+    // Motifs
+    Object.entries(c.motifCount).forEach(([motif, count]) => {
+      if (count > 0) {
+        html += `<span class="detail-chip">${motif}: ${count}</span>`;
+      }
+    });
+
+    // Logements
+    if (c.logements > 0) {
+      html += `<span class="detail-chip">Logements: ${c.logements}</span>`;
+    }
+
+    // Visa Mairie
+    if (c.visaMairie > 0) {
+      html += `<span class="detail-chip">Visa Mairie: ${c.visaMairie}</span>`;
+    }
+
+    html += '</div></div>';
+  });
+
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+function renderDashboardChart(container, communeList) {
+  if (communeList.length === 0) {
+    container.innerHTML = '<div style="text-align: center; padding: 2rem; color: #999;">Aucune donnée</div>';
+    return;
+  }
+
+  const maxCommunes = 30;
+  const listForChart = communeList.slice(0, maxCommunes);
+  const maxMajcs = Math.max(...listForChart.map(c => c.majcs), 1);
+
+  const barWidth = 36;
+  const barGap = 10;
+  const chartHeight = 200;
+  const labelHeight = 60;
+  const leftPad = 32;
+  const totalWidth = leftPad + listForChart.length * (barWidth + barGap);
+
+  let svg = `<svg class="chart-svg" viewBox="0 0 ${totalWidth} ${chartHeight + labelHeight}" xmlns="http://www.w3.org/2000/svg">`;
+
+  // Grille de fond (5 niveaux)
+  for (let i = 0; i <= 4; i++) {
+    const pct = i / 4;
+    const y = chartHeight - pct * chartHeight;
+    const val = Math.round(maxMajcs * pct);
+    svg += `<line x1="0" y1="${y}" x2="${totalWidth}" y2="${y}" stroke="#eee" stroke-width="1"/>`;
+    svg += `<text x="5" y="${y - 3}" font-size="11" fill="#999">${val}</text>`;
+  }
+
+  // Barres
+  listForChart.forEach((c, i) => {
+    const x = leftPad + i * (barWidth + barGap);
+    const height = (c.majcs / maxMajcs) * chartHeight;
+    const y = chartHeight - height;
+
+    // Barre
+    svg += `<rect x="${x}" y="${y}" width="${barWidth}" height="${height}" fill="#000091" opacity="0.8"/>`;
+    svg += `<rect x="${x}" y="${y}" width="${barWidth}" height="${height}" fill="none" stroke="#000091" stroke-width="1" class="hover-bar"/>`;
+
+    // Label rotaté
+    svg += `<text x="${x + barWidth / 2}" y="${chartHeight + 15}" font-size="12" text-anchor="middle" transform="rotate(-40 ${x + barWidth / 2} ${chartHeight + 15})" fill="#333">`;
+    svg += c.nom.substring(0, 15);
+    svg += `</text>`;
+
+    // Tooltip (title)
+    svg += `<title>${c.nom}: ${c.majcs} MAJCS</title>`;
+  });
+
+  svg += '</svg>';
+
+  container.innerHTML = `<div class="chart-wrap">${svg}</div>`;
+}
+
+function renderDashboardSubtabs() {
+  const container = $("dashContent");
+  if (!container) return;
+
+  // Obtenir données filtrées
+  const filtered = getRowsForPeriod(state.allANPCRows);
+
+  // Agg par commune
+  const communeList = aggregateANPCByCommune(filtered);
+
+  // Si scope="commune" et commune sélectionnée
+  if (state.dashScope === "commune" && state.dashSelectedCommune) {
+    const filtered2 = communeList.filter(c => c.id === state.dashSelectedCommune.id);
+    if (state.dashTab === "croise") {
+      renderDashboardCroiseTable(container, filtered2);
+    } else if (state.dashTab === "detail") {
+      renderDashboardDetailTable(container, filtered2);
+    } else {
+      renderDashboardChart(container, filtered2);
+    }
+  } else {
+    // Toutes communes
+    if (state.dashTab === "croise") {
+      renderDashboardCroiseTable(container, communeList);
+    } else if (state.dashTab === "detail") {
+      renderDashboardDetailTable(container, communeList);
+    } else {
+      renderDashboardChart(container, communeList);
+    }
+  }
+}
+
+function renderDashboard() {
+  // Mettre à jour label période
+  const labelEl = $("dashPeriodLabel");
+  if (labelEl) labelEl.textContent = getDashboardPeriodLabel();
+
+  // Activer/désactiver bouton Next
+  const btnNext = $("btnDashNext");
+  if (btnNext) btnNext.disabled = isDashAtCurrentPeriod();
+
+  // Rendre sous-onglets
+  renderDashboardSubtabs();
+}
+
+async function init() {
+  const loadingOverlay = $("loadingOverlay");
+
+  try {
+    grist.ready({ requiredAccess: "full" });
+
+    await loadChoicesFromMetadata(COLS.Type, "type");
+    await loadChoicesFromMetadata(COLS.Type2, "type2");
+    initTypeDd("type-dd", "typeValue", "type", TYPE_LABELS);
+    initTypeDd("type2-dd", "type2Value", "type2", TYPE2_LABELS);
+    initPrecsMultiDd();
+
+    await loadCommunes();
+    await loadStatuts();
+    await loadActesColSet();
+    checkEnvironment();
+
+    // init preview
+    updateControlePreview();
+
+    // Tests (désactivés en production - décommenter pour debug)
+    // runControleLogicTests();
+    await buildActesIndex();
+
+    wireInlineAutoClear();
+    wireControlePreview();
+    initMotifItemRadios();
+
+    setMode("create", null);
+    state.currentRecord = null;
+    resetForm();
+
+    bindSelection();
+    // Initialiser le style "placeholder" des dates
+    syncDateEmptyState();
+
+    // Initialiser les tabs
+    initAppTabs();
+
+    // Hide loading overlay
+    if (loadingOverlay) loadingOverlay.remove();
+  } catch (e) {
+    // Hide loading overlay even on error
+    if (loadingOverlay) loadingOverlay.remove();
+    throw e;
+  }
+}
+
+init().catch(e => {
+  console.error(e);
+  showAlert("error", "Init", (e?.message || e));
+});
+
+/*
+========================================================
+Règles Grist Custom Widget (à partager)
+========================================================
+1) Écriture = grist.ready({requiredAccess:"full"}) + autoriser “Full access” dans les options du widget.
+2) applyUserActions(AddRecord/UpdateRecord) demande des clés = colIds techniques (pas les libellés UI).
+3) Choice List en écriture: utiliser le format Grist ["L", ...valeurs] (sinon valeurs “fantômes” / erreurs).
+4) Normaliser les valeurs côté front (ex: Mois "01".."12") pour éviter les incohérences en édition/création.
+
+
+widget Grist DSFR pour AN_PC + table Communes (autocomplete)
+écriture via docApi.applyUserActions (Full access)
+Choice List encodées en ["L", ...] (le fameux “L”)
+mois en "01".."12" + labels
+année basée sur widgetOptions.choices
+validations inline DSFR + aria-invalid
+bandeau succès persistant avec bouton Fermer (pas d’auto-disparition)
+modeHelp: “Saisissez un nouvel acte.” en création, id ligne en édition
+placeholder commune : “Nom ou code INSEE...”
+pas d’auto-focus
+*/
+
+// Initialisation syncDateEmptyState pour les champs date
+window.addEventListener("DOMContentLoaded", () => {
+  ["visaMairie","receptionPref"].forEach((id) => {
+    const el = $(id);
+    if (!el) return;
+    el.addEventListener("input", syncDateEmptyState);
+    el.addEventListener("change", syncDateEmptyState);
+  });
+});
+
+</script>
+
+      <!-- Conteneur pour les notifications toast -->
+      <div id="toastContainer"></div>
+    </div>
+  </div>
+</body>
+</html>
