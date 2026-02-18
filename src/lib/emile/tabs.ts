@@ -17,7 +17,7 @@ export type L2Tab = { key: string; label: string };
 export type L1Tab = {
   key: L1TabKey;
   label: string;
-  icon: "building" | "key" | "briefcase" | "euro" | "users" | "home" | "graduation" | "car" | "monitor" | "heart";
+  icon: string; // FontAwesome class, e.g. "fa-solid fa-building"
   subtabs: L2Tab[];
 };
 
@@ -26,7 +26,7 @@ export const EMILE_TABS: L1Tab[] = [
   {
     key: "administratif",
     label: "Administratif",
-    icon: "building",
+    icon: "fa-solid fa-building",
     subtabs: [
       { key: "infos_perso", label: "Informations personnelles" },
       { key: "coordonnees", label: "Coordonnées" },
@@ -38,7 +38,7 @@ export const EMILE_TABS: L1Tab[] = [
   {
     key: "dls",
     label: "DLS",
-    icon: "key",
+    icon: "fa-solid fa-key",
     subtabs: [
       { key: "status", label: "Status de la demande" },
       { key: "pieces_admin", label: "Pièces administratives" },
@@ -49,7 +49,7 @@ export const EMILE_TABS: L1Tab[] = [
   {
     key: "emploi_formation",
     label: "Emploi-Formation",
-    icon: "briefcase",
+    icon: "fa-solid fa-briefcase",
     subtabs: [
       { key: "situation", label: "Situation actuelle" },
       { key: "projet", label: "Projet candidat.e" },
@@ -62,7 +62,7 @@ export const EMILE_TABS: L1Tab[] = [
   {
     key: "finances",
     label: "Finances",
-    icon: "euro",
+    icon: "fa-solid fa-euro-sign",
     subtabs: [
       { key: "situation", label: "Situation actuelle" },
       { key: "france_travail", label: "France Travail" },
@@ -73,7 +73,7 @@ export const EMILE_TABS: L1Tab[] = [
   {
     key: "foyer",
     label: "Foyer",
-    icon: "users",
+    icon: "fa-solid fa-users",
     subtabs: [
       { key: "composition", label: "Composition" },
       { key: "couple_famille", label: "Couple/Famille" },
@@ -84,7 +84,7 @@ export const EMILE_TABS: L1Tab[] = [
   {
     key: "habitat",
     label: "Habitat",
-    icon: "home",
+    icon: "fa-solid fa-house",
     subtabs: [
       { key: "infos", label: "Informations générales" },
       { key: "etapes", label: "Situation par étape" },
@@ -97,7 +97,7 @@ export const EMILE_TABS: L1Tab[] = [
   {
     key: "lec",
     label: "Lecture-Écriture-Calcul",
-    icon: "graduation",
+    icon: "fa-solid fa-graduation-cap",
     subtabs: [
       { key: "infos", label: "Informations générales" },
       { key: "francais", label: "Maitrise du français" },
@@ -109,7 +109,7 @@ export const EMILE_TABS: L1Tab[] = [
   {
     key: "mobilite",
     label: "Mobilité",
-    icon: "car",
+    icon: "fa-solid fa-car",
     subtabs: [
       { key: "vehicules", label: "Véhicules, code et permis" },
       { key: "besoins", label: "Besoins particuliers" },
@@ -119,7 +119,7 @@ export const EMILE_TABS: L1Tab[] = [
   {
     key: "numerique",
     label: "Numérique",
-    icon: "monitor",
+    icon: "fa-solid fa-desktop",
     subtabs: [
       { key: "materiel", label: "Matériel et capacités" },
       { key: "besoins", label: "Besoins particuliers" },
@@ -129,7 +129,7 @@ export const EMILE_TABS: L1Tab[] = [
   {
     key: "sante",
     label: "Santé",
-    icon: "heart",
+    icon: "fa-solid fa-heart-pulse",
     subtabs: [
       { key: "situation", label: "Situation actuelle" },
       { key: "documents", label: "Documents" },

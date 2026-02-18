@@ -235,183 +235,141 @@ export default function Page() {
     return Object.values(subMap).flat().length > 0;
   }, [activeTab]);
 
-  const headerTitle = selectedName || "EMILE";
-
   return (
-    <div className="emile-container">
-      {/* Header sticky */}
-      <div className="emile-sticky-actions">
-        {/* Ligne top: recherche candidat + save */}
-        <div style={{ display: "flex", gap: 14, alignItems: "flex-start", flexWrap: "wrap" }}>
-          <div style={{ flex: "1 1 420px", minWidth: 320 }}>
-            <div className="fr-input-group" style={{ margin: 0 }}>
-              <label className="fr-label">Rechercher un candidat</label>
-              <SearchDropdown
-                options={candidateOptions}
-                valueId={candidateValueId}
-                onChange={(candidateId) => {
-                  if (!candidateId) return;
-                  setCandidateValueId(candidateId);
-                  const rowId = rowIdByCandidateId.get(candidateId);
-                  const grist = (window as any).grist;
-
-                  // ✅ en Grist: on se positionne sur la ligne -> onRecord fera le reste
-                  if (rowId && grist?.setCursorPos) {
-                    grist.setCursorPos({ rowId });
-                  } else {
-                    // fallback (hors Grist): on ne peut pas bouger le curseur => on affiche une info
-                    setStatus("Info: sélection candidat active uniquement dans Grist.");
-                  }
-                }}
-                placeholder="Tape prénom, nom ou ID…"
-                disabled={candidateOptions.length === 0}
-              />
-              {/* Hint affiché comme tu veux : ID en dessous */}
-              <p className="fr-hint-text" style={{ marginTop: 6 }}>
-                {selectedHint ? <>ID : <b>{selectedHint}</b></> : " "}
-              </p>
-            </div>
-          </div>
-
-          <div style={{ marginLeft: "auto", display: "flex", gap: 10, alignItems: "center" }}>
-            <button type="button" className="fr-btn" onClick={save} disabled={!selected?.id || !docApi || saving}>
-              {saving ? "Enregistrement…" : "Enregistrer"}
-            </button>
-          </div>
+    <div className="emile-shell">
+      {/* ===== HEADER ===== */}
+      <header className="emile-header">
+        <div className="emile-header__logo">
+          <i className="fa-solid fa-landmark" aria-hidden="true" />
+          DDT31
         </div>
-
-        {/* Ligne 2: nom candidat */}
-        <div style={{ marginTop: 8 }}>
-          <div className="fr-h3" style={{ margin: 0 }}>
-            {headerTitle}
-          </div>
-          <div className="fr-hint-text" style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-            <span className="fr-tag fr-tag--sm">mode: {mode}</span>
-          </div>
-        </div>
-
-        <StatusAlert status={status} />
-      </div>
-
-      <div className="emile-card" style={{ marginTop: 16 }}>
-        <div className="emile-card__inner">
-          {!selected || !docApi ? (
-            <div className="fr-alert fr-alert--info">
-              <p className="fr-alert__title">En attente</p>
-              <p>Sélectionne un candidat (ligne courante) et ouvre le widget.</p>
-            </div>
-          ) : (
-            <>
-              {/* Tabs L1 */}
-              <div
-                style={{
-                  display: "flex",
-                  gap: 22,
-                  alignItems: "center",
-                  flexWrap: "wrap",
-                  borderBottom: "1px solid var(--border-default-grey)",
-                  paddingBottom: 10,
-                  marginBottom: 12,
-                }}
-              >
-                {EMILE_TABS.map((t) => {
-                  const active = activeTab === t.key;
-                  return (
-                    <button
-                      key={t.key}
-                      type="button"
-                      onClick={() => setActiveTab(t.key)}
-                      style={{
-                        display: "inline-flex",
-                        gap: 10,
-                        alignItems: "center",
-                        border: "none",
-                        background: "transparent",
-                        padding: "8px 0",
-                        cursor: "pointer",
-                        borderBottom: active ? "3px solid var(--border-action-high-blue-france)" : "3px solid transparent",
-                        color: active ? "var(--text-title-blue-france)" : "var(--text-default-grey)",
-                        fontWeight: active ? 700 : 500,
-                        opacity: active ? 1 : 0.78,
-                      }}
-                    >
-                      <span style={{ display: "inline-flex" }}>
-                        <TabIcon name={t.icon} />
-                      </span>
-                      <span>{t.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Subtabs L2 */}
-              <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap", marginBottom: 14 }}>
-                {activeTabObj.subtabs.map((st) => {
-                  const active = activeSubtab === st.key;
-                  return (
-                    <button
-                      key={st.key}
-                      type="button"
-                      onClick={() => setActiveSubtab(st.key)}
-                      style={{
-                        border: active ? "1px solid var(--border-action-high-blue-france)" : "1px solid transparent",
-                        background: "var(--background-action-low-blue-france)",
-                        borderRadius: 999,
-                        padding: "10px 18px",
-                        cursor: "pointer",
-                        fontWeight: 700,
-                      }}
-                    >
-                      {st.label}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {!isTabMapped ? (
-                <div className="fr-alert fr-alert--info">
-                  <p className="fr-alert__title">Onglet non mappé</p>
-                  <p>
-                    Pour l’instant, seul <b>Administratif</b> est mappé sur des colonnes Grist.
-                    <br />
-                    Prochaine étape : on mappe <b>{activeTabObj.label}</b>.
-                  </p>
-                </div>
-              ) : (
-                <>
-                  <div
-                    className="emile-form-grid"
-                    style={{
-                      display: "grid",
-                      gap: 16,
-                      gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-                    }}
-                  >
-                    {subtabFields.map((c) => (
-                      <Field
-                        key={c.colId}
-                        col={c}
-                        value={draft[c.colId]}
-                        onChange={(v) => setDraft((d) => ({ ...d, [c.colId]: v }))}
-                        docApi={docApi}
-                        colRowIdMap={colRowIdMap}
-                      />
-                    ))}
-                  </div>
-
-                  <style jsx>{`
-                    @media (max-width: 860px) {
-                      .emile-form-grid {
-                        grid-template-columns: 1fr !important;
-                      }
-                    }
-                  `}</style>
-                </>
-              )}
-            </>
+        <div className="emile-header__title">
+          EMILE
+          {selectedName && (
+            <span className="emile-header__candidate">
+              <i className="fa-solid fa-circle-chevron-right" aria-hidden="true" />
+              {selectedName}
+              {selectedHint && <span className="emile-header__badge">{selectedHint}</span>}
+            </span>
           )}
         </div>
+
+        {/* Tabs L1 dans le header */}
+        <nav className="emile-tabs" aria-label="Onglets principaux">
+          {EMILE_TABS.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              className={`emile-tab${activeTab === t.key ? " active" : ""}`}
+              onClick={() => setActiveTab(t.key)}
+            >
+              <i className={t.icon} aria-hidden="true" />
+              {t.label}
+            </button>
+          ))}
+        </nav>
+      </header>
+
+      {/* ===== SUBHEADER : subtabs + search + save ===== */}
+      <div className="emile-subheader">
+        {/* Subtabs L2 */}
+        <div className="emile-subtabs">
+          {activeTabObj.subtabs.map((st) => (
+            <button
+              key={st.key}
+              type="button"
+              className={`emile-subtab${activeSubtab === st.key ? " active" : ""}`}
+              onClick={() => setActiveSubtab(st.key)}
+            >
+              {st.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Recherche candidat */}
+        <div className="emile-search-zone">
+          <span className="emile-search-label">
+            <i className="fa-solid fa-magnifying-glass" aria-hidden="true" style={{ marginRight: "0.3rem" }} />
+            Candidat
+          </span>
+          <div className="emile-search-wrap">
+            <SearchDropdown
+              options={candidateOptions}
+              valueId={candidateValueId}
+              onChange={(candidateId) => {
+                if (!candidateId) return;
+                setCandidateValueId(candidateId);
+                const rowId = rowIdByCandidateId.get(candidateId);
+                const grist = (window as any).grist;
+                if (rowId && grist?.setCursorPos) {
+                  grist.setCursorPos({ rowId });
+                } else {
+                  setStatus("Info: sélection candidat active uniquement dans Grist.");
+                }
+              }}
+              placeholder="Prénom, nom ou ID…"
+              disabled={candidateOptions.length === 0}
+            />
+          </div>
+          {selectedHint && (
+            <span className="emile-candidate-hint">ID : <b>{selectedHint}</b></span>
+          )}
+        </div>
+
+        {/* Bouton save */}
+        <div className="emile-save-zone">
+          <button
+            type="button"
+            className="fr-btn fr-btn--sm"
+            onClick={save}
+            disabled={!selected?.id || !docApi || saving}
+          >
+            <i className="fa-solid fa-floppy-disk" aria-hidden="true" style={{ marginRight: "0.4rem" }} />
+            {saving ? "Enregistrement…" : "Enregistrer"}
+          </button>
+        </div>
       </div>
+
+      {/* ===== STATUS ALERT ===== */}
+      {status && (
+        <div className="emile-status">
+          <StatusAlert status={status} />
+        </div>
+      )}
+
+      {/* ===== CONTENU PRINCIPAL ===== */}
+      <main className="emile-main">
+        {!selected || !docApi ? (
+          <div className="fr-alert fr-alert--info">
+            <p className="fr-alert__title">En attente</p>
+            <p>Sélectionne un candidat dans Grist pour afficher son dossier.</p>
+          </div>
+        ) : !isTabMapped ? (
+          <div className="fr-alert fr-alert--info">
+            <p className="fr-alert__title">Onglet non mappé</p>
+            <p>
+              Pour l'instant, seul <b>Administratif</b> est mappé sur des colonnes Grist.
+              <br />
+              Prochaine étape : on mappe <b>{activeTabObj.label}</b>.
+            </p>
+          </div>
+        ) : (
+          <div className="emile-card">
+            <div className="emile-form-grid">
+              {subtabFields.map((c) => (
+                <Field
+                  key={c.colId}
+                  col={c}
+                  value={draft[c.colId]}
+                  onChange={(v) => setDraft((d) => ({ ...d, [c.colId]: v }))}
+                  docApi={docApi}
+                  colRowIdMap={colRowIdMap}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+      </main>
     </div>
   );
 }
@@ -591,101 +549,3 @@ function Field(props: {
   );
 }
 
-/* =======================
-   Tabs icons (inline SVG)
-   ======================= */
-
-function TabIcon({
-  name,
-}: {
-  name: "building" | "key" | "briefcase" | "euro" | "users" | "home" | "graduation" | "car" | "monitor" | "heart";
-}) {
-  const common = { width: 22, height: 22, viewBox: "0 0 24 24", fill: "none" as const };
-  const stroke = { stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
-
-  switch (name) {
-    case "building":
-      return (
-        <svg {...common} aria-hidden="true">
-          <path {...stroke} d="M3 21h18" />
-          <path {...stroke} d="M6 21V7a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v14" />
-          <path {...stroke} d="M9 9h.01M9 12h.01M9 15h.01M12 9h.01M12 12h.01M12 15h.01M15 9h.01M15 12h.01M15 15h.01" />
-        </svg>
-      );
-    case "key":
-      return (
-        <svg {...common} aria-hidden="true">
-          <path {...stroke} d="M21 8l-3 3" />
-          <path {...stroke} d="M7 14a5 5 0 1 1 4-8l10 2-2 2-2 2-2 2-2 2-2-2" />
-          <path {...stroke} d="M7 14l-4 4v3h3l4-4" />
-        </svg>
-      );
-    case "briefcase":
-      return (
-        <svg {...common} aria-hidden="true">
-          <path {...stroke} d="M10 6V5a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v1" />
-          <path {...stroke} d="M4 7h16v12H4z" />
-          <path {...stroke} d="M4 12h16" />
-        </svg>
-      );
-    case "euro":
-      return (
-        <svg {...common} aria-hidden="true">
-          <path {...stroke} d="M18 7a6 6 0 1 0 0 10" />
-          <path {...stroke} d="M6 10h9" />
-          <path {...stroke} d="M6 14h9" />
-        </svg>
-      );
-    case "users":
-      return (
-        <svg {...common} aria-hidden="true">
-          <path {...stroke} d="M17 21a7 7 0 0 0-14 0" />
-          <path {...stroke} d="M10 11a4 4 0 1 0-4-4 4 4 0 0 0 4 4z" />
-          <path {...stroke} d="M22 21a6 6 0 0 0-8-5.2" />
-          <path {...stroke} d="M16 3.4a4 4 0 0 1 0 7.2" />
-        </svg>
-      );
-    case "home":
-      return (
-        <svg {...common} aria-hidden="true">
-          <path {...stroke} d="M3 11l9-8 9 8" />
-          <path {...stroke} d="M5 10v11h14V10" />
-        </svg>
-      );
-    case "graduation":
-      return (
-        <svg {...common} aria-hidden="true">
-          <path {...stroke} d="M22 10L12 5 2 10l10 5 10-5z" />
-          <path {...stroke} d="M6 12v5c0 2 3 4 6 4s6-2 6-4v-5" />
-        </svg>
-      );
-    case "car":
-      return (
-        <svg {...common} aria-hidden="true">
-          <path {...stroke} d="M3 16l1-5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2l1 5" />
-          <path {...stroke} d="M5 16v3" />
-          <path {...stroke} d="M19 16v3" />
-          <path {...stroke} d="M7 16h10" />
-          <path {...stroke} d="M7 12h10" />
-        </svg>
-      );
-    case "monitor":
-      return (
-        <svg {...common} aria-hidden="true">
-          <path {...stroke} d="M4 5h16v11H4z" />
-          <path {...stroke} d="M8 21h8" />
-          <path {...stroke} d="M12 16v5" />
-        </svg>
-      );
-    case "heart":
-    default:
-      return (
-        <svg {...common} aria-hidden="true">
-          <path
-            {...stroke}
-            d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"
-          />
-        </svg>
-      );
-  }
-}
