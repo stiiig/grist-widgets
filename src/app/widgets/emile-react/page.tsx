@@ -237,62 +237,30 @@ export default function Page() {
 
   return (
     <div className="emile-shell">
-      {/* ===== HEADER ===== */}
+
+      {/* ===== HEADER BLEU ===== */}
       <header className="emile-header">
         <div className="emile-header__logo">
           <i className="fa-solid fa-landmark" aria-hidden="true" />
           DDT31
         </div>
-        <div className="emile-header__title">
-          EMILE
-          {selectedName && (
-            <span className="emile-header__candidate">
-              <i className="fa-solid fa-circle-chevron-right" aria-hidden="true" />
-              {selectedName}
-              {selectedHint && <span className="emile-header__badge">{selectedHint}</span>}
-            </span>
-          )}
-        </div>
+        <span className="emile-header__appname">EMILE</span>
+        {selectedName && (
+          <>
+            <span className="emile-header__sep">›</span>
+            <span className="emile-header__candidate">{selectedName}</span>
+            {selectedHint && <span className="emile-header__badge">{selectedHint}</span>}
+          </>
+        )}
 
-        {/* Tabs L1 dans le header */}
-        <nav className="emile-tabs" aria-label="Onglets principaux">
-          {EMILE_TABS.map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              className={`emile-tab${activeTab === t.key ? " active" : ""}`}
-              onClick={() => setActiveTab(t.key)}
-            >
-              <i className={t.icon} aria-hidden="true" />
-              {t.label}
-            </button>
-          ))}
-        </nav>
-      </header>
-
-      {/* ===== SUBHEADER : subtabs + search + save ===== */}
-      <div className="emile-subheader">
-        {/* Subtabs L2 */}
-        <div className="emile-subtabs">
-          {activeTabObj.subtabs.map((st) => (
-            <button
-              key={st.key}
-              type="button"
-              className={`emile-subtab${activeSubtab === st.key ? " active" : ""}`}
-              onClick={() => setActiveSubtab(st.key)}
-            >
-              {st.label}
-            </button>
-          ))}
-        </div>
+        <div className="emile-header__spacer" />
 
         {/* Recherche candidat */}
-        <div className="emile-search-zone">
-          <span className="emile-search-label">
-            <i className="fa-solid fa-magnifying-glass" aria-hidden="true" style={{ marginRight: "0.3rem" }} />
-            Candidat
+        <div className="emile-header__search">
+          <span className="emile-header__search-label">
+            <i className="fa-solid fa-magnifying-glass" aria-hidden="true" />
           </span>
-          <div className="emile-search-wrap">
+          <div className="emile-header__search-wrap">
             <SearchDropdown
               options={candidateOptions}
               valueId={candidateValueId}
@@ -307,38 +275,60 @@ export default function Page() {
                   setStatus("Info: sélection candidat active uniquement dans Grist.");
                 }
               }}
-              placeholder="Prénom, nom ou ID…"
+              placeholder="Candidat…"
               disabled={candidateOptions.length === 0}
             />
           </div>
-          {selectedHint && (
-            <span className="emile-candidate-hint">ID : <b>{selectedHint}</b></span>
-          )}
-        </div>
-
-        {/* Bouton save */}
-        <div className="emile-save-zone">
           <button
             type="button"
-            className="fr-btn fr-btn--sm"
+            className="emile-save-btn"
             onClick={save}
             disabled={!selected?.id || !docApi || saving}
           >
-            <i className="fa-solid fa-floppy-disk" aria-hidden="true" style={{ marginRight: "0.4rem" }} />
-            {saving ? "Enregistrement…" : "Enregistrer"}
+            <i className="fa-solid fa-floppy-disk" aria-hidden="true" />
+            {saving ? "…" : "Enregistrer"}
           </button>
         </div>
+      </header>
+
+      {/* ===== BARRE L1 : onglets principaux ===== */}
+      <nav className="emile-navbar" aria-label="Onglets principaux">
+        {EMILE_TABS.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            className={`emile-nav-tab${activeTab === t.key ? " active" : ""}`}
+            onClick={() => setActiveTab(t.key)}
+          >
+            <i className={t.icon} aria-hidden="true" />
+            {t.label}
+          </button>
+        ))}
+      </nav>
+
+      {/* ===== BARRE L2 : subtabs ===== */}
+      <div className="emile-subnav">
+        {activeTabObj.subtabs.map((st) => (
+          <button
+            key={st.key}
+            type="button"
+            className={`emile-subnav-tab${activeSubtab === st.key ? " active" : ""}`}
+            onClick={() => setActiveSubtab(st.key)}
+          >
+            {st.label}
+          </button>
+        ))}
       </div>
 
-      {/* ===== STATUS ALERT ===== */}
+      {/* ===== STATUS ===== */}
       {status && (
-        <div className="emile-status">
+        <div className="emile-status" style={{ padding: "0.4rem 1rem 0" }}>
           <StatusAlert status={status} />
         </div>
       )}
 
-      {/* ===== CONTENU PRINCIPAL ===== */}
-      <main className="emile-main">
+      {/* ===== CORPS ===== */}
+      <div className="emile-body">
         {!selected || !docApi ? (
           <div className="fr-alert fr-alert--info">
             <p className="fr-alert__title">En attente</p>
@@ -349,13 +339,12 @@ export default function Page() {
             <p className="fr-alert__title">Onglet non mappé</p>
             <p>
               Pour l'instant, seul <b>Administratif</b> est mappé sur des colonnes Grist.
-              <br />
-              Prochaine étape : on mappe <b>{activeTabObj.label}</b>.
+              <br />Prochaine étape : on mappe <b>{activeTabObj.label}</b>.
             </p>
           </div>
         ) : (
-          <div className="emile-card">
-            <div className="emile-form-grid">
+          <div className="emile-form-card">
+            <div className="emile-field-grid">
               {subtabFields.map((c) => (
                 <Field
                   key={c.colId}
@@ -369,13 +358,14 @@ export default function Page() {
             </div>
           </div>
         )}
-      </main>
+      </div>
+
     </div>
   );
 }
 
 /* =======================
-   FieldRenderer — textarea for comment/notes
+   FieldRenderer compact
    ======================= */
 
 function Field(props: {
@@ -401,6 +391,9 @@ function Field(props: {
   const useTextarea =
     type === "Text" && (lowerLabel.includes("comment") || lowerLabel.includes("compl") || lowerId.includes("comment"));
 
+  const labelCls = `emile-field__label${disabled ? " emile-field__label--readonly" : ""}`;
+  const wrapCls = useTextarea ? "emile-field emile-field--wide" : "emile-field";
+
   const choiceOptions = useMemo(() => {
     const raw = col.widgetOptionsParsed?.choices;
     const arr = Array.isArray(raw) ? raw : [];
@@ -425,10 +418,10 @@ function Field(props: {
 
   if (isDate) {
     return (
-      <div className="fr-input-group">
-        <label className="fr-label">{col.label}</label>
+      <div className={wrapCls}>
+        <div className={labelCls}>{col.label}</div>
         <input
-          className="fr-input"
+          className="emile-input"
           type="date"
           value={unixSecondsToISODate(value)}
           onChange={(e) => onChange(isoDateToUnixSeconds(e.target.value))}
@@ -441,15 +434,14 @@ function Field(props: {
   if (isChoice) {
     const valueStr = value == null ? "" : String(value);
     const valueId = valueStr ? choiceIdByLabel.get(valueStr) ?? null : null;
-
     return (
-      <div className="fr-input-group">
-        <label className="fr-label">{col.label}</label>
+      <div className={wrapCls}>
+        <div className={labelCls}>{col.label}</div>
         <SearchDropdown
           options={choiceOptions}
           valueId={valueId}
           onChange={(id) => onChange(id ? choiceLabelById.get(id) ?? null : null)}
-          placeholder="Rechercher…"
+          placeholder="—"
           disabled={disabled || choiceOptions.length === 0}
         />
       </div>
@@ -461,10 +453,9 @@ function Field(props: {
     const selectedIds = selectedLabels
       .map((lab) => choiceIdByLabel.get(lab))
       .filter((x): x is number => typeof x === "number");
-
     return (
-      <div className="fr-input-group">
-        <label className="fr-label">{col.label}</label>
+      <div className={wrapCls}>
+        <div className={labelCls}>{col.label}</div>
         <SearchMultiDropdown
           options={choiceOptions}
           valueIds={selectedIds}
@@ -472,7 +463,7 @@ function Field(props: {
             const nextLabels = nextIds.map((id) => choiceLabelById.get(id)).filter((s): s is string => !!s);
             onChange(encodeListCell(nextLabels));
           }}
-          placeholder="Rechercher…"
+          placeholder="—"
           disabled={disabled || choiceOptions.length === 0}
         />
       </div>
@@ -504,13 +495,13 @@ function Field(props: {
     if (isRef) {
       const valueId = typeof value === "number" ? value : null;
       return (
-        <div className="fr-input-group">
-          <label className="fr-label">{col.label}</label>
+        <div className={wrapCls}>
+          <div className={labelCls}>{col.label}</div>
           <SearchDropdown
             options={refOptions}
             valueId={valueId}
             onChange={(id) => onChange(id)}
-            placeholder={loading ? "Chargement…" : "Rechercher…"}
+            placeholder={loading ? "…" : "—"}
             disabled={disabled || loading}
           />
         </div>
@@ -519,13 +510,13 @@ function Field(props: {
 
     const ids = decodeListCell(value).filter((x) => typeof x === "number") as number[];
     return (
-      <div className="fr-input-group">
-        <label className="fr-label">{col.label}</label>
+      <div className={wrapCls}>
+        <div className={labelCls}>{col.label}</div>
         <SearchMultiDropdown
           options={refOptions}
           valueIds={ids}
           onChange={(nextIds) => onChange(encodeListCell(nextIds))}
-          placeholder={loading ? "Chargement…" : "Rechercher…"}
+          placeholder={loading ? "…" : "—"}
           disabled={disabled || loading}
         />
       </div>
@@ -534,17 +525,28 @@ function Field(props: {
 
   if (useTextarea) {
     return (
-      <div className="fr-input-group" style={{ gridColumn: "1 / -1" }}>
-        <label className="fr-label">{col.label}</label>
-        <textarea className="fr-input" rows={5} value={value ?? ""} onChange={(e) => onChange(e.target.value)} disabled={disabled} />
+      <div className={wrapCls}>
+        <div className={labelCls}>{col.label}</div>
+        <textarea
+          className="emile-textarea"
+          rows={3}
+          value={value ?? ""}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={disabled}
+        />
       </div>
     );
   }
 
   return (
-    <div className="fr-input-group">
-      <label className="fr-label">{col.label}</label>
-      <input className="fr-input" value={value ?? ""} onChange={(e) => onChange(e.target.value)} disabled={disabled} />
+    <div className={wrapCls}>
+      <div className={labelCls}>{col.label}</div>
+      <input
+        className="emile-input"
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+      />
     </div>
   );
 }
