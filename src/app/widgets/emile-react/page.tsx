@@ -388,7 +388,8 @@ function Field(props: {
   const isDate = type === "Date";
   const isAttachment = type === "Attachments";
 
-  const disabled = !isEditable(col);
+  // Les colonnes Attachments sont toujours éditables (même si isFormula=true dans Grist)
+  const disabled = isAttachment ? false : !isEditable(col);
 
   const lowerLabel = (col.label ?? "").toLowerCase();
   const lowerId = (col.colId ?? "").toLowerCase();
