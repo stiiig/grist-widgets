@@ -36,15 +36,17 @@ async function fetchAttachmentsMeta(docApi: any): Promise<Map<number, AttachMeta
   }
 }
 
-/* Icône FontAwesome selon le type MIME */
-function fileIcon(mime: string): string {
-  if (mime.startsWith("image/"))                              return "fa-solid fa-file-image";
-  if (mime === "application/pdf")                            return "fa-solid fa-file-pdf";
-  if (mime.includes("word") || mime.includes("document"))   return "fa-solid fa-file-word";
-  if (mime.includes("sheet") || mime.includes("excel"))     return "fa-solid fa-file-excel";
-  if (mime.startsWith("video/"))                            return "fa-solid fa-file-video";
-  if (mime.startsWith("audio/"))                            return "fa-solid fa-file-audio";
-  return "fa-solid fa-file";
+/* Badge court selon le type MIME */
+function fileBadge(mime: string, fileName: string): string {
+  if (mime.startsWith("image/"))                            return "IMG";
+  if (mime === "application/pdf")                           return "PDF";
+  if (mime.includes("word") || mime.includes("document"))  return "DOC";
+  if (mime.includes("sheet") || mime.includes("excel"))    return "XLS";
+  if (mime.startsWith("video/"))                           return "VID";
+  if (mime.startsWith("audio/"))                           return "SON";
+  // fallback : extension du nom de fichier
+  const ext = fileName.split(".").pop()?.toUpperCase() ?? "";
+  return ext.slice(0, 4) || "FILE";
 }
 
 /* ─── AttachmentItem ──────────────────────────────────────── */
@@ -64,11 +66,12 @@ function AttachmentItem({
 }) {
   const name = meta?.fileName || `fichier_${attachId}`;
   const mime = meta?.fileType || "";
+  const badge = fileBadge(mime, name);
 
   return (
     <div className="att-item">
       <a href={downloadUrl} target="_blank" rel="noopener noreferrer" className="att-item__link" title={name}>
-        <i className={`${fileIcon(mime)} att-item__icon`} aria-hidden="true" />
+        <span className="att-item__badge">{badge}</span>
         <span className="att-item__name">{name}</span>
       </a>
       {!disabled && (
@@ -152,6 +155,8 @@ export function AttachmentField({
     [tokenInfo, ids, onChange, docApi]
   );
 
+  // Le bouton + est toujours visible (même si tokenInfo pas encore chargé),
+  // mais l'input reste disabled jusqu'au token
   const uploadBtn = !disabled && (
     <label className={`att-add${uploading ? " att-add--loading" : ""}`} title="Ajouter une pièce jointe">
       <input

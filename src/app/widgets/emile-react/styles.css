@@ -381,11 +381,19 @@ body {
   flex: 1;
 }
 .att-item__link:hover { background: #f5f5fe; }
+/* Supprime l'icône external-link ajoutée automatiquement par le DSFR */
+.att-item__link::after { display: none !important; }
 
-.att-item__icon {
-  font-size: 0.9rem;
-  color: #555;
+.att-item__badge {
+  font-size: 0.58rem;
+  font-weight: 700;
+  color: #fff;
+  background: #000091;
+  border-radius: 2px;
+  padding: 0.1rem 0.3rem;
+  white-space: nowrap;
   flex-shrink: 0;
+  letter-spacing: 0.02em;
 }
 
 .att-item__name {
