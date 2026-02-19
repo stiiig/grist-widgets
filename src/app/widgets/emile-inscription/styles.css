@@ -1,0 +1,255 @@
+/* ================================================================
+   EMILE — Formulaire d'inscription
+   ================================================================ */
+
+/* Reprend la charte DDT31 / DSFR d'EMILE */
+@import url("https://unpkg.com/@gouvfr/dsfr@1.14.0/dist/dsfr/dsfr.min.css");
+@import url("https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css");
+
+/* ── Shell ─────────────────────────────────────────────────── */
+.ins-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: #f5f5f5;
+  font-family: "Marianne", "Helvetica Neue", Arial, sans-serif;
+  font-size: 0.875rem;
+  color: #1e1e1e;
+}
+
+/* ── Header bleu (identique EMILE) ─────────────────────────── */
+.ins-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: #000091;
+  color: #fff;
+  padding: 0 1rem;
+  height: 3rem;
+  flex-shrink: 0;
+}
+.ins-header__logo {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+}
+.ins-header__appname {
+  font-size: 0.85rem;
+  opacity: 0.85;
+}
+
+/* ── Intro ──────────────────────────────────────────────────── */
+.ins-intro {
+  background: #fff;
+  border-bottom: 1px solid #e0e0e0;
+  padding: 0.75rem 1.5rem;
+  font-size: 0.82rem;
+  color: #555;
+}
+
+/* ── Body ───────────────────────────────────────────────────── */
+.ins-body {
+  flex: 1;
+  padding: 1.5rem;
+  max-width: 900px;
+  width: 100%;
+  margin: 0 auto;
+}
+.ins-body--center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+}
+
+/* ── Form ───────────────────────────────────────────────────── */
+.ins-form {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 1.5rem;
+}
+
+/* ── Section title ──────────────────────────────────────────── */
+.ins-section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #000091;
+  border-bottom: 2px solid #000091;
+  padding-bottom: 0.35rem;
+  margin: 1.5rem 0 1rem;
+}
+.ins-section-title:first-child {
+  margin-top: 0;
+}
+.ins-section-icon {
+  font-size: 0.85rem;
+}
+
+/* ── Grid 3 colonnes ────────────────────────────────────────── */
+.ins-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem 1rem;
+}
+@media (max-width: 640px) {
+  .ins-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (min-width: 641px) and (max-width: 860px) {
+  .ins-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ── Field ──────────────────────────────────────────────────── */
+.ins-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.ins-field--wide {
+  grid-column: 1 / -1;
+}
+
+/* ── Label ──────────────────────────────────────────────────── */
+.ins-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #666;
+}
+.ins-required {
+  color: #ce0500;
+  margin-left: 1px;
+}
+
+/* ── Input / Select ─────────────────────────────────────────── */
+.ins-input,
+.ins-select {
+  height: 2rem;
+  border: 1px solid #d0d0d0;
+  border-radius: 3px;
+  background: #f9f9f9;
+  padding: 0 0.5rem;
+  font-size: 0.82rem;
+  color: #1e1e1e;
+  width: 100%;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.15s;
+}
+.ins-input:focus,
+.ins-select:focus {
+  border-color: #000091;
+  background: #fff;
+}
+.ins-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23666'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.6rem center;
+  padding-right: 1.8rem;
+  cursor: pointer;
+}
+
+/* ── Textarea ───────────────────────────────────────────────── */
+.ins-textarea {
+  border: 1px solid #d0d0d0;
+  border-radius: 3px;
+  background: #f9f9f9;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.82rem;
+  color: #1e1e1e;
+  width: 100%;
+  outline: none;
+  font-family: inherit;
+  resize: vertical;
+  transition: border-color 0.15s;
+}
+.ins-textarea:focus {
+  border-color: #000091;
+  background: #fff;
+}
+
+/* ── Submit row ─────────────────────────────────────────────── */
+.ins-submit-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e8e8e8;
+}
+
+/* ── Buttons ────────────────────────────────────────────────── */
+.ins-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 1.25rem;
+  height: 2.25rem;
+  border-radius: 3px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  transition: background 0.15s, opacity 0.15s;
+}
+.ins-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.ins-btn--primary {
+  background: #000091;
+  color: #fff;
+}
+.ins-btn--primary:hover:not(:disabled) {
+  background: #1212ff;
+}
+.ins-btn--secondary {
+  background: #f0f0f0;
+  color: #1e1e1e;
+  border: 1px solid #d0d0d0;
+}
+.ins-btn--secondary:hover:not(:disabled) {
+  background: #e0e0e0;
+}
+
+/* ── Écran de confirmation ──────────────────────────────────── */
+.ins-confirm {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 3rem 2rem;
+  text-align: center;
+  max-width: 500px;
+}
+.ins-confirm__icon {
+  font-size: 3rem;
+  color: #18753c;
+}
+.ins-confirm__title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1e1e1e;
+  margin: 0;
+}
+.ins-confirm__text {
+  font-size: 0.9rem;
+  color: #555;
+  line-height: 1.6;
+  margin: 0;
+}
