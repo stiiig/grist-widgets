@@ -3036,7 +3036,16 @@ function clearCommune() {
  * la liaison de sélection Grist.
  */
 async function init() {
-  grist.ready({ requiredAccess: "full" });
+  grist.ready({
+    requiredAccess: "full",
+    columns: [
+      DECOMPTE_COLS.Commune,   // Ref → Communes (utilisé par bindGristSelection)
+      DECOMPTE_COLS.Annee,     // Année de la saisie
+      DECOMPTE_COLS.Mois,      // Mois de la saisie
+      DECOMPTE_COLS.Trimestre, // Trimestre calculé (ex. "2026-T1")
+      ...DOC_TYPES.map(dt => dt.key), // 12 types d'actes : DP, PC, PA, CU, PD…
+    ]
+  });
 
   // Chargements parallèles
   await Promise.all([
