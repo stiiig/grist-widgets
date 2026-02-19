@@ -17,6 +17,7 @@ import {
   GristDocAPI,
 } from "@/lib/grist/meta";
 import { SearchDropdown, SearchMultiDropdown, Option } from "@/components/SearchDropdown";
+import { AttachmentField } from "@/components/AttachmentField";
 import { EMILE_TABS, L1TabKey } from "@/lib/emile/tabs";
 import { FIELD_MAP } from "@/lib/emile/fieldmap";
 
@@ -385,6 +386,7 @@ function Field(props: {
   const isChoice = type === "Choice";
   const isChoiceList = type === "ChoiceList";
   const isDate = type === "Date";
+  const isAttachment = type === "Attachments";
 
   const disabled = !isEditable(col);
 
@@ -417,6 +419,18 @@ function Field(props: {
     for (const o of choiceOptions) m.set(o.id, o.label);
     return m;
   }, [choiceOptions]);
+
+  if (isAttachment) {
+    return (
+      <AttachmentField
+        label={col.label}
+        value={value}
+        onChange={onChange}
+        docApi={docApi}
+        disabled={disabled}
+      />
+    );
+  }
 
   if (isDate) {
     return (
