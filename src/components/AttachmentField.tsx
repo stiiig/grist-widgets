@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+/* ─── Helpers ─────────────────────────────────────────────── */
+
 function decodeAttachmentCell(value: any): number[] {
   if (!value) return [];
   if (Array.isArray(value)) {
@@ -15,14 +17,33 @@ function encodeAttachmentCell(ids: number[]): any {
   return ["L", ...ids];
 }
 
+type AttachMeta = { fileName: string; fileType: string };
+
+/** Charge toute la table _grist_Attachments et retourne un Map id → meta */
+async function fetchAttachmentsMeta(docApi: any): Promise<Map<number, AttachMeta>> {
+  try {
+    const t = await docApi.fetchTable("_grist_Attachments");
+    const map = new Map<number, AttachMeta>();
+    for (let i = 0; i < t.id.length; i++) {
+      map.set(t.id[i], {
+        fileName: t.fileName?.[i] ?? "",
+        fileType: t.fileType?.[i] ?? "",
+      });
+    }
+    return map;
+  } catch {
+    return new Map();
+  }
+}
+
 /* Icône FontAwesome selon le type MIME */
 function fileIcon(mime: string): string {
-  if (mime.startsWith("image/"))       return "fa-solid fa-file-image";
-  if (mime === "application/pdf")      return "fa-solid fa-file-pdf";
-  if (mime.includes("word") || mime.includes("document")) return "fa-solid fa-file-word";
-  if (mime.includes("sheet") || mime.includes("excel"))   return "fa-solid fa-file-excel";
-  if (mime.startsWith("video/"))       return "fa-solid fa-file-video";
-  if (mime.startsWith("audio/"))       return "fa-solid fa-file-audio";
+  if (mime.startsWith("image/"))                              return "fa-solid fa-file-image";
+  if (mime === "application/pdf")                            return "fa-solid fa-file-pdf";
+  if (mime.includes("word") || mime.includes("document"))   return "fa-solid fa-file-word";
+  if (mime.includes("sheet") || mime.includes("excel"))     return "fa-solid fa-file-excel";
+  if (mime.startsWith("video/"))                            return "fa-solid fa-file-video";
+  if (mime.startsWith("audio/"))                            return "fa-solid fa-file-audio";
   return "fa-solid fa-file";
 }
 
@@ -30,32 +51,19 @@ function fileIcon(mime: string): string {
 
 function AttachmentItem({
   attachId,
-  baseUrl,
-  token,
+  meta,
+  downloadUrl,
   onRemove,
   disabled,
 }: {
   attachId: number;
-  baseUrl: string;
-  token: string;
+  meta: AttachMeta | undefined;
+  downloadUrl: string;
   onRemove: () => void;
   disabled: boolean;
 }) {
-  const downloadUrl = `${baseUrl}/attachments/${attachId}/download?auth=${token}`;
-  const [name, setName] = useState<string>(`…`);
-  const [mime, setMime] = useState<string>("");
-
-  useEffect(() => {
-    fetch(downloadUrl, { method: "HEAD" })
-      .then((r) => {
-        const cd = r.headers.get("content-disposition") ?? "";
-        const ct = r.headers.get("content-type") ?? "";
-        const match = cd.match(/filename\*?=(?:UTF-8'')?["']?([^"';\r\n]+)["']?/i);
-        setName(match ? decodeURIComponent(match[1].trim()) : `fichier_${attachId}`);
-        setMime(ct.split(";")[0].trim());
-      })
-      .catch(() => setName(`fichier_${attachId}`));
-  }, [downloadUrl, attachId]);
+  const name = meta?.fileName || `fichier_${attachId}`;
+  const mime = meta?.fileType || "";
 
   return (
     <div className="att-item">
@@ -89,16 +97,21 @@ export function AttachmentField({
 }) {
   const ids = decodeAttachmentCell(value);
   const [tokenInfo, setTokenInfo] = useState<{ baseUrl: string; token: string } | null>(null);
+  const [metaMap, setMetaMap] = useState<Map<number, AttachMeta>>(new Map());
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const fileRef = useRef<HTMLInputElement | null>(null);
 
+  // Token + métadonnées au montage
   useEffect(() => {
     if (!docApi) return;
-    docApi
-      .getAccessToken({ readOnly: false })
-      .then((t: any) => setTokenInfo({ baseUrl: t.baseUrl, token: t.token }))
-      .catch(() => setError("Token indisponible."));
+    Promise.all([
+      docApi.getAccessToken({ readOnly: false }),
+      fetchAttachmentsMeta(docApi),
+    ]).then(([t, map]) => {
+      setTokenInfo({ baseUrl: t.baseUrl, token: t.token });
+      setMetaMap(map);
+    }).catch(() => setError("Token indisponible."));
   }, [docApi]);
 
   const handleFiles = useCallback(
@@ -121,8 +134,14 @@ export function AttachmentField({
           newIds.push(...uploaded);
         }
         onChange(encodeAttachmentCell([...ids, ...newIds]));
-        const t = await docApi.getAccessToken({ readOnly: false });
+
+        // Rafraîchit token + metaMap pour afficher les nouveaux noms
+        const [t, map] = await Promise.all([
+          docApi.getAccessToken({ readOnly: false }),
+          fetchAttachmentsMeta(docApi),
+        ]);
         setTokenInfo({ baseUrl: t.baseUrl, token: t.token });
+        setMetaMap(map);
       } catch (e: any) {
         setError(e?.message ?? "Erreur upload.");
       } finally {
@@ -133,6 +152,23 @@ export function AttachmentField({
     [tokenInfo, ids, onChange, docApi]
   );
 
+  const uploadBtn = !disabled && (
+    <label className={`att-add${uploading ? " att-add--loading" : ""}`} title="Ajouter une pièce jointe">
+      <input
+        ref={fileRef}
+        type="file"
+        multiple
+        style={{ display: "none" }}
+        onChange={(e) => handleFiles(e.target.files)}
+        disabled={uploading || !tokenInfo}
+      />
+      {uploading
+        ? <i className="fa-solid fa-spinner fa-spin" aria-hidden="true" />
+        : <i className="fa-solid fa-plus" aria-hidden="true" />
+      }
+    </label>
+  );
+
   return (
     <div className="emile-field emile-field--wide att-field">
       <div className="emile-field__label">{label}</div>
@@ -141,29 +177,13 @@ export function AttachmentField({
           <AttachmentItem
             key={id}
             attachId={id}
-            baseUrl={tokenInfo.baseUrl}
-            token={tokenInfo.token}
+            meta={metaMap.get(id)}
+            downloadUrl={`${tokenInfo.baseUrl}/attachments/${id}/download?auth=${tokenInfo.token}`}
             onRemove={() => onChange(encodeAttachmentCell(ids.filter((x) => x !== id)))}
             disabled={disabled}
           />
         ))}
-
-        {!disabled && (
-          <label className={`att-add${uploading ? " att-add--loading" : ""}`}>
-            <input
-              ref={fileRef}
-              type="file"
-              multiple
-              style={{ display: "none" }}
-              onChange={(e) => handleFiles(e.target.files)}
-              disabled={uploading || !tokenInfo}
-            />
-            {uploading
-              ? <i className="fa-solid fa-spinner fa-spin" aria-hidden="true" />
-              : <i className="fa-solid fa-plus" aria-hidden="true" />
-            }
-          </label>
-        )}
+        {uploadBtn}
       </div>
       {error && <div className="att-error">{error}</div>}
     </div>
