@@ -332,7 +332,11 @@ export default function Page() {
 
       {/* ===== CORPS ===== */}
       <div className="emile-body">
-        {!selected || !docApi ? (
+        {mode === "boot" ? (
+          <div style={{ padding: "3rem", textAlign: "center", color: "#bbb" }}>
+            <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: "1.5rem" }} />
+          </div>
+        ) : !selected || !docApi ? (
           <div className="fr-alert fr-alert--info">
             <p className="fr-alert__title">En attente</p>
             <p>Sélectionne un candidat dans Grist pour afficher son dossier.</p>
