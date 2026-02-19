@@ -1320,23 +1320,42 @@ const state = {
 ══════════════════════════════════════ */
 const MONTHS_FR = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
 
+/* Retourne l'année courante (basée sur state.now) */
 function nowAnnee()     { return state.now.getFullYear(); }
+/* Retourne le mois courant 1–12 (basé sur state.now) */
 function nowMois()      { return state.now.getMonth() + 1; }
+/**
+ * Retourne le trimestre courant au format "YYYY-Tn" (ex. "2026-T1").
+ * Calcul : floor(mois / 3) + 1 → mois 1-3 = T1, 4-6 = T2, etc.
+ */
 function nowTrimestre() {
   const t = Math.floor(state.now.getMonth() / 3) + 1;
   return `${nowAnnee()}-T${t}`;
 }
+/**
+ * Formate un code trimestre Grist en libellé lisible.
+ * @param tr - format "YYYY-Tn" (ex. "2026-T1") → "T1 2026"
+ */
 function trimestreLabel(tr) {
   if (!tr) return "";
   const m = tr.match(/^(\d{4})-T(\d)$/);
   return m ? `T${m[2]} ${m[1]}` : tr;
 }
+/**
+ * Retourne le nom du mois en français + l'année (ex. "Février 2026").
+ * @param m - numéro de mois 1–12 ; @param a - année entière
+ */
 function moisLabel(m, a) {
   return `${MONTHS_FR[(m || 1) - 1]} ${a}`;
 }
+/* Retourne l'instant courant en ISO 8601 — utilisé pour horodater les logs */
 function isoNow() {
   return new Date().toISOString();
 }
+/**
+ * Formate un timestamp ISO en heure lisible "HH:MM:SS" (locale fr-FR).
+ * Retourne "" si la valeur est absente ou invalide.
+ */
 function formatTime(iso) {
   if (!iso) return "";
   try {
@@ -1433,6 +1452,10 @@ function navigateSaisieMois(delta) {
 /* ══════════════════════════════════════
    HELPERS STATUTS
 ══════════════════════════════════════ */
+/**
+ * Génère la clé de cache pour le Map state.statutsByKey.
+ * Format : "communeId|trimestre" ex. "42|2026-T1"
+ */
 function statutKey(communeId, trimestre) {
   return `${communeId}|${trimestre}`;
 }
@@ -1454,6 +1477,11 @@ function cleanSelection(v) {
   return (v ?? "").toString().trim();
 }
 
+/**
+ * Retourne la valeur de sélection (ex. "Rotation") pour une commune et un trimestre,
+ * en vérifiant que la date de référence est dans la plage Debut/Fin si définie.
+ * @param dateStr - date ISO "YYYY-MM-DD" utilisée comme référence de plage
+ */
 function getStatutSelection(communeId, trimestre, dateStr) {
   if (!communeId || !trimestre) return "";
   const statut = state.statutsByKey.get(statutKey(communeId, trimestre));
@@ -1467,6 +1495,10 @@ function getStatutSelection(communeId, trimestre, dateStr) {
   return statut.selection || "";
 }
 
+/**
+ * Raccourci : retourne le statut d'une commune pour le trimestre en cours (today).
+ * Utilise state.now comme date de référence.
+ */
 function getCurrentStatutForCommune(communeId) {
   const trimestre = nowTrimestre();
   const today = state.now.toISOString().slice(0, 10);
@@ -1490,14 +1522,27 @@ function statutChipHtml(sel) {
 /* ══════════════════════════════════════
    HELPERS DOM
 ══════════════════════════════════════ */
+/* Raccourci pour document.getElementById — réduit le bruit syntaxique */
 const $ = id => document.getElementById(id);
 
+/**
+ * Normalise une chaîne pour comparaison insensible à la casse et aux accents.
+ * Retire les diacritiques, met en minuscules, compresse les espaces.
+ * Utilisé par filterCommunes() et pickCol().
+ */
 function norm(s) {
   return (s ?? "").toString().toLowerCase()
     .normalize("NFD").replace(/\p{Diacritic}/gu, "")
     .replace(/[^a-z0-9]+/g, " ").trim();
 }
 
+/**
+ * Résout le nom réel d'une colonne Grist à partir d'une liste de noms candidats.
+ * Essaie d'abord une correspondance exacte, puis une comparaison normalisée
+ * (insensible à la casse, aux accents et aux underscores/espaces).
+ * @param tableObj - objet retourné par gristFetch (clés = noms de colonnes)
+ * @param candidates - liste de noms à essayer dans l'ordre de priorité
+ */
 function pickCol(tableObj, candidates) {
   const keys = Object.keys(tableObj);
   for (const c of candidates) if (keys.includes(c)) return c;
@@ -1509,12 +1554,20 @@ function pickCol(tableObj, candidates) {
   return null;
 }
 
+/**
+ * Échappe les caractères spéciaux HTML pour injection sécurisée dans innerHTML.
+ * Gère &, <, >, " et ' — à utiliser sur toute donnée externe (noms de communes, etc.).
+ */
 function escapeHtml(s) {
   return (s ?? "").toString()
     .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
     .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
 }
 
+/**
+ * Retarde l'exécution de fn jusqu'à ce que delay ms se soient écoulées sans nouvel appel.
+ * Utilisé pour la recherche de communes (DEBOUNCE_DELAY_MS = 200 ms).
+ */
 function debounce(fn, delay) {
   let t = null;
   return function(...args) { clearTimeout(t); t = setTimeout(() => fn.apply(this, args), delay); };
@@ -1524,6 +1577,13 @@ function debounce(fn, delay) {
    TOAST
 ══════════════════════════════════════ */
 let toastCounter = 0;
+/**
+ * Affiche une notification toast temporaire dans le conteneur #toastContainer.
+ * @param kind - "success" | "error" | "info" | "warning" (détermine icône + couleur)
+ * @param title - titre en gras affiché dans le toast
+ * @param desc  - message optionnel sous le titre
+ * @param duration - durée avant fermeture automatique (ms, défaut 4000 ; 0 = permanent)
+ */
 function showToast(kind, title, desc, duration = 4000) {
   const container = $("toastContainer");
   if (!container) return;
@@ -1545,6 +1605,10 @@ function showToast(kind, title, desc, duration = 4000) {
   toast.querySelector(".toast__close").addEventListener("click", () => closeToast(id));
   if (kind !== "error" && duration > 0) setTimeout(() => closeToast(id), duration);
 }
+/**
+ * Ferme un toast par son id DOM avec une animation de sortie (classe "toast--closing").
+ * Le nœud DOM est supprimé après 300 ms (durée de la transition CSS).
+ */
 function closeToast(id) {
   const el = $(id);
   if (!el) return;
@@ -1555,15 +1619,31 @@ function closeToast(id) {
 /* ══════════════════════════════════════
    GRIST API
 ══════════════════════════════════════ */
+/**
+ * Lit l'intégralité d'une table Grist et retourne un objet { colName: [valeurs], … }.
+ * @param table - nom exact de la table Grist (ex. TABLE_DECOMPTE)
+ */
 async function gristFetch(table) {
   return grist.docApi.fetchTable(table);
 }
 
+/**
+ * Insère une nouvelle ligne dans une table Grist via l'action "AddRecord".
+ * @param table  - nom de la table Grist
+ * @param fields - objet { colonne: valeur } à écrire
+ * @returns l'id de la ligne créée, ou null si l'API ne retourne rien
+ */
 async function gristAdd(table, fields) {
   const res = await grist.docApi.applyUserActions([["AddRecord", table, null, fields]]);
   return res?.retValues?.[0] ?? null;
 }
 
+/**
+ * Met à jour une ligne existante dans une table Grist via l'action "UpdateRecord".
+ * @param table  - nom de la table Grist
+ * @param rowId  - id Grist de la ligne à modifier
+ * @param fields - objet { colonne: valeur } contenant les champs à mettre à jour
+ */
 async function gristUpdate(table, rowId, fields) {
   await grist.docApi.applyUserActions([["UpdateRecord", table, rowId, fields]]);
 }
@@ -1571,6 +1651,12 @@ async function gristUpdate(table, rowId, fields) {
 /* ══════════════════════════════════════
    CHARGEMENT DONNÉES
 ══════════════════════════════════════ */
+/**
+ * Charge la table Communes depuis Grist et peuple state.communes + state.communesById.
+ * Utilise pickCol() pour résoudre les noms de colonnes de façon flexible.
+ * Les communes sont triées alphabétiquement (localeCompare "fr").
+ * Un toast d'erreur est affiché si la colonne Nom est introuvable.
+ */
 async function loadCommunes() {
   try {
     const tbl = await gristFetch(TABLE_COMMUNES);
@@ -1613,6 +1699,11 @@ async function loadCommunes() {
   }
 }
 
+/**
+ * Charge la table Communes_Statut et peuple state.statutsByKey (Map clé → {selection, debut, fin}).
+ * Grist spécificités gérées : dates en secondes (× 1000), Choice List ["L", "valeur"].
+ * Les erreurs sont silencieuses (warn) — le widget fonctionne sans statuts.
+ */
 async function loadStatuts() {
   state.statutsByKey.clear();
   try {
@@ -1770,15 +1861,28 @@ function findRowForSaisie() {
   return state.decompteRows.find(r => r.annee === state.saisieYear && r.mois === state.saisieMonth) || null;
 }
 
+/**
+ * Extrait les compteurs (DP, PC, PA…) d'une ligne DECOMPTE.
+ * Retourne un objet { docKey: valeur } avec 0 pour chaque type si row est null.
+ */
 function getCounters(row) {
   if (!row) return Object.fromEntries(DOC_TYPES.map(dt => [dt.key, 0]));
   return Object.fromEntries(DOC_TYPES.map(dt => [dt.key, row[dt.key] || 0]));
 }
 
+/**
+ * Calcule la somme de tous les compteurs d'un objet counters { docKey: valeur }.
+ * Retourne un entier — utilisé pour afficher le Total dans les tuiles et tableaux.
+ */
 function totalCounters(counters) {
   return DOC_TYPES.reduce((s, dt) => s + (counters[dt.key] || 0), 0);
 }
 
+/**
+ * Additionne les compteurs de plusieurs lignes DECOMPTE en un seul objet totaux.
+ * Utilisé pour calculer les totaux par trimestre, année, ou toutes communes.
+ * @param rows - tableau de lignes DECOMPTE (chacune doit avoir les propriétés docKey)
+ */
 function aggregateRows(rows) {
   const out = Object.fromEntries(DOC_TYPES.map(dt => [dt.key, 0]));
   rows.forEach(row => {
@@ -1999,6 +2103,12 @@ function renderApp() {
 /* ══════════════════════════════════════
    ONGLET SAISIE
 ══════════════════════════════════════ */
+/**
+ * Rendu complet de l'onglet Saisie.
+ * Construit la barre de navigation mois (← Mois Année →) + badge période,
+ * puis soit l'invite "Sélectionnez une commune" soit les tuiles de comptage.
+ * Branche ensuite les écouteurs via wireSaisiePeriodBar() et les boutons tuiles.
+ */
 function renderSaisieTab() {
   const zone = $("mainZone");
   if (!zone) return;
@@ -2046,6 +2156,11 @@ function renderSaisieTab() {
   const row = findRowForSaisie();
   const counters = getCounters(row);
   const total = totalCounters(counters);
+  /**
+   * Génère le HTML d'une tuile de comptage (un type de document).
+   * @param dt - entrée DOC_TYPES { key, code, label, color, hero? }
+   * @param extraClass - classe CSS supplémentaire (ex. "tile--hero")
+   */
   function makeTileHtml(dt, extraClass = "") {
     const readonlyCls = !isEditable ? " tile--readonly" : "";
     return `
@@ -2120,6 +2235,10 @@ function renderSaisieTab() {
   }
 }
 
+/**
+ * Branche les écouteurs de clic sur les boutons ← / → de la barre de navigation mois.
+ * Doit être appelé après chaque injection innerHTML qui recrée ces boutons.
+ */
 function wireSaisiePeriodBar() {
   $("btnPrevMois")?.addEventListener("click", () => navigateSaisieMois(-1));
   $("btnNextMois")?.addEventListener("click", () => navigateSaisieMois(+1));
@@ -2152,6 +2271,11 @@ function renderTiles() {
 /* ══════════════════════════════════════
    ONGLET DASHBOARD
 ══════════════════════════════════════ */
+/**
+ * Rendu complet de l'onglet Dashboard.
+ * Construit la barre d'outils (sélecteur vue Mois/Trim/Année, navigation ← →, scope commune/all),
+ * branche tous les écouteurs, puis délègue le contenu à renderDashContent().
+ */
 function renderDashboardTab() {
   const zone = $("mainZone");
   if (!zone) return;
@@ -2218,6 +2342,10 @@ function renderDashboardTab() {
   renderDashContent();
 }
 
+/**
+ * Dispatche le contenu du dashboard selon state.dashScope.
+ * "commune" → renderDashCommune() | "all" → renderDashAll()
+ */
 function renderDashContent() {
   const dashContent = $("dashContent");
   if (!dashContent) return;
@@ -2385,6 +2513,11 @@ function renderDashAll(container) {
   renderSubTabContent();
 }
 
+/**
+ * Aggrège les données de state.allDecompteRows pour la période courante,
+ * enrichit chaque commune avec son statut, trie selon state.dashSort,
+ * puis dispatche vers renderCroiseTable / renderDetailTable / renderChart.
+ */
 function renderSubTabContent() {
   const sub = $("subTabContent");
   if (!sub) return;
@@ -2455,6 +2588,12 @@ function getRowsForPeriod(allRows) {
   return allRows.filter(r => r.annee === a);
 }
 
+/**
+ * Affiche le tableau croisé Communes × Types de documents.
+ * Chaque ligne est cliquable pour zoomer sur la commune (via selectCommune).
+ * Affiche les chips statut (Fixe/Ciblée/Rotation) à côté du nom.
+ * @param communeList - tableau d'entrées { id, nom, counters, total, statut? } déjà triées
+ */
 function renderCroiseTable(container, communeList) {
   const totals = Object.fromEntries(DOC_TYPES.map(dt => [dt.key, 0]));
   communeList.forEach(c => DOC_TYPES.forEach(dt => { totals[dt.key] += c.counters[dt.key]; }));
@@ -2520,6 +2659,11 @@ function renderCroiseTable(container, communeList) {
   });
 }
 
+/**
+ * Affiche la vue "Par commune" : liste compacte avec total + mini-chips par type de document.
+ * Chaque entrée est cliquable pour zoomer sur la commune (via selectCommune).
+ * @param communeList - tableau d'entrées { id, nom, counters, total, statut? } déjà triées
+ */
 function renderDetailTable(container, communeList) {
   const items = communeList.map(c => {
     const chips = DOC_TYPES
@@ -2558,6 +2702,11 @@ function renderDetailTable(container, communeList) {
   });
 }
 
+/**
+ * Génère un graphique SVG en barres verticales (sans librairie externe).
+ * Limité à 30 communes max pour la lisibilité ; les labels sont inclinés à -40°.
+ * @param communeList - tableau d'entrées { nom, total } déjà triées (seul .total est utilisé)
+ */
 function renderChart(container, communeList) {
   if (communeList.length === 0) {
     container.innerHTML = `<div class="chart-empty">Aucune donnée.</div>`;
@@ -2622,6 +2771,11 @@ function renderChart(container, communeList) {
 /* ══════════════════════════════════════
    BADGE STATUT COMMUNE
 ══════════════════════════════════════ */
+/**
+ * Met à jour le badge statut (Fixe / Ciblée / Rotation) dans la barre commune.
+ * La période consultée dépend de l'onglet actif (saisie → saisieMonth/Year,
+ * dashboard → dashMonth/Year) — le badge change donc si on navigue dans le temps.
+ */
 function updateSelBadge() {
   const badge = $("communeSelBadge");
   if (!badge) return;
@@ -2638,6 +2792,10 @@ function updateSelBadge() {
   badge.classList.add("visible", cls);
 }
 
+/**
+ * Met à jour le badge arrondissement (ex. "1", "2", "3") dans la barre commune.
+ * Affiche state.selectedCommune.arr ou masque le badge si la commune n'a pas d'arr.
+ */
 function updateArrBadge() {
   const badge = $("communeArrBadge");
   if (!badge) return;
@@ -2654,6 +2812,10 @@ function updateArrBadge() {
 /* ══════════════════════════════════════
    LOG SIDEBAR
 ══════════════════════════════════════ */
+/**
+ * Met à jour le compteur affiché sur le bouton Journal (badge rouge).
+ * state.logCount contient le nombre de logs du jour — se remet à 0 naturellement le lendemain.
+ */
 function updateLogBadge() {
   const badge = $("logBadge");
   if (!badge) return;
@@ -2661,6 +2823,11 @@ function updateLogBadge() {
   badge.classList.toggle("visible", state.logCount > 0);
 }
 
+/**
+ * Génère la liste HTML des logs dans la sidebar (#logList).
+ * Chaque entrée affiche : icône ±delta colorée, type de doc, commune, mois, heure.
+ * Branche les boutons "Annuler" pour appeler rollbackLog() sur le log correspondant.
+ */
 function renderLogList() {
   const list = $("logList");
   if (!list) return;
@@ -2708,6 +2875,12 @@ function renderLogList() {
 /* ══════════════════════════════════════
    COMMUNE SEARCH
 ══════════════════════════════════════ */
+/**
+ * Filtre la liste state.communes selon la requête q.
+ * Recherche sur le nom (normalisé) ou le code INSEE (si q contient ≥3 chiffres).
+ * Retourne jusqu'à MAX_COMMUNE_RESULTS résultats triés par score de pertinence.
+ * @param q - texte saisi par l'utilisateur
+ */
 function filterCommunes(q) {
   const nq = norm(q);
   const isNum = /^\d{3,}$/.test(q.trim());
@@ -2736,6 +2909,12 @@ function filterCommunes(q) {
     .map(x => x.c);
 }
 
+/**
+ * Affiche le panneau dropdown avec les résultats de recherche.
+ * Génère les options HTML (tag arrondissement + nom) et branche mousedown/keydown.
+ * Utilise mousedown (pas click) pour éviter que le blur sur l'input ferme avant la sélection.
+ * @param results - tableau de communes { id, nom, arr } issues de filterCommunes()
+ */
 function openCommuneDropdown(results) {
   const panel = $("communeDd");
   if (!panel) return;
@@ -2773,12 +2952,21 @@ function openCommuneDropdown(results) {
   input?.setAttribute("aria-expanded", "true");
 }
 
+/**
+ * Ferme le panneau dropdown en retirant la classe "open" et met aria-expanded à false.
+ */
 function closeCommuneDropdown() {
   const panel = $("communeDd");
   if (panel) panel.classList.remove("open");
   $("communeInput")?.setAttribute("aria-expanded", "false");
 }
 
+/**
+ * Sélectionne une commune : met à jour le champ de recherche, charge ses données
+ * via loadDecompteForCommune(), bascule le scope dashboard sur "commune" si besoin,
+ * puis re-rend l'application complète.
+ * @param commune - objet { id, nom, arr, insee } issu de state.communes
+ */
 async function selectCommune(commune) {
   state.selectedCommune = commune;
   const input = $("communeInput");
@@ -2817,6 +3005,11 @@ async function selectCommune(commune) {
   renderLogList();
 }
 
+/**
+ * Désélectionne la commune courante et remet l'UI à son état "vide".
+ * Réinitialise state.dashScope à "all" pour afficher toutes les communes dans le dashboard.
+ * Appelé lors d'un clic sur ✕ ou d'un changement d'onglet.
+ */
 function clearCommune() {
   state.selectedCommune  = null;
   state.decompteRows     = [];
@@ -2836,6 +3029,12 @@ function clearCommune() {
 /* ══════════════════════════════════════
    INIT
 ══════════════════════════════════════ */
+/**
+ * Point d'entrée principal du widget.
+ * Déclare les accès requis à Grist (full), charge toutes les tables en parallèle,
+ * rend l'UI initiale, puis branche l'input commune, les onglets, la sidebar et
+ * la liaison de sélection Grist.
+ */
 async function init() {
   grist.ready({ requiredAccess: "full" });
 
@@ -2899,6 +3098,11 @@ async function init() {
 /* ══════════════════════════════════════
    GRIST SELECTION BINDING
 ══════════════════════════════════════ */
+/**
+ * Abonne le widget à l'événement grist.onRecord (sélection de ligne dans la grille Grist).
+ * Quand l'utilisateur clique sur une ligne DECOMPTE dans Grist, extrait le communeId
+ * et appelle selectCommune() — évite de re-sélectionner si la commune est déjà chargée.
+ */
 function bindGristSelection() {
   grist.onRecord((record) => {
     if (!record) return;

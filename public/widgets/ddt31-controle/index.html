@@ -1758,78 +1758,97 @@ input[type="date"].is-empty::-webkit-datetime-edit-year-field{
 }
 
 /* Tableau croisé */
+/* Tableau global (affichage des lignes individuelles) */
 .croise-wrap {
   overflow-x: auto;
   margin-bottom: 2rem;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .croise-table {
   width: 100%;
-  min-width: 600px;
+  min-width: 1000px;
   border-collapse: collapse;
   background: #fff;
+  font-size: 0.875rem;
 }
 
+/* Header du tableau */
 .croise-table th {
   position: sticky;
   top: 0;
-  padding: 0.75rem;
+  padding: 1rem 0.75rem;
   font-size: 0.8125rem;
   font-weight: 700;
-  color: #fff;
-  background: var(--background-contrast-blue-france);
-  border: 1px solid var(--border-default-grey);
+  color: #333; /* Texte gris foncé pour être lisible sur fond gris */
+  background: #e8e8e8; /* Gris clair comme capture 2 */
   text-align: left;
+  border: none;
+  border-bottom: 2px solid #ddd;
 }
 
 .croise-table th:first-child {
   position: sticky;
   left: 0;
   z-index: 2;
-  background: var(--text-action-high-blue-france);
+  background: #e8e8e8;
+  color: #333;
 }
 
 .croise-table th.col-num {
-  text-align: right;
+  text-align: center;
 }
 
+/* Cellules du tableau */
 .croise-table td {
-  padding: 0.75rem;
-  font-size: 0.8125rem;
-  border: 1px solid var(--border-default-grey);
-  color: var(--text-title-grey);
+  padding: 0.875rem 0.75rem;
+  font-size: 0.875rem;
+  border: none;
+  border-bottom: 1px solid #f0f0f0;
+  color: #333;
+  vertical-align: middle;
 }
 
 .croise-table td:first-child {
   position: sticky;
   left: 0;
-  background: var(--background-alt-grey);
+  background: #fff;
   font-weight: 600;
   z-index: 1;
+  color: #000091;
 }
 
 .croise-table td.col-num {
-  text-align: right;
+  text-align: center;
   font-variant-numeric: tabular-nums;
 }
 
 .croise-table td.col-num.zero {
-  color: #ccc;
-  font-weight: 400;
+  color: #999;
 }
 
+/* Lignes alternées pour meilleure lisibilité */
+.croise-table tr {
+  background: #fff;
+}
+
+.croise-table tr.alt-row {
+  background: #f9f9f9;
+}
+
+/* Hover effect */
+.croise-table tbody tr:hover {
+  background: #f5f5ff;
+}
+
+.croise-table tbody tr.alt-row:hover {
+  background: #f0f0ff;
+}
+
+/* Dernière ligne */
 .croise-table tr:last-child td {
-  border-bottom: none;
-}
-
-.croise-table tr.total-row {
-  font-weight: 700;
-  background: #f5f5fe;
-  color: var(--text-action-high-blue-france);
-}
-
-.croise-table tr:hover td:not(:first-child) {
-  background: #f9f9ff;
+  border-bottom: 2px solid #ddd;
 }
 
 /* Vue détail */
@@ -2295,7 +2314,20 @@ input[type="date"].is-empty::-webkit-datetime-edit-year-field{
 
     <!-- TAB TABLEAU DE BORD -->
     <div id="tabDashboard" class="app-tab-panel">
-      <!-- Barre d'outils -->
+      <!-- Recherche commune EN HAUT -->
+      <div style="padding: 1rem; border-bottom: 1px solid #ddd; background: #f9f9f9;">
+        <label for="dashCommuneInput" style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; font-size: 0.875rem; font-weight: 600; color: #333;">
+          <i class="fa-solid fa-location-dot"></i> COMMUNE
+        </label>
+        <div style="position: relative;">
+          <input type="text" id="dashCommuneInput" class="commune-input"
+                 placeholder="Rechercher une commune…" autocomplete="off"
+                 style="width: 100%; padding: 0.75rem; border: 2px solid #000091; border-radius: 4px; font-size: 1rem;" />
+          <div id="dashCommuneDd" class="dd-panel" style="display: none;"></div>
+        </div>
+      </div>
+
+      <!-- Barre d'outils Filtres -->
       <div class="dashboard-toolbar" role="region" aria-label="Filtres tableau de bord">
         <!-- Libellé période -->
         <div class="dashboard-toolbar__period">
@@ -2321,27 +2353,26 @@ input[type="date"].is-empty::-webkit-datetime-edit-year-field{
           </button>
         </div>
 
-        <!-- Sélecteur périmètre -->
+        <!-- Sélecteur périmètre (avec pictos) -->
         <div class="scope-bar">
-          <button class="scope-btn active" data-scope="all" type="button">Toutes les communes</button>
-          <button class="scope-btn" data-scope="commune" type="button">Commune sélectionnée</button>
-        </div>
-
-        <!-- Recherche commune + Bouton tri -->
-        <div style="display: flex; gap: 1rem; margin-left: auto; align-items: center;">
-          <input type="text" id="dashCommuneInput" class="commune-input"
-                 placeholder="Rechercher une commune…" autocomplete="off" />
-          <div id="dashCommuneDd" class="dd-panel" style="display: none;"></div>
-          <button id="btnDashSort" class="sort-toggle-btn" type="button">
-            <i class="fa-solid fa-arrow-down-a-z"></i> A→Z
+          <button class="scope-btn active" data-scope="all" type="button">
+            <i class="fa-solid fa-globe"></i> Toutes les communes
+          </button>
+          <button class="scope-btn" data-scope="commune" type="button">
+            <i class="fa-solid fa-map-pin"></i> Commune sélectionnée
           </button>
         </div>
+
+        <!-- Bouton tri -->
+        <button id="btnDashSort" class="sort-toggle-btn" type="button" style="margin-left: auto;">
+          <i class="fa-solid fa-arrow-down-a-z"></i> A→Z
+        </button>
       </div>
 
       <!-- Sous-onglets -->
       <div class="sub-tabs" role="tablist" aria-label="Vues">
         <button class="sub-tab active" data-subtab="croise" role="tab" aria-selected="true" type="button">
-          <i class="fa-solid fa-table"></i> Tableau croisé
+          <i class="fa-solid fa-table"></i> Tableau global
         </button>
         <button class="sub-tab" data-subtab="detail" role="tab" aria-selected="false" type="button">
           <i class="fa-solid fa-list"></i> Par commune
@@ -2523,11 +2554,46 @@ function normalizeMonthKey(v) {
 
 
 /* ================= TRIMESTRE ================= */
-// Calcule le trimestre depuis une date ISO (YYYY-MM-DD) ou un objet Date
+// ================= PARSING DES DATES =================
+// Parse une date depuis plusieurs formats possibles (Grist, ISO, français).
+// Grist envoie les dates comme timestamps Unix en SECONDES, pas millisecondes.
+// Supporte aussi format ISO (2026-02-03) et français (03/02/2026).
+// Retourne un objet Date ou null si invalide.
 function parseDate(v) {
   if (!v) return null;
-  const d = new Date(v);
-  return isNaN(d.getTime()) ? null : d;
+
+  // Si c'est un nombre (timestamp Unix en secondes - format Grist)
+  if (typeof v === 'number') {
+    const d = new Date(v * 1000); // Convertir secondes → millisecondes
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  if (typeof v !== 'string') return null;
+
+  // Essayer format ISO d'abord (yyyy-MM-dd ou yyyy-MM-ddT...)
+  let d = new Date(v);
+  if (!isNaN(d.getTime())) return d;
+
+  // Essayer format jj/mm/yyyy (français)
+  const parts = v.split('/');
+  if (parts.length === 3) {
+    const day = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10);
+    const year = parseInt(parts[2], 10);
+    if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
+      d = new Date(year, month - 1, day);
+      if (!isNaN(d.getTime())) return d;
+    }
+  }
+
+  // Essayer parser comme nombre (timestamp en secondes)
+  const asNum = parseFloat(v);
+  if (!isNaN(asNum) && asNum > 0) {
+    d = new Date(asNum * 1000);
+    if (!isNaN(d.getTime())) return d;
+  }
+
+  return null;
 }
 
 function computeTrimestreFromDate(dateStr) {
@@ -4323,9 +4389,33 @@ async function save() {
       showSuccessPersistent("Contrôle créé", resume);
       resetForm();
       setMode("create", null);
+      // Recharger les données du dashboard si activé (après un léger délai pour que Grist synchronise)
+      if (state.anpcDataLoaded) {
+        setTimeout(async () => {
+          state.anpcDataLoaded = false; // Force le rechargement
+          try {
+            await loadAllANPCData();
+            renderDashboard();
+          } catch (e) {
+            console.error("Error refreshing dashboard after create:", e);
+          }
+        }, 500);
+      }
     } else {
       await updateOneRecord(TABLE_ACTES, state.currentRowId, payload);
       showSuccessPersistent("Contrôle mis à jour", resume);
+      // Recharger les données du dashboard si activé (après un léger délai pour que Grist synchronise)
+      if (state.anpcDataLoaded) {
+        setTimeout(async () => {
+          state.anpcDataLoaded = false; // Force le rechargement
+          try {
+            await loadAllANPCData();
+            renderDashboard();
+          } catch (e) {
+            console.error("Error refreshing dashboard after update:", e);
+          }
+        }, 500);
+      }
     }
   } catch (e) {
     console.error(e);
@@ -4899,11 +4989,22 @@ async function loadAllANPCData() {
   if (state.anpcDataLoaded) return; // Éviter rechargement multiple
 
   try {
-    const r = await grist.docApi.fetchTable(TABLE_ACTES);
+    // Récupérer les données de la table AN_PC
+    let r;
+    try {
+      r = await grist.docApi.fetchTable(TABLE_ACTES);
+    } catch (e1) {
+      // Fallback: essayer grist.selectedTable
+      if (grist.selectedTable) {
+        r = await grist.selectedTable.fetchData();
+      } else {
+        throw e1;
+      }
+    }
 
     // Récupérer les colonnes
     const colMajcs = pickCol(r, ["MAJCS"]);
-    const colCommune = pickCol(r, ["Commune"]);
+    const colCommune = pickCol(r, ["Communes"]);
     const colArr = pickCol(r, ["Arrondissement"]);
     const colLogements = pickCol(r, ["Logements"]);
     const colType = pickCol(r, ["Type"]);
@@ -4913,14 +5014,26 @@ async function loadAllANPCData() {
     const colVisa = pickCol(r, ["Visa_Mairie"]);
     const colReceptionPref = pickCol(r, ["Reception_Pref"]);
 
-    state.allANPCRows = r.id.map((id, i) => {
+    // Vérifier qu'on a des lignes
+    if (!r.id || r.id.length === 0) {
+      state.allANPCRows = [];
+      state.anpcDataLoaded = true;
+      return;
+    }
+
+    // Mapper les lignes
+    const allRows = r.id.map((id, i) => {
+      const majcsRaw = r[colMajcs]?.[i];
       const communeRaw = r[colCommune]?.[i];
       const communeId = normalizeCommuneId(communeRaw);
       const receptionPrefRaw = r[colReceptionPref]?.[i];
+      const receptionPref = parseDate(receptionPrefRaw);
+      const visaMairieRaw = r[colVisa]?.[i];
+      const visaMairie = parseDate(visaMairieRaw); // Parser comme date si c'est un timestamp
 
       return {
         id: id,
-        majcs: 1, // Chaque ligne = 1 MAJCS
+        majcs: majcsRaw || id, // Utiliser la vraie valeur MAJCS de la colonne, sinon l'ID de la ligne
         communeId: communeId,
         communeName: state.communes.find(c => c.id === communeId)?.nom || "?",
         arr: r[colArr]?.[i],
@@ -4929,13 +5042,15 @@ async function loadAllANPCData() {
         type2: cleanStr(r[colType2]?.[i]),
         motif: cleanStr(r[colMotif]?.[i]),
         objet: cleanStr(r[colObjet]?.[i]),
-        visaMairie: r[colVisa]?.[i],
-        receptionPref: parseDate(receptionPrefRaw),
+        visaMairie: visaMairie,
+        receptionPref: receptionPref,
       };
-    }).filter(row => row.communeId && row.receptionPref); // Filtrer rows invalides
+    });
+
+    // Filtrer les lignes avec une commune valide
+    state.allANPCRows = allRows.filter(row => row.communeId);
 
     state.anpcDataLoaded = true;
-    console.log(`Loaded ${state.allANPCRows.length} AN_PC rows`);
   } catch (e) {
     console.error("Error loading AN_PC data:", e);
     state.anpcDataLoaded = false;
@@ -4997,7 +5112,11 @@ function isDashAtCurrentPeriod() {
 
 function getRowsForPeriod(allRows) {
   return allRows.filter(row => {
-    if (!row.receptionPref) return false;
+    // Si pas de date: inclure seulement en vue "année"
+    if (!row.receptionPref) {
+      return state.dashVue === "annee";
+    }
+
     const m = row.receptionPref.getMonth() + 1;
     const y = row.receptionPref.getFullYear();
 
@@ -5166,81 +5285,76 @@ function aggregateANPCByCommune(filteredRows) {
 }
 
 /* ================= DASHBOARD: RENDUS ================= */
-function renderDashboardCroiseTable(container, communeList) {
-  // Récupérer tous les types et type2
-  const allTypes = new Set();
-  const allType2s = new Set();
-  communeList.forEach(c => {
-    Object.keys(c.typeCount).forEach(t => allTypes.add(t));
-    Object.keys(c.type2Count).forEach(t => allType2s.add(t));
-  });
+function renderDashboardCroiseTable(container, filteredRows) {
+  // Afficher TOUTES les lignes avec les colonnes: MAJCS, Commune, Arr., Logements, Type, Type2, Motif, Objet, Visa, Date
 
-  const typeArray = Array.from(allTypes).sort();
-  const type2Array = Array.from(allType2s).sort();
+  if (!filteredRows || filteredRows.length === 0) {
+    // Message avec suggestion si on est en mode mois/trimestre et qu'il y a des données sans dates
+    let message = 'Aucune donnée pour cette période.';
+
+    if (state.dashVue !== "annee" && state.allANPCRows.length > 0) {
+      const rowsWithoutDates = state.allANPCRows.filter(r => !r.receptionPref).length;
+      if (rowsWithoutDates > 0) {
+        message += `<br><small style="color: #666; margin-top: 0.5rem; display: block;">💡 ${rowsWithoutDates} ligne(s) n'ont pas de date de réception. <a href="#" style="color: #000091; text-decoration: underline; cursor: pointer;" onclick="state.dashVue='annee'; renderDashboard(); return false;">Basculez en vue Année</a> pour les voir.</small>`;
+      } else {
+        // Il y a des données mais aucune pour cette période avec des dates
+        message += `<br><small style="color: #666; margin-top: 0.5rem; display: block;">💡 <a href="#" style="color: #000091; text-decoration: underline; cursor: pointer;" onclick="state.dashVue='annee'; renderDashboard(); return false;">Voir toutes les données</a> en vue Année.</small>`;
+      }
+    }
+
+    container.innerHTML = `<div style="text-align: center; padding: 2rem; color: #999;">${message}</div>`;
+    return;
+  }
 
   // Header
   let html = '<div class="croise-wrap"><table class="croise-table"><thead><tr>';
+  html += '<th>MAJCS</th>';
   html += '<th>Commune</th>';
-  html += '<th class="col-num">MAJCS</th>';
-  typeArray.forEach(t => {
-    html += `<th class="col-num" title="${t}">${t}</th>`;
-  });
-  type2Array.forEach(t => {
-    html += `<th class="col-num" title="${t}">${t}</th>`;
-  });
+  html += '<th>Arr.</th>';
   html += '<th class="col-num">Logements</th>';
-  html += '<th class="col-num">Visa Mairie</th>';
+  html += '<th>Type</th>';
+  html += '<th>Type2</th>';
+  html += '<th>Motif</th>';
+  html += '<th>Objet</th>';
+  html += '<th>Visa Mairie</th>';
+  html += '<th>Date Réception</th>';
   html += '</tr></thead><tbody>';
 
-  // Rows communes
-  const totals = {
-    majcs: 0,
-    type: {},
-    type2: {},
-    logements: 0,
-    visa: 0,
-  };
+  // Rows - chaque ligne de AN_PC
+  filteredRows.forEach((row, idx) => {
+    const rowClass = idx % 2 === 0 ? '' : 'alt-row';
+    html += `<tr class="${rowClass}">`;
+    html += `<td><strong>${row.majcs}</strong></td>`;
+    html += `<td><strong>${row.communeName || '?'}</strong></td>`;
+    html += `<td>${row.arr || '—'}</td>`;
+    html += `<td class="col-num">${row.logements || '—'}</td>`;
+    html += `<td>${row.type || '—'}</td>`;
+    html += `<td>${row.type2 || '—'}</td>`;
+    html += `<td>${row.motif || '—'}</td>`;
+    html += `<td>${row.objet || '—'}</td>`;
+    // Formater la date de Visa Mairie
+    let visaStr = '—';
+    if (row.visaMairie) {
+      if (typeof row.visaMairie === 'object' && row.visaMairie instanceof Date) {
+        const d = row.visaMairie;
+        visaStr = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+      } else {
+        visaStr = '✓';
+      }
+    }
+    html += `<td>${visaStr}</td>`;
 
-  communeList.forEach(c => {
-    html += '<tr>';
-    html += `<td><strong>${c.nom}</strong></td>`;
-    html += `<td class="col-num"><strong>${c.majcs}</strong></td>`;
-
-    typeArray.forEach(t => {
-      const count = c.typeCount[t] || 0;
-      html += `<td class="col-num ${count === 0 ? 'zero' : ''}">${count > 0 ? count : '—'}</td>`;
-      totals.type[t] = (totals.type[t] || 0) + count;
-    });
-
-    type2Array.forEach(t => {
-      const count = c.type2Count[t] || 0;
-      html += `<td class="col-num ${count === 0 ? 'zero' : ''}">${count > 0 ? count : '—'}</td>`;
-      totals.type2[t] = (totals.type2[t] || 0) + count;
-    });
-
-    html += `<td class="col-num">${c.logements > 0 ? c.logements : '—'}</td>`;
-    html += `<td class="col-num">${c.visaMairie > 0 ? c.visaMairie : '—'}</td>`;
+    // Formater la date de Réception Pref
+    let dateStr = '—';
+    if (row.receptionPref) {
+      const d = row.receptionPref;
+      dateStr = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+    }
+    html += `<td>${dateStr}</td>`;
     html += '</tr>';
-
-    totals.majcs += c.majcs;
-    totals.logements += c.logements;
-    totals.visa += c.visaMairie;
   });
 
-  // Row TOTAL
-  html += '<tr class="total-row">';
-  html += '<td><strong>TOTAL</strong></td>';
-  html += `<td class="col-num"><strong>${totals.majcs}</strong></td>`;
-  typeArray.forEach(t => {
-    html += `<td class="col-num"><strong>${totals.type[t] || 0}</strong></td>`;
-  });
-  type2Array.forEach(t => {
-    html += `<td class="col-num"><strong>${totals.type2[t] || 0}</strong></td>`;
-  });
-  html += `<td class="col-num"><strong>${totals.logements}</strong></td>`;
-  html += `<td class="col-num"><strong>${totals.visa}</strong></td>`;
-  html += '</tr></tbody></table></div>';
-
+  html += '</tbody></table></div>';
   container.innerHTML = html;
 }
 
@@ -5353,52 +5467,66 @@ function renderDashboardSubtabs() {
   const container = $("dashContent");
   if (!container) return;
 
-  // Obtenir données filtrées
-  const filtered = getRowsForPeriod(state.allANPCRows);
+  // Obtenir données filtrées par période
+  let filtered = getRowsForPeriod(state.allANPCRows);
 
-  // Agg par commune
+  // Si scope="commune" et commune sélectionnée: filtrer aussi par commune
+  if (state.dashScope === "commune" && state.dashSelectedCommune) {
+    filtered = filtered.filter(row => row.communeId === state.dashSelectedCommune.id);
+  }
+
+  // Pour les vues "détail" et "graphique": agréger par commune
   const communeList = aggregateANPCByCommune(filtered);
 
-  // Si scope="commune" et commune sélectionnée
-  if (state.dashScope === "commune" && state.dashSelectedCommune) {
-    const filtered2 = communeList.filter(c => c.id === state.dashSelectedCommune.id);
-    if (state.dashTab === "croise") {
-      renderDashboardCroiseTable(container, filtered2);
-    } else if (state.dashTab === "detail") {
-      renderDashboardDetailTable(container, filtered2);
-    } else {
-      renderDashboardChart(container, filtered2);
-    }
+  // Rendre selon le tab actif
+  if (state.dashTab === "croise") {
+    // Tableau croisé: afficher TOUTES les lignes filtrées
+    renderDashboardCroiseTable(container, filtered);
+  } else if (state.dashTab === "detail") {
+    // Détail: afficher communes agrégées
+    renderDashboardDetailTable(container, communeList);
   } else {
-    // Toutes communes
-    if (state.dashTab === "croise") {
-      renderDashboardCroiseTable(container, communeList);
-    } else if (state.dashTab === "detail") {
-      renderDashboardDetailTable(container, communeList);
-    } else {
-      renderDashboardChart(container, communeList);
-    }
+    // Graphique: afficher communes agrégées
+    renderDashboardChart(container, communeList);
   }
 }
 
+// ================= RENDU PRINCIPAL DASHBOARD =================
+// Orchestrateur du dashboard: met à jour le label période, désactive le bouton "Suivant"
+// si on est à la période courante, puis appelle le rendu des sous-onglets.
 function renderDashboard() {
   // Mettre à jour label période
   const labelEl = $("dashPeriodLabel");
   if (labelEl) labelEl.textContent = getDashboardPeriodLabel();
 
-  // Activer/désactiver bouton Next
+  // Activer/désactiver bouton Next (désactivé si période courante)
   const btnNext = $("btnDashNext");
   if (btnNext) btnNext.disabled = isDashAtCurrentPeriod();
 
-  // Rendre sous-onglets
+  // Rendre sous-onglets (tableau global, par commune, graphique)
   renderDashboardSubtabs();
 }
 
+// ================= INITIALISATION GLOBALE =================
+// Point d'entrée principal du widget: charge toutes les données, initialise les UI,
+// configure les event listeners et affiche le formulaire en mode création par défaut.
 async function init() {
   const loadingOverlay = $("loadingOverlay");
 
   try {
-    grist.ready({ requiredAccess: "full" });
+    // Déclarer toutes les colonnes requises pour que Grist les envoie dans grist.onRecord()
+    // Sans cette liste, Grist ne renvoie que les colonnes "visibles", ce qui exclut Type2 et autres
+    grist.ready({
+      requiredAccess: "full",
+      columns: [
+        COLS.Type, COLS.Type2,
+        COLS.NoActe, COLS.NParcelle, COLS.NomProjet,
+        COLS.VisaMairie, COLS.ReceptionPref,
+        COLS.Precisions, COLS.Motifs, COLS.ObjetAutorisation,
+        COLS.RaisonControle, COLS.MAJCS,
+        COLS.CommuneRef, COLS.TailleLogements
+      ]
+    });
 
     await loadChoicesFromMetadata(COLS.Type, "type");
     await loadChoicesFromMetadata(COLS.Type2, "type2");
@@ -5447,31 +5575,11 @@ init().catch(e => {
   showAlert("error", "Init", (e?.message || e));
 });
 
-/*
-========================================================
-Règles Grist Custom Widget (à partager)
-========================================================
-1) Écriture = grist.ready({requiredAccess:"full"}) + autoriser “Full access” dans les options du widget.
-2) applyUserActions(AddRecord/UpdateRecord) demande des clés = colIds techniques (pas les libellés UI).
-3) Choice List en écriture: utiliser le format Grist ["L", ...valeurs] (sinon valeurs “fantômes” / erreurs).
-4) Normaliser les valeurs côté front (ex: Mois "01".."12") pour éviter les incohérences en édition/création.
-
-
-widget Grist DSFR pour AN_PC + table Communes (autocomplete)
-écriture via docApi.applyUserActions (Full access)
-Choice List encodées en ["L", ...] (le fameux “L”)
-mois en "01".."12" + labels
-année basée sur widgetOptions.choices
-validations inline DSFR + aria-invalid
-bandeau succès persistant avec bouton Fermer (pas d’auto-disparition)
-modeHelp: “Saisissez un nouvel acte.” en création, id ligne en édition
-placeholder commune : “Nom ou code INSEE...”
-pas d’auto-focus
-*/
-
-// Initialisation syncDateEmptyState pour les champs date
+// ================= INITIALISATION DES CHAMPS DATE =================
+// Synchronise l'état visuel (placeholder) des champs date quand l'utilisateur les remplit/vide.
+// Utile pour les champs date (visaMairie, receptionPref) afin de maintenir une cohérence visuelle.
 window.addEventListener("DOMContentLoaded", () => {
-  ["visaMairie","receptionPref"].forEach((id) => {
+  ["visaMairie", "receptionPref"].forEach((id) => {
     const el = $(id);
     if (!el) return;
     el.addEventListener("input", syncDateEmptyState);
