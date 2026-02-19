@@ -383,6 +383,7 @@ body {
   height: 100%;
 }
 .att-item__link:hover { background: #f5f5fe; }
+.att-item__link, .att-item__link:hover { text-decoration: none !important; }
 /* Supprime l'icône external-link ajoutée automatiquement par le DSFR */
 .att-item__link::after { display: none !important; }
 
