@@ -358,40 +358,42 @@ body {
   align-items: center;
 }
 
-/* Chaque pièce jointe : icône + nom, tout simple */
+/* Chaque pièce jointe : icône + nom, compact */
 .att-item {
   display: inline-flex;
   align-items: center;
   gap: 0;
   background: #fff;
   border: 1px solid #ddd;
-  border-radius: 6px;
+  border-radius: 4px;
   overflow: hidden;
-  max-width: 200px;
+  max-width: 160px;
+  height: 1.6rem;
 }
 
 .att-item__link {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.3rem 0.5rem;
+  gap: 0.3rem;
+  padding: 0 0.4rem;
   text-decoration: none;
   color: #1e1e1e;
   min-width: 0;
   flex: 1;
+  height: 100%;
 }
 .att-item__link:hover { background: #f5f5fe; }
 /* Supprime l'icône external-link ajoutée automatiquement par le DSFR */
 .att-item__link::after { display: none !important; }
 
 .att-item__icon {
-  font-size: 0.95rem;
-  color: #555;
+  font-size: 0.78rem;
+  color: #666;
   flex-shrink: 0;
 }
 
 .att-item__name {
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -402,14 +404,14 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.5rem;
+  width: 1.2rem;
   height: 100%;
   border: none;
   border-left: 1px solid #eee;
   background: transparent;
-  color: #bbb;
+  color: #ccc;
   cursor: pointer;
-  font-size: 0.7rem;
+  font-size: 0.6rem;
   flex-shrink: 0;
   transition: background 0.12s, color 0.12s;
 }

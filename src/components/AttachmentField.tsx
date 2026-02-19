@@ -36,14 +36,31 @@ async function fetchAttachmentsMeta(docApi: any): Promise<Map<number, AttachMeta
   }
 }
 
-/* Icône FontAwesome selon le type MIME */
-function fileIcon(mime: string): string {
+/* Icône FontAwesome selon le type MIME + extension du nom */
+function fileIcon(mime: string, fileName: string): string {
+  const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
+
+  // Par MIME d'abord
   if (mime.startsWith("image/"))                            return "fa-solid fa-file-image";
   if (mime === "application/pdf")                           return "fa-solid fa-file-pdf";
   if (mime.includes("word") || mime.includes("document"))  return "fa-solid fa-file-word";
   if (mime.includes("sheet") || mime.includes("excel"))    return "fa-solid fa-file-excel";
   if (mime.startsWith("video/"))                           return "fa-solid fa-file-video";
   if (mime.startsWith("audio/"))                           return "fa-solid fa-file-audio";
+  if (mime.includes("zip") || mime.includes("compressed")) return "fa-solid fa-file-zipper";
+  if (mime.startsWith("text/"))                            return "fa-solid fa-file-lines";
+
+  // Fallback par extension
+  if (["jpg","jpeg","png","gif","webp","svg","bmp"].includes(ext)) return "fa-solid fa-file-image";
+  if (ext === "pdf")                                        return "fa-solid fa-file-pdf";
+  if (["doc","docx","odt"].includes(ext))                  return "fa-solid fa-file-word";
+  if (["xls","xlsx","ods","csv"].includes(ext))            return "fa-solid fa-file-excel";
+  if (["ppt","pptx","odp"].includes(ext))                  return "fa-solid fa-file-powerpoint";
+  if (["mp4","avi","mov","mkv","webm"].includes(ext))      return "fa-solid fa-file-video";
+  if (["mp3","wav","ogg","flac"].includes(ext))            return "fa-solid fa-file-audio";
+  if (["zip","rar","7z","tar","gz"].includes(ext))         return "fa-solid fa-file-zipper";
+  if (["txt","md","log"].includes(ext))                    return "fa-solid fa-file-lines";
+
   return "fa-solid fa-file";
 }
 
@@ -68,7 +85,7 @@ function AttachmentItem({
   return (
     <div className="att-item">
       <a href={downloadUrl} target="_blank" rel="noopener noreferrer" className="att-item__link" title={name}>
-        <i className={`${fileIcon(mime)} att-item__icon`} aria-hidden="true" />
+        <i className={`${fileIcon(mime, name)} att-item__icon`} aria-hidden="true" />
         <span className="att-item__name">{name}</span>
       </a>
       {!disabled && (
