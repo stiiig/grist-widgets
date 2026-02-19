@@ -1,12 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import "./styles.css";
+import { initGristOrMock } from "@/lib/grist/init";
+import { GristDocAPI } from "@/lib/grist/meta";
 
-/* ─── Config Grist (variables d'env Next.js) ──────────────── */
-const GRIST_BASE_URL = process.env.NEXT_PUBLIC_GRIST_BASE_URL ?? "";
-const GRIST_DOC_ID   = process.env.NEXT_PUBLIC_GRIST_DOC_ID ?? "";
-const GRIST_API_KEY  = process.env.NEXT_PUBLIC_GRIST_SERVICE_KEY ?? "";
+const TABLE_ID = "CANDIDATS";
 
 /* ─── Types ────────────────────────────────────────────────── */
 type FormData = {
@@ -53,7 +52,7 @@ const INITIAL: FormData = {
   Motivation_candidat: "",
 };
 
-/* ─── Choix (à adapter selon vos données Grist réelles) ────── */
+/* ─── Choix ─────────────────────────────────────────────────── */
 const CHOICES: Partial<Record<keyof FormData, string[]>> = {
   Genre: ["Homme", "Femme", "Autre", "Non renseigné"],
   Regularite_situation: ["Régulier", "Irrégulier", "En cours de régularisation", "Non renseigné"],
@@ -84,42 +83,7 @@ function isoToUnix(iso: string): number | null {
   return isNaN(ms) ? null : Math.floor(ms / 1000);
 }
 
-/* ─── Envoi vers Grist REST API ────────────────────────────── */
-async function submitToGrist(data: FormData): Promise<void> {
-  if (!GRIST_BASE_URL || !GRIST_DOC_ID || !GRIST_API_KEY) {
-    throw new Error("Variables d'environnement Grist non configurées (NEXT_PUBLIC_GRIST_*).");
-  }
-
-  // Construire l'objet de champs à envoyer
-  // On omet les champs vides pour ne pas écraser des valeurs par défaut
-  const fields: Record<string, any> = {};
-
-  for (const [key, val] of Object.entries(data) as [keyof FormData, string][]) {
-    if (key === "Date_de_naissance") {
-      const unix = isoToUnix(val);
-      if (unix !== null) fields[key] = unix;
-    } else if (val !== "") {
-      fields[key] = val;
-    }
-  }
-
-  const url = `${GRIST_BASE_URL}/api/docs/${GRIST_DOC_ID}/tables/CANDIDATS/records`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${GRIST_API_KEY}`,
-    },
-    body: JSON.stringify({ records: [{ fields }] }),
-  });
-
-  if (!res.ok) {
-    const txt = await res.text().catch(() => "");
-    throw new Error(`Erreur Grist ${res.status}${txt ? ` : ${txt}` : ""}`);
-  }
-}
-
-/* ─── Composants UI ────────────────────────────────────────── */
+/* ─── Composants UI ─────────────────────────────────────────── */
 
 function TextInput({
   label, name, value, onChange, type = "text", required = false, placeholder = "",
@@ -134,9 +98,7 @@ function TextInput({
         {label}{required && <span className="ins-required"> *</span>}
       </label>
       <input
-        id={name}
-        name={name}
-        type={type}
+        id={name} name={name} type={type}
         className="ins-input"
         value={value}
         onChange={(e) => onChange(name, e.target.value)}
@@ -161,17 +123,14 @@ function SelectInput({
         {label}{required && <span className="ins-required"> *</span>}
       </label>
       <select
-        id={name}
-        name={name}
+        id={name} name={name}
         className="ins-select"
         value={value}
         onChange={(e) => onChange(name, e.target.value)}
         required={required}
       >
         <option value="">— Choisir —</option>
-        {options.map((o) => (
-          <option key={o} value={o}>{o}</option>
-        ))}
+        {options.map((o) => <option key={o} value={o}>{o}</option>)}
       </select>
     </div>
   );
@@ -188,8 +147,7 @@ function Textarea({
     <div className="ins-field ins-field--wide">
       <label className="ins-label" htmlFor={name}>{label}</label>
       <textarea
-        id={name}
-        name={name}
+        id={name} name={name}
         className="ins-textarea"
         value={value}
         onChange={(e) => onChange(name, e.target.value)}
@@ -208,13 +166,42 @@ function SectionTitle({ icon, title }: { icon: string; title: string }) {
   );
 }
 
-/* ─── Page principale ──────────────────────────────────────── */
+/* ─── Page principale ───────────────────────────────────────── */
 
 export default function InscriptionPage() {
-  const [form, setForm] = useState<FormData>(INITIAL);
+  const [mode, setMode]     = useState<string>("boot");
+  const [docApi, setDocApi] = useState<GristDocAPI | null>(null);
+  const [form, setForm]     = useState<FormData>(INITIAL);
   const [submitting, setSubmitting] = useState(false);
-  const [done, setDone] = useState(false);
-  const [error, setError] = useState("");
+  const [done, setDone]     = useState(false);
+  const [error, setError]   = useState("");
+
+  /* ── Init Grist (identique à EMILE) ── */
+  useEffect(() => {
+    (async () => {
+      try {
+        if (typeof window !== "undefined" && !(window as any).grist) {
+          await new Promise<void>((resolve, reject) => {
+            const existing = document.querySelector('script[data-grist-plugin-api="1"]') as HTMLScriptElement | null;
+            if (existing) return resolve();
+            const s = document.createElement("script");
+            s.src = "https://docs.getgrist.com/grist-plugin-api.js";
+            s.async = true;
+            s.setAttribute("data-grist-plugin-api", "1");
+            s.onload = () => resolve();
+            s.onerror = () => reject(new Error("Impossible de charger grist-plugin-api.js"));
+            document.head.appendChild(s);
+          });
+        }
+        const result = await initGristOrMock({ requiredAccess: "full" });
+        setMode(result.mode);
+        setDocApi(result.docApi);
+      } catch (e: any) {
+        setError(`Erreur init: ${e?.message ?? String(e)}`);
+        setMode("none");
+      }
+    })();
+  }, []);
 
   function set(key: keyof FormData, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -222,13 +209,28 @@ export default function InscriptionPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!docApi) {
+      setError("Grist non disponible.");
+      return;
+    }
     setSubmitting(true);
     setError("");
     try {
-      await submitToGrist(form);
+      // Construire les champs à envoyer (on omet les champs vides)
+      const fields: Record<string, any> = {};
+      for (const [key, val] of Object.entries(form) as [keyof FormData, string][]) {
+        if (key === "Date_de_naissance") {
+          const unix = isoToUnix(val);
+          if (unix !== null) fields[key] = unix;
+        } else if (val !== "") {
+          fields[key] = val;
+        }
+      }
+
+      await docApi.applyUserActions([["AddRecord", TABLE_ID, null, fields]]);
       setDone(true);
-    } catch (err: any) {
-      setError(err?.message ?? "Une erreur est survenue.");
+    } catch (e: any) {
+      setError(e?.message ?? "Une erreur est survenue.");
     } finally {
       setSubmitting(false);
     }
@@ -250,16 +252,15 @@ export default function InscriptionPage() {
             <i className="fa-solid fa-circle-check ins-confirm__icon" aria-hidden="true" />
             <h2 className="ins-confirm__title">Dossier envoyé !</h2>
             <p className="ins-confirm__text">
-              Votre dossier de candidature a bien été transmis à l'équipe DDT31.
-              <br />Vous serez contacté prochainement.
+              Le candidat a bien été ajouté dans Grist.
             </p>
             <button
               type="button"
               className="ins-btn ins-btn--secondary"
-              onClick={() => { setForm(INITIAL); setDone(false); }}
+              onClick={() => { setForm(INITIAL); setDone(false); setError(""); }}
             >
               <i className="fa-solid fa-rotate-left" aria-hidden="true" />
-              Nouveau dossier
+              Nouveau candidat
             </button>
           </div>
         </div>
@@ -279,99 +280,97 @@ export default function InscriptionPage() {
         <span className="ins-header__appname">EMILE — Inscription</span>
       </header>
 
-      {/* ── Intro ── */}
-      <div className="ins-intro">
-        <p>
-          Remplissez ce formulaire pour initier votre dossier de candidature au dispositif EMILE.
-          Les champs marqués <span className="ins-required">*</span> sont obligatoires.
-        </p>
-      </div>
-
-      {/* ── Formulaire ── */}
-      <div className="ins-body">
-        <form className="ins-form" onSubmit={handleSubmit} noValidate>
-
-          {/* ── Identité ── */}
-          <SectionTitle icon="fa-solid fa-user" title="Identité" />
-          <div className="ins-grid">
-            <TextInput label="Prénom" name="Prenom" value={form.Prenom} onChange={set} required />
-            <TextInput label="Nom de famille" name="Nom_de_famille" value={form.Nom_de_famille} onChange={set} required />
-            <TextInput label="Date de naissance" name="Date_de_naissance" value={form.Date_de_naissance} onChange={set} type="date" required />
-            <SelectInput label="Genre" name="Genre" value={form.Genre} onChange={set} />
-            <TextInput label="Nationalité" name="Nationalite" value={form.Nationalite} onChange={set} placeholder="Ex: Française, Marocaine…" />
-            <SelectInput label="Régularité de la situation" name="Regularite_situation" value={form.Regularite_situation} onChange={set} />
+      {/* ── Corps ── */}
+      {mode === "boot" ? (
+        <div className="ins-body ins-body--center">
+          <div style={{ color: "#bbb", fontSize: "1.5rem" }}>
+            <i className="fa-solid fa-spinner fa-spin" />
           </div>
-
-          {/* ── Coordonnées ── */}
-          <SectionTitle icon="fa-solid fa-address-card" title="Coordonnées" />
-          <div className="ins-grid">
-            <TextInput label="Adresse" name="Adresse" value={form.Adresse} onChange={set} placeholder="Numéro, rue, ville, code postal" />
-            <TextInput label="Email" name="Email" value={form.Email} onChange={set} type="email" placeholder="exemple@mail.fr" />
-            <TextInput label="Téléphone" name="Tel" value={form.Tel} onChange={set} type="tel" placeholder="06 XX XX XX XX" />
+        </div>
+      ) : mode === "none" || !docApi ? (
+        <div className="ins-body">
+          <div className="fr-alert fr-alert--warning">
+            <p className="fr-alert__title">Non disponible</p>
+            <p>Ce widget doit être ouvert dans Grist.</p>
           </div>
-
-          {/* ── Situation ── */}
-          <SectionTitle icon="fa-solid fa-briefcase" title="Situation" />
-          <div className="ins-grid">
-            <SelectInput label="Situation face à l'emploi" name="Situation_face_emploi" value={form.Situation_face_emploi} onChange={set} />
-            <SelectInput label="Situation financière" name="Situation_financiere" value={form.Situation_financiere} onChange={set} />
-            <SelectInput label="Situation d'hébergement" name="Situation_hebergement" value={form.Situation_hebergement} onChange={set} />
-            <SelectInput label="Niveau de langue" name="Niveau_de_langue" value={form.Niveau_de_langue} onChange={set} />
-            <SelectInput label="Niveau d'études (reconnu en France)" name="Niveau_etudes_reconnu_en_France" value={form.Niveau_etudes_reconnu_en_France} onChange={set} />
+        </div>
+      ) : (
+        <>
+          <div className="ins-intro">
+            <p>
+              Remplissez ce formulaire pour créer un nouveau dossier candidat dans EMILE.
+              Les champs marqués <span className="ins-required">*</span> sont obligatoires.
+            </p>
           </div>
+          <div className="ins-body">
+            <form className="ins-form" onSubmit={handleSubmit} noValidate>
 
-          {/* ── Mobilité & Santé ── */}
-          <SectionTitle icon="fa-solid fa-car" title="Mobilité &amp; Santé" />
-          <div className="ins-grid">
-            <SelectInput label="Véhicule" name="Vehicule" value={form.Vehicule} onChange={set} />
-            <SelectInput label="Permis de conduire" name="Permis" value={form.Permis} onChange={set} />
-            <SelectInput label="PMR (Personne à Mobilité Réduite)" name="PMR" value={form.PMR} onChange={set} />
-            <SelectInput label="RQTH" name="RQTH" value={form.RQTH} onChange={set} />
-          </div>
+              <SectionTitle icon="fa-solid fa-user" title="Identité" />
+              <div className="ins-grid">
+                <TextInput label="Prénom" name="Prenom" value={form.Prenom} onChange={set} required />
+                <TextInput label="Nom de famille" name="Nom_de_famille" value={form.Nom_de_famille} onChange={set} required />
+                <TextInput label="Date de naissance" name="Date_de_naissance" value={form.Date_de_naissance} onChange={set} type="date" required />
+                <SelectInput label="Genre" name="Genre" value={form.Genre} onChange={set} />
+                <TextInput label="Nationalité" name="Nationalite" value={form.Nationalite} onChange={set} placeholder="Ex: Française, Marocaine…" />
+                <SelectInput label="Régularité de situation" name="Regularite_situation" value={form.Regularite_situation} onChange={set} />
+              </div>
 
-          {/* ── Motivation ── */}
-          <SectionTitle icon="fa-solid fa-star" title="Motivation" />
-          <div className="ins-grid">
-            <Textarea
-              label="Décrivez votre motivation et votre projet (optionnel)"
-              name="Motivation_candidat"
-              value={form.Motivation_candidat}
-              onChange={set}
-              rows={5}
-            />
-          </div>
+              <SectionTitle icon="fa-solid fa-address-card" title="Coordonnées" />
+              <div className="ins-grid">
+                <TextInput label="Adresse" name="Adresse" value={form.Adresse} onChange={set} placeholder="Numéro, rue, ville, code postal" />
+                <TextInput label="Email" name="Email" value={form.Email} onChange={set} type="email" placeholder="exemple@mail.fr" />
+                <TextInput label="Téléphone" name="Tel" value={form.Tel} onChange={set} type="tel" placeholder="06 XX XX XX XX" />
+              </div>
 
-          {/* ── Erreur ── */}
-          {error && (
-            <div className="fr-alert fr-alert--error" style={{ marginTop: "1rem" }}>
-              <p className="fr-alert__title">Erreur</p>
-              <p>{error}</p>
-            </div>
-          )}
+              <SectionTitle icon="fa-solid fa-briefcase" title="Situation" />
+              <div className="ins-grid">
+                <SelectInput label="Situation face à l'emploi" name="Situation_face_emploi" value={form.Situation_face_emploi} onChange={set} />
+                <SelectInput label="Situation financière" name="Situation_financiere" value={form.Situation_financiere} onChange={set} />
+                <SelectInput label="Situation d'hébergement" name="Situation_hebergement" value={form.Situation_hebergement} onChange={set} />
+                <SelectInput label="Niveau de langue" name="Niveau_de_langue" value={form.Niveau_de_langue} onChange={set} />
+                <SelectInput label="Niveau d'études (reconnu en France)" name="Niveau_etudes_reconnu_en_France" value={form.Niveau_etudes_reconnu_en_France} onChange={set} />
+              </div>
 
-          {/* ── Submit ── */}
-          <div className="ins-submit-row">
-            <button
-              type="submit"
-              className="ins-btn ins-btn--primary"
-              disabled={submitting}
-            >
-              {submitting ? (
-                <>
-                  <i className="fa-solid fa-spinner fa-spin" aria-hidden="true" />
-                  Envoi en cours…
-                </>
-              ) : (
-                <>
-                  <i className="fa-solid fa-paper-plane" aria-hidden="true" />
-                  Envoyer mon dossier
-                </>
+              <SectionTitle icon="fa-solid fa-car" title="Mobilité & Santé" />
+              <div className="ins-grid">
+                <SelectInput label="Véhicule" name="Vehicule" value={form.Vehicule} onChange={set} />
+                <SelectInput label="Permis de conduire" name="Permis" value={form.Permis} onChange={set} />
+                <SelectInput label="PMR (Personne à Mobilité Réduite)" name="PMR" value={form.PMR} onChange={set} />
+                <SelectInput label="RQTH" name="RQTH" value={form.RQTH} onChange={set} />
+              </div>
+
+              <SectionTitle icon="fa-solid fa-star" title="Motivation" />
+              <div className="ins-grid">
+                <Textarea
+                  label="Motivation et projet du candidat (optionnel)"
+                  name="Motivation_candidat"
+                  value={form.Motivation_candidat}
+                  onChange={set}
+                  rows={5}
+                />
+              </div>
+
+              {error && (
+                <div className="fr-alert fr-alert--error" style={{ marginTop: "1rem" }}>
+                  <p className="fr-alert__title">Erreur</p>
+                  <p>{error}</p>
+                </div>
               )}
-            </button>
-          </div>
 
-        </form>
-      </div>
+              <div className="ins-submit-row">
+                <button type="submit" className="ins-btn ins-btn--primary" disabled={submitting}>
+                  {submitting ? (
+                    <><i className="fa-solid fa-spinner fa-spin" aria-hidden="true" /> Enregistrement…</>
+                  ) : (
+                    <><i className="fa-solid fa-floppy-disk" aria-hidden="true" /> Créer le dossier</>
+                  )}
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </>
+      )}
 
     </div>
   );
