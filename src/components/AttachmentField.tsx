@@ -84,10 +84,15 @@ function AttachmentItem({
 
   return (
     <div className="att-item">
-      <a href={downloadUrl} target="_blank" rel="noopener noreferrer" className="att-item__link" title={name}>
+      <button
+        type="button"
+        className="att-item__link"
+        title={name}
+        onClick={() => window.open(downloadUrl, "_blank", "noopener,noreferrer")}
+      >
         <i className={`${fileIcon(mime, name)} att-item__icon`} aria-hidden="true" />
         <span className="att-item__name">{name}</span>
-      </a>
+      </button>
       {!disabled && (
         <button type="button" className="att-item__rm" onClick={onRemove} title="Retirer">
           <i className="fa-solid fa-xmark" aria-hidden="true" />

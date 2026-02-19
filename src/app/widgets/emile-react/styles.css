@@ -381,20 +381,14 @@ body {
   min-width: 0;
   flex: 1;
   height: 100%;
-}
-.att-item__link:hover { background: #f5f5fe; }
-.att-item__link,
-.att-item__link:hover,
-.att-item__link:focus,
-.att-item__link:visited {
-  text-decoration: none !important;
-  border-bottom: none !important;
-  box-shadow: none !important;
+  /* reset bouton */
+  background: none;
+  border: none;
+  cursor: pointer;
+  font: inherit;
   outline: none;
 }
-/* Supprime l'icône external-link ajoutée automatiquement par le DSFR */
-.att-item__link::after { display: none !important; }
-.att-item__link::before { display: none !important; }
+.att-item__link:hover { background: #f5f5fe; }
 
 .att-item__icon {
   font-size: 0.78rem;
