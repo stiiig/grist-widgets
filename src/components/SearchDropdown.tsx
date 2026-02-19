@@ -48,10 +48,10 @@ const chevronStyle: React.CSSProperties = {
 
 const dropPanel: React.CSSProperties = {
   position: "absolute",
-  zIndex: 200,
+  zIndex: 500,
   top: "calc(100% + 3px)",
   left: 0,
-  right: 0,
+  minWidth: "100%",
   border: "1px solid #c8c8e8",
   borderRadius: 6,
   background: "#fff",
