@@ -31,7 +31,7 @@ type FormData = {
   Adresse: string;
   Precarite_de_logement: string;
   Consentement_volontaire: boolean | null;
-  Niveau_de_langue: string;
+  Niveau_de_langue: number | null;   // Ref:NIVEAU_LANGUE → rowId
   Foyer: string;
   Regularite_situation: string;
   Primo_arrivant: boolean;
@@ -54,7 +54,7 @@ const INITIAL: FormData = {
   Adresse: "",
   Precarite_de_logement: "",
   Consentement_volontaire: null,
-  Niveau_de_langue: "",
+  Niveau_de_langue: null,
   Foyer: "",
   Regularite_situation: "",
   Primo_arrivant: false,
@@ -467,8 +467,12 @@ export default function InscriptionPage() {
   const [paysLoading, setPaysLoading]   = useState(false);
 
   // Options pour Département (Ref:DPTS_REGIONS)
-  const [dptsOptions, setDptsOptions]   = useState<Option[]>([]);
-  const [dptsLoading, setDptsLoading]   = useState(false);
+  const [dptsOptions, setDptsOptions]     = useState<Option[]>([]);
+  const [dptsLoading, setDptsLoading]     = useState(false);
+
+  // Options pour Niveau de langue (Ref:NIVEAU_LANGUE)
+  const [niveauOptions, setNiveauOptions] = useState<Option[]>([]);
+  const [niveauLoading, setNiveauLoading] = useState(false);
 
   const [form, setForm]               = useState<FormData>(INITIAL);
   const [step, setStep]               = useState(1);
@@ -539,6 +543,36 @@ export default function InscriptionPage() {
       .finally(() => setDptsLoading(false));
   }, [docApi]);
 
+  /* ── Chargement niveaux de langue depuis table NIVEAU_LANGUE ── */
+  useEffect(() => {
+    if (!docApi) return;
+    setNiveauLoading(true);
+    docApi.fetchTable("NIVEAU_LANGUE")
+      .then((table: any) => {
+        const ids = table.id as number[];
+        // Prend la première colonne non-système comme label
+        const labelCol = Object.keys(table).find((c) => c !== "id" && c !== "manualSort") ?? "";
+        const opts: Option[] = [];
+        for (let i = 0; i < ids.length; i++) {
+          const id = ids[i];
+          const label = String(table[labelCol]?.[i] ?? "").trim();
+          if (!label) continue;
+          opts.push({ id, label, q: label.toLowerCase() });
+        }
+        setNiveauOptions(opts);
+      })
+      .catch(() => {})
+      .finally(() => setNiveauLoading(false));
+  }, [docApi]);
+
+  /* ── Auto-sélection Majeur selon date de naissance ── */
+  useEffect(() => {
+    if (!form.Date_de_naissance) return;
+    const age = computeAge(form.Date_de_naissance);
+    if (age === null) return;
+    setForm((f) => ({ ...f, Majeur: age >= 18 ? "Oui" : "Non" }));
+  }, [form.Date_de_naissance]);
+
   /* ── Chargement colonnes ── */
   useEffect(() => {
     if (!docApi) return;
@@ -585,14 +619,18 @@ export default function InscriptionPage() {
       if (!form.Nationalite)           return "La nationalité est requise.";
       if (!form.Majeur)                return "Veuillez indiquer si le/la candidat·e est majeur·e.";
       if (!form.Email.trim())          return "L'email est requis.";
+      if (!/^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/.test(form.Email.trim()))
+                                       return "L'adresse email n'est pas valide.";
       if (!form.Tel.trim())            return "Le téléphone est requis.";
+      if (form.Tel.replace(/\D/g, "").length !== 10)
+                                       return "Le téléphone doit contenir 10 chiffres.";
     }
     if (s === 2) {
       if (form.Departement_domicile_inscription === null) return "Le département est requis.";
       if (!form.Adresse.trim())                   return "L'adresse est requise.";
       if (!form.Precarite_de_logement)            return "La situation de précarité est requise.";
       if (form.Consentement_volontaire === null)   return "Le consentement EMILE est requis.";
-      if (!form.Niveau_de_langue)                 return "Le niveau de langue est requis.";
+      if (form.Niveau_de_langue === null)          return "Le niveau de langue est requis.";
       if (!form.Foyer)                            return "La composition du foyer est requise.";
       if (!form.Regularite_situation)             return "La situation régulière est requise.";
     }
@@ -632,7 +670,7 @@ export default function InscriptionPage() {
       const strFields = [
         "Prenom", "Nom_de_famille", "Genre", "Majeur",
         "Email", "Tel", "Adresse",
-        "Precarite_de_logement", "Niveau_de_langue", "Foyer",
+        "Precarite_de_logement", "Foyer",
         "Regularite_situation", "Bpi",
       ] as const;
       for (const k of strFields) {
@@ -642,6 +680,7 @@ export default function InscriptionPage() {
       // Refs (rowId)
       if (form.Nationalite !== null) fields.Nationalite = form.Nationalite;
       if (form.Departement_domicile_inscription !== null) fields.Departement_domicile_inscription = form.Departement_domicile_inscription;
+      if (form.Niveau_de_langue !== null) fields.Niveau_de_langue = form.Niveau_de_langue;
 
       // Date → unix seconds
       if (form.Date_de_naissance) {
@@ -804,7 +843,16 @@ export default function InscriptionPage() {
                 />
 
                 <SectionTitle title="Autres informations" />
-                <ChoiceField label="Niveau de langue" choices={ch("Niveau_de_langue")} value={form.Niveau_de_langue} onChange={(v) => set("Niveau_de_langue", v)} required />
+                <FieldWrap label="Niveau de langue" required>
+                  <SearchDropdown
+                    options={niveauOptions}
+                    valueId={form.Niveau_de_langue}
+                    onChange={(id) => set("Niveau_de_langue", id)}
+                    placeholder={niveauLoading ? "Chargement…" : "Sélectionner"}
+                    disabled={niveauLoading && niveauOptions.length === 0}
+                    searchable={false}
+                  />
+                </FieldWrap>
                 <ChoiceField label="Composition du foyer" choices={ch("Foyer")} value={form.Foyer} onChange={(v) => set("Foyer", v)} required />
 
                 <OuiNonField
