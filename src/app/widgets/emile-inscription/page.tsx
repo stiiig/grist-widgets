@@ -30,7 +30,7 @@ type FormData = {
   // Étape 2 — Situation
   Departement_domicile_inscription: number | null;  // Ref:DPTS_REGIONS → rowId
   Adresse: string;
-  Precarite_de_logement: string;
+  Precarite_de_logement: string[];      // ChoiceList
   Consentement_volontaire: boolean | null;
   Niveau_de_langue: number | null;   // Ref:NIVEAU_LANGUE → rowId
   Foyer: string;
@@ -54,7 +54,7 @@ const INITIAL: FormData = {
   Tel: "",
   Departement_domicile_inscription: null,
   Adresse: "",
-  Precarite_de_logement: "",
+  Precarite_de_logement: [],
   Consentement_volontaire: null,
   Niveau_de_langue: null,
   Foyer: "",
@@ -843,7 +843,7 @@ export default function InscriptionPage() {
     if (s === 2) {
       if (form.Departement_domicile_inscription === null) return "Le département est requis.";
       if (!form.Adresse.trim())                   return "L'adresse est requise.";
-      if (!form.Precarite_de_logement)            return "La situation de précarité est requise.";
+      if (form.Precarite_de_logement.length === 0) return "La situation de précarité est requise.";
       if (form.Consentement_volontaire === null)   return "Le consentement EMILE est requis.";
       if (form.Niveau_de_langue === null)          return "Le niveau de langue est requis.";
       if (!form.Foyer)                            return "La composition du foyer est requise.";
@@ -882,7 +882,7 @@ export default function InscriptionPage() {
       const strFields = [
         "Prenom", "Nom_de_famille", "Genre", "Majeur",
         "Email", "Adresse",
-        "Precarite_de_logement", "Foyer",
+        "Foyer",
         "Regularite_situation", "Bpi",
       ] as const;
       for (const k of strFields) {
@@ -908,7 +908,10 @@ export default function InscriptionPage() {
       if (form.Engagement_orienteur   !== null) fields.Engagement_orienteur   = form.Engagement_orienteur;
       fields.Primo_arrivant = form.Primo_arrivant;
 
-      // ChoiceList
+      // ChoiceLists
+      if (form.Precarite_de_logement.length > 0) {
+        fields.Precarite_de_logement = encodeListCell(form.Precarite_de_logement);
+      }
       if (form.Pret_a_se_former.length > 0) {
         fields.Pret_a_se_former = encodeListCell(form.Pret_a_se_former);
       }
@@ -1049,7 +1052,7 @@ export default function InscriptionPage() {
                   />
                 </FieldWrap>
                 <TextField label="Adresse de domiciliation" value={form.Adresse} onChange={(v) => set("Adresse", v)} required placeholder="Description" />
-                <ChoiceField label="Situation de précarité du logement" choices={ch("Precarite_de_logement")} value={form.Precarite_de_logement} onChange={(v) => set("Precarite_de_logement", v)} required />
+                <MultiChoiceField label="Situation de précarité du logement" choices={ch("Precarite_de_logement")} value={form.Precarite_de_logement} onChange={(v) => set("Precarite_de_logement", v)} required />
                 <InfoBox>
                   <strong>À NOTER :</strong>
                   <br />- Pour bien comprendre les différentes situations de précarité du logement, cf. FAQ &gt; "Inscrire un·e candidat·e"
