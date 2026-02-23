@@ -5,8 +5,6 @@ import "./styles.css";
 import { initGristOrMock } from "@/lib/grist/init";
 import {
   loadColumnsMetaFor,
-  buildColRowIdMap,
-  ensureRefCache,
   encodeListCell,
   isoDateToUnixSeconds,
   ColMeta,
@@ -442,11 +440,11 @@ export default function InscriptionPage() {
   const [mode, setMode]       = useState<string>("boot");
   const [docApi, setDocApi]   = useState<GristDocAPI | null>(null);
   const [cols, setCols]       = useState<ColMeta[]>([]);
-  const [colRowIdMap, setColRowIdMap] = useState<Map<number, { colId: string }>>(new Map());
 
   // Options pour Nationalite (Ref:Pays)
   const [paysOptions, setPaysOptions]   = useState<PaysOption[]>([]);
   const [paysLoading, setPaysLoading]   = useState(false);
+  const [paysDebug, setPaysDebug]       = useState<string>("");
 
   const [form, setForm]               = useState<FormData>(INITIAL);
   const [step, setStep]               = useState(1);
@@ -496,48 +494,41 @@ export default function InscriptionPage() {
     })();
   }, []);
 
-  /* ── Chargement colonnes + colRowIdMap ── */
+  /* ── Chargement colonnes ── */
   useEffect(() => {
     if (!docApi) return;
-    Promise.all([
-      loadColumnsMetaFor(docApi, TABLE_ID),
-      buildColRowIdMap(docApi),
-    ]).then(([meta, map]) => {
-      setCols(meta);
-      setColRowIdMap(map);
-    }).catch(() => {});
+    loadColumnsMetaFor(docApi, TABLE_ID)
+      .then((meta) => setCols(meta))
+      .catch(() => {});
   }, [docApi]);
 
-  /* ── Chargement pays (Ref:Pays) avec Type_de_nationalite ── */
+  /* ── Chargement pays depuis table PAYS ── */
   useEffect(() => {
-    if (!docApi || cols.length === 0 || colRowIdMap.size === 0) return;
-    const nationaliteCol = cols.find((c) => c.colId === "Nationalite");
-    if (!nationaliteCol) return;
-
+    if (!docApi) return;
     setPaysLoading(true);
-    Promise.all([
-      ensureRefCache(docApi, nationaliteCol, colRowIdMap),
-      docApi.fetchTable("Pays"),
-    ])
-      .then(([cache, table]) => {
-        // Map id → Type_de_nationalite depuis la table brute
-        const typeMap = new Map<number, string>();
-        for (let i = 0; i < table.id.length; i++) {
-          typeMap.set(table.id[i] as number, (table["Type_de_nationalite"]?.[i] ?? "").toString());
+    setPaysDebug("");
+    docApi.fetchTable("PAYS")
+      .then((table: any) => {
+        const cols = Object.keys(table);
+        const rowCount = (table.id as any[])?.length ?? 0;
+        setPaysDebug(`OK — ${rowCount} lignes, colonnes: ${cols.join(", ")}`);
+        const ids = table.id as number[];
+        const opts: PaysOption[] = [];
+        for (let i = 0; i < ids.length; i++) {
+          const id = ids[i];
+          const label = String(table["Nom_du_pays"]?.[i] ?? "").trim();
+          if (!label) continue;
+          const typeNat = String(table["Type_de_nationalite"]?.[i] ?? "").trim();
+          opts.push({ id, label, q: label.toLowerCase(), typeNationalite: typeNat });
         }
-        const opts: PaysOption[] = (cache?.rows ?? []).map((r) => ({
-          id: r.id,
-          label: r.label,
-          q: r.q,
-          typeNationalite: typeMap.get(r.id) ?? "",
-        }));
-        // Tri alphabétique
         opts.sort((a, b) => a.label.localeCompare(b.label, "fr"));
         setPaysOptions(opts);
       })
-      .catch(() => {})
+      .catch((err: any) => {
+        setPaysDebug(`ERREUR: ${err?.message ?? String(err)}`);
+      })
       .finally(() => setPaysLoading(false));
-  }, [docApi, cols, colRowIdMap]);
+  }, [docApi]);
 
   /* ── Setters ── */
   function set<K extends keyof FormData>(key: K, value: FormData[K]) {
@@ -722,6 +713,11 @@ export default function InscriptionPage() {
                   loading={paysLoading}
                   required
                 />
+                {paysDebug && (
+                  <div style={{ fontSize: "0.72rem", color: paysDebug.startsWith("ERREUR") ? "#b91c1c" : "#555", background: "#f9f9f9", border: "1px solid #e0e0e0", borderRadius: 4, padding: "0.3rem 0.5rem", fontFamily: "monospace", wordBreak: "break-all" }}>
+                    🐛 {paysDebug}
+                  </div>
+                )}
 
                 <div className="ins-field">
                   <label className="ins-label">Date de naissance<span className="ins-required"> *</span></label>
