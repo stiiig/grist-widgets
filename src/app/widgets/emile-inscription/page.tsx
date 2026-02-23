@@ -25,6 +25,7 @@ type FormData = {
   Nationalite: number | null;        // Ref:pays → rowId
   Majeur: string;
   Email: string;
+  TelCode: string;   // indicatif pays, ex: "+33"
   Tel: string;
   // Étape 2 — Situation
   Departement_domicile_inscription: number | null;  // Ref:DPTS_REGIONS → rowId
@@ -49,6 +50,7 @@ const INITIAL: FormData = {
   Nationalite: null,
   Majeur: "",
   Email: "",
+  TelCode: "+33",
   Tel: "",
   Departement_domicile_inscription: null,
   Adresse: "",
@@ -345,6 +347,117 @@ function MultiChoiceField({
   );
 }
 
+/* ─── Picker indicatif téléphonique ─────────────────────── */
+const DIAL_CODES: { flag: string; name: string; code: string }[] = [
+  { flag: "🇫🇷", name: "France",           code: "+33"  },
+  { flag: "🇩🇿", name: "Algérie",           code: "+213" },
+  { flag: "🇲🇦", name: "Maroc",             code: "+212" },
+  { flag: "🇹🇳", name: "Tunisie",           code: "+216" },
+  { flag: "🇨🇲", name: "Cameroun",          code: "+237" },
+  { flag: "🇨🇩", name: "Congo (RDC)",       code: "+243" },
+  { flag: "🇨🇮", name: "Côte d'Ivoire",     code: "+225" },
+  { flag: "🇬🇳", name: "Guinée",            code: "+224" },
+  { flag: "🇭🇹", name: "Haïti",             code: "+509" },
+  { flag: "🇸🇳", name: "Sénégal",           code: "+221" },
+  { flag: "🇦🇫", name: "Afghanistan",       code: "+93"  },
+  { flag: "🇧🇪", name: "Belgique",          code: "+32"  },
+  { flag: "🇨🇭", name: "Suisse",            code: "+41"  },
+  { flag: "🇬🇧", name: "Royaume-Uni",       code: "+44"  },
+  { flag: "🇩🇪", name: "Allemagne",         code: "+49"  },
+  { flag: "🇪🇸", name: "Espagne",           code: "+34"  },
+  { flag: "🇮🇹", name: "Italie",            code: "+39"  },
+  { flag: "🇵🇹", name: "Portugal",          code: "+351" },
+];
+
+function TelField({
+  value, onValueChange, code, onCodeChange, required = false,
+}: {
+  value: string; onValueChange: (v: string) => void;
+  code: string; onCodeChange: (c: string) => void; required?: boolean;
+}) {
+  const [open, setOpen]           = useState(false);
+  const [hoveredCode, setHoveredCode] = useState<string | null>(null);
+  const rootRef                   = useRef<HTMLDivElement | null>(null);
+  const selected = DIAL_CODES.find((d) => d.code === code) ?? DIAL_CODES[0];
+
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
+
+  return (
+    <div className="ins-field">
+      <label className="ins-label">
+        Téléphone{required && <span className="ins-required"> *</span>}
+      </label>
+      <div style={{ display: "flex", gap: "0.4rem" }}>
+        {/* Picker drapeau */}
+        <div ref={rootRef} style={{ position: "relative", flexShrink: 0 }}>
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            style={{
+              height: "2.25rem", padding: "0 0.5rem",
+              border: "1px solid #c1c1c1", borderRadius: 4,
+              background: "#f8f8f8", cursor: "pointer",
+              fontFamily: "inherit", fontSize: "0.85rem",
+              display: "flex", alignItems: "center", gap: "0.3rem",
+              whiteSpace: "nowrap",
+            }}
+          >
+            <span style={{ fontSize: "1.1rem" }}>{selected.flag}</span>
+            <span style={{ color: "#444", fontSize: "0.8rem", fontWeight: 600 }}>{selected.code}</span>
+            <span style={{ fontSize: "0.6rem", color: "#888" }}>▾</span>
+          </button>
+          {open && (
+            <div style={{
+              position: "absolute", zIndex: 500, top: "calc(100% + 3px)", left: 0,
+              width: "13.5rem", border: "1px solid #c8c8e8", borderRadius: 6,
+              background: "#fff", boxShadow: "0 6px 20px rgba(0,0,145,.1)",
+              maxHeight: 260, overflowY: "auto",
+            }}>
+              {DIAL_CODES.map((d) => (
+                <button
+                  key={d.code}
+                  type="button"
+                  onMouseEnter={() => setHoveredCode(d.code)}
+                  onMouseLeave={() => setHoveredCode(null)}
+                  onClick={() => { onCodeChange(d.code); setOpen(false); }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: "0.5rem",
+                    width: "100%", padding: "0.35rem 0.6rem",
+                    border: 0, borderBottom: "1px solid #f5f5f5",
+                    background: d.code === code ? "#f0f0ff" : hoveredCode === d.code ? "#f5f5ff" : "white",
+                    cursor: "pointer", fontSize: "0.82rem",
+                    fontFamily: "inherit", textAlign: "left",
+                    fontWeight: d.code === code ? 700 : 400,
+                  }}
+                >
+                  <span style={{ fontSize: "1.1rem" }}>{d.flag}</span>
+                  <span style={{ flex: 1 }}>{d.name}</span>
+                  <span style={{ color: "#888", fontSize: "0.78rem" }}>{d.code}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        {/* Numéro */}
+        <input
+          type="tel"
+          className="ins-input"
+          value={value}
+          onChange={(e) => onValueChange(e.target.value)}
+          placeholder="Numéro"
+          style={{ flex: 1 }}
+        />
+      </div>
+    </div>
+  );
+}
+
 function TextField({
   label, value, onChange, type = "text", required = false,
   placeholder = "", readOnly = false, wide = false,
@@ -458,7 +571,7 @@ function DateNaissanceField({
       {age !== null && (
         <div className="ins-age-badge-row">
           <span className="ins-age-badge ins-age-badge--age">
-            <i className="fa-solid fa-cake-candles" aria-hidden="true" /> {age} ans
+            {age} ans
           </span>
           <span className={`ins-age-badge ins-age-badge--${age >= 18 ? "majeur" : "mineur"}`}>
             {age >= 18
@@ -724,8 +837,8 @@ export default function InscriptionPage() {
       if (!/^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/.test(form.Email.trim()))
                                        return "L'adresse email n'est pas valide.";
       if (!form.Tel.trim())            return "Le téléphone est requis.";
-      if (form.Tel.replace(/\D/g, "").length !== 10)
-                                       return "Le téléphone doit contenir 10 chiffres.";
+      if (form.Tel.replace(/\D/g, "").length < 6)
+                                       return "Le téléphone doit contenir au moins 6 chiffres.";
     }
     if (s === 2) {
       if (form.Departement_domicile_inscription === null) return "Le département est requis.";
@@ -771,13 +884,16 @@ export default function InscriptionPage() {
       // Champs texte / choice (string)
       const strFields = [
         "Prenom", "Nom_de_famille", "Genre", "Majeur",
-        "Email", "Tel", "Adresse",
+        "Email", "Adresse",
         "Precarite_de_logement", "Foyer",
         "Regularite_situation", "Bpi",
       ] as const;
       for (const k of strFields) {
         if (form[k]) fields[k] = form[k];
       }
+
+      // Téléphone : indicatif + numéro
+      if (form.Tel.trim()) fields.Tel = `${form.TelCode} ${form.Tel}`.trim();
 
       // Refs (rowId)
       if (form.Nationalite !== null) fields.Nationalite = form.Nationalite;
@@ -909,7 +1025,13 @@ export default function InscriptionPage() {
 
                 <SectionTitle title="Coordonnées du / de la candidat·e" />
                 <TextField label="Email" value={form.Email} onChange={(v) => set("Email", v)} type="email" required />
-                <TextField label="Téléphone" value={form.Tel} onChange={(v) => set("Tel", v)} type="tel" required />
+                <TelField
+                  value={form.Tel}
+                  onValueChange={(v) => set("Tel", v)}
+                  code={form.TelCode}
+                  onCodeChange={(c) => set("TelCode", c)}
+                  required
+                />
               </>
             )}
 
