@@ -1050,9 +1050,6 @@ export default function InscriptionPage() {
       if (!form.Foyer)                            return "La composition du foyer est requise.";
       if (!form.Regularite_situation)             return "La situation régulière est requise.";
     }
-    if (s === 3) {
-      if (form.Engagement_orienteur === null) return "Veuillez confirmer votre engagement avant de soumettre.";
-    }
     return null;
   }
 
@@ -1352,7 +1349,7 @@ export default function InscriptionPage() {
                   Suivant <i className="fa-solid fa-arrow-right" aria-hidden="true" />
                 </button>
               ) : (
-                <button type="submit" className="ins-btn ins-btn--primary" disabled={submitting}>
+                <button type="submit" className="ins-btn ins-btn--primary" disabled={submitting || form.Engagement_orienteur === null}>
                   {submitting
                     ? <><i className="fa-solid fa-spinner fa-spin" aria-hidden="true" /> Enregistrement…</>
                     : <>Valider</>
