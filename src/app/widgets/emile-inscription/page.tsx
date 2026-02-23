@@ -386,19 +386,35 @@ function DateNaissanceField({
 }: {
   value: string; onChange: (v: string) => void; required?: boolean; genre?: string;
 }) {
-  const [yStr, mStr, dStr] = value ? value.split("-") : ["", "", ""];
+  // État interne pour chaque partie — indépendant du prop value
+  // (permet de sélectionner jour/mois/année dans n'importe quel ordre)
+  const init = value ? value.split("-") : ["", "", ""];
+  const [selY, setSelY] = useState(init[0] ?? "");
+  const [selM, setSelM] = useState(init[1] ?? "");
+  const [selD, setSelD] = useState(init[2] ?? "");
 
-  const daysInMonth = yStr && mStr
-    ? new Date(parseInt(yStr), parseInt(mStr), 0).getDate()
+  // Sync depuis le parent uniquement quand value change de l'extérieur (reset)
+  useEffect(() => {
+    const p = value ? value.split("-") : ["", "", ""];
+    setSelY(p[0] ?? "");
+    setSelM(p[1] ?? "");
+    setSelD(p[2] ?? "");
+  }, [value]);
+
+  function commit(y: string, m: string, d: string) {
+    if (y && m && d) {
+      const maxDay = new Date(parseInt(y), parseInt(m), 0).getDate();
+      const clampedDay = Math.min(parseInt(d), maxDay);
+      onChange(`${y}-${m}-${String(clampedDay).padStart(2, "0")}`);
+    } else {
+      onChange("");
+    }
+  }
+
+  const daysInMonth = selY && selM
+    ? new Date(parseInt(selY), parseInt(selM), 0).getDate()
     : 31;
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
-
-  function update(y: string, m: string, d: string) {
-    if (!y || !m || !d) { onChange(""); return; }
-    const maxDay = new Date(parseInt(y), parseInt(m), 0).getDate();
-    const clampedDay = Math.min(parseInt(d), maxDay);
-    onChange(`${y}-${m}-${String(clampedDay).padStart(2, "0")}`);
-  }
 
   const age = computeAge(value);
 
@@ -410,8 +426,8 @@ function DateNaissanceField({
       <div className="ins-date-row">
         <select
           className="ins-select ins-date-select ins-date-select--day"
-          value={dStr ?? ""}
-          onChange={(e) => update(yStr ?? "", mStr ?? "", e.target.value)}
+          value={selD}
+          onChange={(e) => { setSelD(e.target.value); commit(selY, selM, e.target.value); }}
         >
           <option value="">Jour</option>
           {days.map((d) => (
@@ -420,8 +436,8 @@ function DateNaissanceField({
         </select>
         <select
           className="ins-select ins-date-select"
-          value={mStr ?? ""}
-          onChange={(e) => update(yStr ?? "", e.target.value, dStr ?? "")}
+          value={selM}
+          onChange={(e) => { setSelM(e.target.value); commit(selY, e.target.value, selD); }}
         >
           <option value="">Mois</option>
           {MONTHS_FR.map((name, i) => (
@@ -430,8 +446,8 @@ function DateNaissanceField({
         </select>
         <select
           className="ins-select ins-date-select ins-date-select--year"
-          value={yStr ?? ""}
-          onChange={(e) => update(e.target.value, mStr ?? "", dStr ?? "")}
+          value={selY}
+          onChange={(e) => { setSelY(e.target.value); commit(e.target.value, selM, selD); }}
         >
           <option value="">Année</option>
           {BIRTH_YEARS.map((y) => (
