@@ -27,7 +27,7 @@ type FormData = {
   Email: string;
   Tel: string;
   // Étape 2 — Situation
-  Departement_domicile_inscription: string;
+  Departement_domicile_inscription: number | null;  // Ref:DPTS_REGIONS → rowId
   Adresse: string;
   Precarite_de_logement: string;
   Consentement_volontaire: boolean | null;
@@ -50,7 +50,7 @@ const INITIAL: FormData = {
   Majeur: "",
   Email: "",
   Tel: "",
-  Departement_domicile_inscription: "",
+  Departement_domicile_inscription: null,
   Adresse: "",
   Precarite_de_logement: "",
   Consentement_volontaire: null,
@@ -369,6 +369,24 @@ function TextField({
   );
 }
 
+function GenreField({
+  value, onChange, required = false,
+}: {
+  value: string; onChange: (v: string) => void; required?: boolean;
+}) {
+  return (
+    <div className="ins-field ins-field--wide">
+      <label className="ins-label">
+        Genre{required && <span className="ins-required"> *</span>}
+      </label>
+      <div className="ins-ouinon">
+        <button type="button" className={`ins-ouinon-btn${value === "Femme" ? " ins-ouinon-btn--active" : ""}`} onClick={() => onChange("Femme")}>Femme</button>
+        <button type="button" className={`ins-ouinon-btn${value === "Homme" ? " ins-ouinon-btn--active" : ""}`} onClick={() => onChange("Homme")}>Homme</button>
+      </div>
+    </div>
+  );
+}
+
 function OuiNonField({
   label, value, onChange, required = false, description,
 }: {
@@ -444,9 +462,13 @@ export default function InscriptionPage() {
   const [docApi, setDocApi]   = useState<GristDocAPI | null>(null);
   const [cols, setCols]       = useState<ColMeta[]>([]);
 
-  // Options pour Nationalite (Ref:Pays)
+  // Options pour Nationalite (Ref:PAYS)
   const [paysOptions, setPaysOptions]   = useState<PaysOption[]>([]);
   const [paysLoading, setPaysLoading]   = useState(false);
+
+  // Options pour Département (Ref:DPTS_REGIONS)
+  const [dptsOptions, setDptsOptions]   = useState<Option[]>([]);
+  const [dptsLoading, setDptsLoading]   = useState(false);
 
   const [form, setForm]               = useState<FormData>(INITIAL);
   const [step, setStep]               = useState(1);
@@ -495,6 +517,27 @@ export default function InscriptionPage() {
       }
     })();
   }, []);
+
+  /* ── Chargement départements depuis table DPTS_REGIONS ── */
+  useEffect(() => {
+    if (!docApi) return;
+    setDptsLoading(true);
+    docApi.fetchTable("DPTS_REGIONS")
+      .then((table: any) => {
+        const ids = table.id as number[];
+        const opts: Option[] = [];
+        for (let i = 0; i < ids.length; i++) {
+          const id = ids[i];
+          const label = String(table["Numero_et_nom"]?.[i] ?? "").trim();
+          if (!label) continue;
+          opts.push({ id, label, q: label.toLowerCase() });
+        }
+        opts.sort((a, b) => a.label.localeCompare(b.label, "fr"));
+        setDptsOptions(opts);
+      })
+      .catch(() => {})
+      .finally(() => setDptsLoading(false));
+  }, [docApi]);
 
   /* ── Chargement colonnes ── */
   useEffect(() => {
@@ -545,7 +588,7 @@ export default function InscriptionPage() {
       if (!form.Tel.trim())            return "Le téléphone est requis.";
     }
     if (s === 2) {
-      if (!form.Departement_domicile_inscription) return "Le département est requis.";
+      if (form.Departement_domicile_inscription === null) return "Le département est requis.";
       if (!form.Adresse.trim())                   return "L'adresse est requise.";
       if (!form.Precarite_de_logement)            return "La situation de précarité est requise.";
       if (form.Consentement_volontaire === null)   return "Le consentement EMILE est requis.";
@@ -588,7 +631,7 @@ export default function InscriptionPage() {
       // Champs texte / choice (string)
       const strFields = [
         "Prenom", "Nom_de_famille", "Genre", "Majeur",
-        "Email", "Tel", "Departement_domicile_inscription", "Adresse",
+        "Email", "Tel", "Adresse",
         "Precarite_de_logement", "Niveau_de_langue", "Foyer",
         "Regularite_situation", "Bpi",
       ] as const;
@@ -596,8 +639,9 @@ export default function InscriptionPage() {
         if (form[k]) fields[k] = form[k];
       }
 
-      // Nationalite (Ref → rowId)
+      // Refs (rowId)
       if (form.Nationalite !== null) fields.Nationalite = form.Nationalite;
+      if (form.Departement_domicile_inscription !== null) fields.Departement_domicile_inscription = form.Departement_domicile_inscription;
 
       // Date → unix seconds
       if (form.Date_de_naissance) {
@@ -701,7 +745,7 @@ export default function InscriptionPage() {
 
                 <TextField label="Prénom" value={form.Prenom} onChange={(v) => set("Prenom", v)} required />
                 <TextField label="Nom" value={form.Nom_de_famille} onChange={(v) => set("Nom_de_famille", v)} required />
-                <ChoiceField label="Genre" choices={ch("Genre")} value={form.Genre} onChange={(v) => set("Genre", v)} required />
+                <GenreField value={form.Genre} onChange={(v) => set("Genre", v)} required />
                 <NationaliteDropdown
                   options={paysOptions}
                   valueId={form.Nationalite}
@@ -734,7 +778,16 @@ export default function InscriptionPage() {
                 <StepHeader step={2} title="Situation du / de la candidat·e" subtitle="Informations obligatoires *" />
 
                 <SectionTitle title="Domiciliation" />
-                <ChoiceField label="Département du domicile actuel" choices={ch("Departement_domicile_inscription")} value={form.Departement_domicile_inscription} onChange={(v) => set("Departement_domicile_inscription", v)} required />
+                <FieldWrap label="Département du domicile actuel" required>
+                  <SearchDropdown
+                    options={dptsOptions}
+                    valueId={form.Departement_domicile_inscription}
+                    onChange={(id) => set("Departement_domicile_inscription", id)}
+                    placeholder={dptsLoading ? "Chargement…" : "Sélectionner"}
+                    disabled={dptsLoading && dptsOptions.length === 0}
+                    searchable
+                  />
+                </FieldWrap>
                 <TextField label="Adresse de domiciliation" value={form.Adresse} onChange={(v) => set("Adresse", v)} required placeholder="Description" />
                 <ChoiceField label="Situation de précarité du logement" choices={ch("Precarite_de_logement")} value={form.Precarite_de_logement} onChange={(v) => set("Precarite_de_logement", v)} required />
                 <InfoBox>
