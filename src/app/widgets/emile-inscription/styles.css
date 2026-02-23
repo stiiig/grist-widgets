@@ -335,6 +335,15 @@
   margin-top: 0.15rem;
 }
 
+/* ── Cadre consentement ─────────────────────────────────────── */
+.ins-consent-frame {
+  border: 2px solid #000091;
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  background: #f0f0ff;
+  margin-bottom: 0.25rem;
+}
+
 /* ── Erreur de validation ───────────────────────────────────── */
 .ins-validation-error {
   display: flex;

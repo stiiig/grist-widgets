@@ -35,8 +35,8 @@ type FormData = {
   Niveau_de_langue: number | null;   // Ref:NIVEAU_LANGUE → rowId
   Foyer: string;
   Regularite_situation: string;
-  Primo_arrivant: boolean;
-  Bpi: string;
+  Primo_arrivant: boolean | null;
+  Bpi: boolean | null;
   Pret_a_se_former: string[];
   // Étape 3 — Engagement
   Engagement_orienteur: boolean | null;
@@ -50,7 +50,7 @@ const INITIAL: FormData = {
   Nationalite: null,
   Majeur: "",
   Email: "",
-  TelCode: "+33",
+  TelCode: "France",   // nom du pays (clé unique)
   Tel: "",
   Departement_domicile_inscription: null,
   Adresse: "",
@@ -59,8 +59,8 @@ const INITIAL: FormData = {
   Niveau_de_langue: null,
   Foyer: "",
   Regularite_situation: "",
-  Primo_arrivant: false,
-  Bpi: "",
+  Primo_arrivant: null,
+  Bpi: null,
   Pret_a_se_former: [],
   Engagement_orienteur: null,
 };
@@ -348,25 +348,207 @@ function MultiChoiceField({
 }
 
 /* ─── Picker indicatif téléphonique ─────────────────────── */
+// Clé unique = name (le code dial peut être partagé, ex: +1)
 const DIAL_CODES: { flag: string; name: string; code: string }[] = [
-  { flag: "🇫🇷", name: "France",           code: "+33"  },
-  { flag: "🇩🇿", name: "Algérie",           code: "+213" },
-  { flag: "🇲🇦", name: "Maroc",             code: "+212" },
-  { flag: "🇹🇳", name: "Tunisie",           code: "+216" },
-  { flag: "🇨🇲", name: "Cameroun",          code: "+237" },
-  { flag: "🇨🇩", name: "Congo (RDC)",       code: "+243" },
-  { flag: "🇨🇮", name: "Côte d'Ivoire",     code: "+225" },
-  { flag: "🇬🇳", name: "Guinée",            code: "+224" },
-  { flag: "🇭🇹", name: "Haïti",             code: "+509" },
-  { flag: "🇸🇳", name: "Sénégal",           code: "+221" },
-  { flag: "🇦🇫", name: "Afghanistan",       code: "+93"  },
-  { flag: "🇧🇪", name: "Belgique",          code: "+32"  },
-  { flag: "🇨🇭", name: "Suisse",            code: "+41"  },
-  { flag: "🇬🇧", name: "Royaume-Uni",       code: "+44"  },
-  { flag: "🇩🇪", name: "Allemagne",         code: "+49"  },
-  { flag: "🇪🇸", name: "Espagne",           code: "+34"  },
-  { flag: "🇮🇹", name: "Italie",            code: "+39"  },
-  { flag: "🇵🇹", name: "Portugal",          code: "+351" },
+  // France en tête (valeur par défaut)
+  { flag: "🇫🇷", name: "France",                          code: "+33"  },
+  // Reste du monde, ordre alphabétique français
+  { flag: "🇦🇫", name: "Afghanistan",                     code: "+93"  },
+  { flag: "🇿🇦", name: "Afrique du Sud",                  code: "+27"  },
+  { flag: "🇦🇱", name: "Albanie",                         code: "+355" },
+  { flag: "🇩🇿", name: "Algérie",                         code: "+213" },
+  { flag: "🇩🇪", name: "Allemagne",                       code: "+49"  },
+  { flag: "🇦🇩", name: "Andorre",                         code: "+376" },
+  { flag: "🇦🇴", name: "Angola",                          code: "+244" },
+  { flag: "🇦🇬", name: "Antigua-et-Barbuda",              code: "+1"   },
+  { flag: "🇸🇦", name: "Arabie saoudite",                 code: "+966" },
+  { flag: "🇦🇷", name: "Argentine",                       code: "+54"  },
+  { flag: "🇦🇲", name: "Arménie",                         code: "+374" },
+  { flag: "🇦🇺", name: "Australie",                       code: "+61"  },
+  { flag: "🇦🇹", name: "Autriche",                        code: "+43"  },
+  { flag: "🇦🇿", name: "Azerbaïdjan",                     code: "+994" },
+  { flag: "🇧🇸", name: "Bahamas",                         code: "+1"   },
+  { flag: "🇧🇭", name: "Bahreïn",                         code: "+973" },
+  { flag: "🇧🇩", name: "Bangladesh",                      code: "+880" },
+  { flag: "🇧🇧", name: "Barbade",                         code: "+1"   },
+  { flag: "🇧🇾", name: "Bélarus",                         code: "+375" },
+  { flag: "🇧🇪", name: "Belgique",                        code: "+32"  },
+  { flag: "🇧🇿", name: "Belize",                          code: "+501" },
+  { flag: "🇧🇯", name: "Bénin",                           code: "+229" },
+  { flag: "🇧🇹", name: "Bhoutan",                         code: "+975" },
+  { flag: "🇧🇴", name: "Bolivie",                         code: "+591" },
+  { flag: "🇧🇦", name: "Bosnie-Herzégovine",              code: "+387" },
+  { flag: "🇧🇼", name: "Botswana",                        code: "+267" },
+  { flag: "🇧🇷", name: "Brésil",                          code: "+55"  },
+  { flag: "🇧🇳", name: "Brunéi",                          code: "+673" },
+  { flag: "🇧🇬", name: "Bulgarie",                        code: "+359" },
+  { flag: "🇧🇫", name: "Burkina Faso",                    code: "+226" },
+  { flag: "🇧🇮", name: "Burundi",                         code: "+257" },
+  { flag: "🇨🇻", name: "Cabo Verde",                      code: "+238" },
+  { flag: "🇰🇭", name: "Cambodge",                        code: "+855" },
+  { flag: "🇨🇲", name: "Cameroun",                        code: "+237" },
+  { flag: "🇨🇦", name: "Canada",                          code: "+1"   },
+  { flag: "🇨🇫", name: "Centrafrique",                    code: "+236" },
+  { flag: "🇨🇱", name: "Chili",                           code: "+56"  },
+  { flag: "🇨🇳", name: "Chine",                           code: "+86"  },
+  { flag: "🇨🇾", name: "Chypre",                          code: "+357" },
+  { flag: "🇨🇴", name: "Colombie",                        code: "+57"  },
+  { flag: "🇰🇲", name: "Comores",                         code: "+269" },
+  { flag: "🇨🇬", name: "Congo",                           code: "+242" },
+  { flag: "🇨🇩", name: "Congo (RDC)",                     code: "+243" },
+  { flag: "🇰🇵", name: "Corée du Nord",                   code: "+850" },
+  { flag: "🇰🇷", name: "Corée du Sud",                    code: "+82"  },
+  { flag: "🇨🇷", name: "Costa Rica",                      code: "+506" },
+  { flag: "🇨🇮", name: "Côte d'Ivoire",                   code: "+225" },
+  { flag: "🇭🇷", name: "Croatie",                         code: "+385" },
+  { flag: "🇨🇺", name: "Cuba",                            code: "+53"  },
+  { flag: "🇩🇰", name: "Danemark",                        code: "+45"  },
+  { flag: "🇩🇯", name: "Djibouti",                        code: "+253" },
+  { flag: "🇩🇲", name: "Dominique",                       code: "+1"   },
+  { flag: "🇪🇬", name: "Égypte",                          code: "+20"  },
+  { flag: "🇦🇪", name: "Émirats arabes unis",             code: "+971" },
+  { flag: "🇪🇨", name: "Équateur",                        code: "+593" },
+  { flag: "🇪🇷", name: "Érythrée",                        code: "+291" },
+  { flag: "🇪🇸", name: "Espagne",                         code: "+34"  },
+  { flag: "🇸🇿", name: "Eswatini",                        code: "+268" },
+  { flag: "🇪🇪", name: "Estonie",                         code: "+372" },
+  { flag: "🇺🇸", name: "États-Unis",                      code: "+1"   },
+  { flag: "🇪🇹", name: "Éthiopie",                        code: "+251" },
+  { flag: "🇫🇯", name: "Fidji",                           code: "+679" },
+  { flag: "🇫🇮", name: "Finlande",                        code: "+358" },
+  { flag: "🇬🇦", name: "Gabon",                           code: "+241" },
+  { flag: "🇬🇲", name: "Gambie",                          code: "+220" },
+  { flag: "🇬🇪", name: "Géorgie",                         code: "+995" },
+  { flag: "🇬🇭", name: "Ghana",                           code: "+233" },
+  { flag: "🇬🇷", name: "Grèce",                           code: "+30"  },
+  { flag: "🇬🇩", name: "Grenade",                         code: "+1"   },
+  { flag: "🇬🇹", name: "Guatemala",                       code: "+502" },
+  { flag: "🇬🇳", name: "Guinée",                          code: "+224" },
+  { flag: "🇬🇼", name: "Guinée-Bissau",                   code: "+245" },
+  { flag: "🇬🇶", name: "Guinée équatoriale",              code: "+240" },
+  { flag: "🇬🇾", name: "Guyana",                          code: "+592" },
+  { flag: "🇭🇹", name: "Haïti",                           code: "+509" },
+  { flag: "🇭🇳", name: "Honduras",                        code: "+504" },
+  { flag: "🇭🇺", name: "Hongrie",                         code: "+36"  },
+  { flag: "🇮🇳", name: "Inde",                            code: "+91"  },
+  { flag: "🇮🇩", name: "Indonésie",                       code: "+62"  },
+  { flag: "🇮🇶", name: "Irak",                            code: "+964" },
+  { flag: "🇮🇷", name: "Iran",                            code: "+98"  },
+  { flag: "🇮🇪", name: "Irlande",                         code: "+353" },
+  { flag: "🇮🇸", name: "Islande",                         code: "+354" },
+  { flag: "🇮🇱", name: "Israël",                          code: "+972" },
+  { flag: "🇮🇹", name: "Italie",                          code: "+39"  },
+  { flag: "🇯🇲", name: "Jamaïque",                        code: "+1"   },
+  { flag: "🇯🇵", name: "Japon",                           code: "+81"  },
+  { flag: "🇯🇴", name: "Jordanie",                        code: "+962" },
+  { flag: "🇰🇿", name: "Kazakhstan",                      code: "+7"   },
+  { flag: "🇰🇪", name: "Kenya",                           code: "+254" },
+  { flag: "🇰🇬", name: "Kirghizistan",                    code: "+996" },
+  { flag: "🇰🇮", name: "Kiribati",                        code: "+686" },
+  { flag: "🇽🇰", name: "Kosovo",                          code: "+383" },
+  { flag: "🇰🇼", name: "Koweït",                          code: "+965" },
+  { flag: "🇱🇦", name: "Laos",                            code: "+856" },
+  { flag: "🇱🇸", name: "Lesotho",                         code: "+266" },
+  { flag: "🇱🇻", name: "Lettonie",                        code: "+371" },
+  { flag: "🇱🇧", name: "Liban",                           code: "+961" },
+  { flag: "🇱🇷", name: "Libéria",                         code: "+231" },
+  { flag: "🇱🇾", name: "Libye",                           code: "+218" },
+  { flag: "🇱🇮", name: "Liechtenstein",                   code: "+423" },
+  { flag: "🇱🇹", name: "Lituanie",                        code: "+370" },
+  { flag: "🇱🇺", name: "Luxembourg",                      code: "+352" },
+  { flag: "🇲🇰", name: "Macédoine du Nord",               code: "+389" },
+  { flag: "🇲🇬", name: "Madagascar",                      code: "+261" },
+  { flag: "🇲🇾", name: "Malaisie",                        code: "+60"  },
+  { flag: "🇲🇼", name: "Malawi",                          code: "+265" },
+  { flag: "🇲🇻", name: "Maldives",                        code: "+960" },
+  { flag: "🇲🇱", name: "Mali",                            code: "+223" },
+  { flag: "🇲🇹", name: "Malte",                           code: "+356" },
+  { flag: "🇲🇦", name: "Maroc",                           code: "+212" },
+  { flag: "🇲🇭", name: "Marshall",                        code: "+692" },
+  { flag: "🇲🇺", name: "Maurice",                         code: "+230" },
+  { flag: "🇲🇷", name: "Mauritanie",                      code: "+222" },
+  { flag: "🇲🇽", name: "Mexique",                         code: "+52"  },
+  { flag: "🇫🇲", name: "Micronésie",                      code: "+691" },
+  { flag: "🇲🇩", name: "Moldavie",                        code: "+373" },
+  { flag: "🇲🇨", name: "Monaco",                          code: "+377" },
+  { flag: "🇲🇳", name: "Mongolie",                        code: "+976" },
+  { flag: "🇲🇪", name: "Monténégro",                      code: "+382" },
+  { flag: "🇲🇿", name: "Mozambique",                      code: "+258" },
+  { flag: "🇲🇲", name: "Myanmar",                         code: "+95"  },
+  { flag: "🇳🇦", name: "Namibie",                         code: "+264" },
+  { flag: "🇳🇷", name: "Nauru",                           code: "+674" },
+  { flag: "🇳🇵", name: "Népal",                           code: "+977" },
+  { flag: "🇳🇮", name: "Nicaragua",                       code: "+505" },
+  { flag: "🇳🇪", name: "Niger",                           code: "+227" },
+  { flag: "🇳🇬", name: "Nigéria",                         code: "+234" },
+  { flag: "🇳🇴", name: "Norvège",                         code: "+47"  },
+  { flag: "🇳🇿", name: "Nouvelle-Zélande",                code: "+64"  },
+  { flag: "🇴🇲", name: "Oman",                            code: "+968" },
+  { flag: "🇺🇬", name: "Ouganda",                         code: "+256" },
+  { flag: "🇺🇿", name: "Ouzbékistan",                     code: "+998" },
+  { flag: "🇵🇰", name: "Pakistan",                        code: "+92"  },
+  { flag: "🇵🇼", name: "Palaos",                          code: "+680" },
+  { flag: "🇵🇸", name: "Palestine",                       code: "+970" },
+  { flag: "🇵🇦", name: "Panama",                          code: "+507" },
+  { flag: "🇵🇬", name: "Papouasie-Nouvelle-Guinée",       code: "+675" },
+  { flag: "🇵🇾", name: "Paraguay",                        code: "+595" },
+  { flag: "🇳🇱", name: "Pays-Bas",                        code: "+31"  },
+  { flag: "🇵🇪", name: "Pérou",                           code: "+51"  },
+  { flag: "🇵🇭", name: "Philippines",                     code: "+63"  },
+  { flag: "🇵🇱", name: "Pologne",                         code: "+48"  },
+  { flag: "🇵🇹", name: "Portugal",                        code: "+351" },
+  { flag: "🇶🇦", name: "Qatar",                           code: "+974" },
+  { flag: "🇩🇴", name: "République dominicaine",          code: "+1"   },
+  { flag: "🇨🇿", name: "République tchèque",              code: "+420" },
+  { flag: "🇷🇴", name: "Roumanie",                        code: "+40"  },
+  { flag: "🇬🇧", name: "Royaume-Uni",                     code: "+44"  },
+  { flag: "🇷🇺", name: "Russie",                          code: "+7"   },
+  { flag: "🇷🇼", name: "Rwanda",                          code: "+250" },
+  { flag: "🇰🇳", name: "Saint-Christophe-et-Niévès",     code: "+1"   },
+  { flag: "🇸🇲", name: "Saint-Marin",                     code: "+378" },
+  { flag: "🇻🇨", name: "Saint-Vincent-et-les-Grenadines", code: "+1"  },
+  { flag: "🇱🇨", name: "Sainte-Lucie",                    code: "+1"   },
+  { flag: "🇸🇧", name: "Salomon",                         code: "+677" },
+  { flag: "🇸🇻", name: "Salvador",                        code: "+503" },
+  { flag: "🇼🇸", name: "Samoa",                           code: "+685" },
+  { flag: "🇸🇹", name: "São Tomé-et-Príncipe",            code: "+239" },
+  { flag: "🇸🇳", name: "Sénégal",                         code: "+221" },
+  { flag: "🇷🇸", name: "Serbie",                          code: "+381" },
+  { flag: "🇸🇨", name: "Seychelles",                      code: "+248" },
+  { flag: "🇸🇱", name: "Sierra Leone",                    code: "+232" },
+  { flag: "🇸🇬", name: "Singapour",                       code: "+65"  },
+  { flag: "🇸🇰", name: "Slovaquie",                       code: "+421" },
+  { flag: "🇸🇮", name: "Slovénie",                        code: "+386" },
+  { flag: "🇸🇴", name: "Somalie",                         code: "+252" },
+  { flag: "🇸🇩", name: "Soudan",                          code: "+249" },
+  { flag: "🇸🇸", name: "Soudan du Sud",                   code: "+211" },
+  { flag: "🇱🇰", name: "Sri Lanka",                       code: "+94"  },
+  { flag: "🇸🇪", name: "Suède",                           code: "+46"  },
+  { flag: "🇨🇭", name: "Suisse",                          code: "+41"  },
+  { flag: "🇸🇷", name: "Suriname",                        code: "+597" },
+  { flag: "🇸🇾", name: "Syrie",                           code: "+963" },
+  { flag: "🇹🇼", name: "Taïwan",                          code: "+886" },
+  { flag: "🇹🇯", name: "Tadjikistan",                     code: "+992" },
+  { flag: "🇹🇿", name: "Tanzanie",                        code: "+255" },
+  { flag: "🇹🇩", name: "Tchad",                           code: "+235" },
+  { flag: "🇹🇭", name: "Thaïlande",                       code: "+66"  },
+  { flag: "🇹🇱", name: "Timor oriental",                  code: "+670" },
+  { flag: "🇹🇬", name: "Togo",                            code: "+228" },
+  { flag: "🇹🇴", name: "Tonga",                           code: "+676" },
+  { flag: "🇹🇹", name: "Trinité-et-Tobago",               code: "+1"   },
+  { flag: "🇹🇳", name: "Tunisie",                         code: "+216" },
+  { flag: "🇹🇲", name: "Turkménistan",                    code: "+993" },
+  { flag: "🇹🇷", name: "Turquie",                         code: "+90"  },
+  { flag: "🇹🇻", name: "Tuvalu",                          code: "+688" },
+  { flag: "🇺🇦", name: "Ukraine",                         code: "+380" },
+  { flag: "🇺🇾", name: "Uruguay",                         code: "+598" },
+  { flag: "🇻🇺", name: "Vanuatu",                         code: "+678" },
+  { flag: "🇻🇦", name: "Vatican",                         code: "+379" },
+  { flag: "🇻🇪", name: "Venezuela",                       code: "+58"  },
+  { flag: "🇻🇳", name: "Viêt Nam",                        code: "+84"  },
+  { flag: "🇾🇪", name: "Yémen",                           code: "+967" },
+  { flag: "🇿🇲", name: "Zambie",                          code: "+260" },
+  { flag: "🇿🇼", name: "Zimbabwe",                        code: "+263" },
 ];
 
 function TelField({
@@ -375,14 +557,23 @@ function TelField({
   value: string; onValueChange: (v: string) => void;
   code: string; onCodeChange: (c: string) => void; required?: boolean;
 }) {
-  const [open, setOpen]           = useState(false);
-  const [hoveredCode, setHoveredCode] = useState<string | null>(null);
-  const rootRef                   = useRef<HTMLDivElement | null>(null);
-  const selected = DIAL_CODES.find((d) => d.code === code) ?? DIAL_CODES[0];
+  const [open, setOpen]               = useState(false);
+  const [hoveredName, setHoveredName] = useState<string | null>(null);
+  const [dialSearch, setDialSearch]   = useState("");
+  const rootRef                       = useRef<HTMLDivElement | null>(null);
+
+  // code stocke le NOM du pays (clé unique) pour éviter l'ambiguïté de +1
+  const selected = DIAL_CODES.find((d) => d.name === code) ?? DIAL_CODES[0];
+
+  const filteredDial = useMemo(() => {
+    const q = dialSearch.trim().toLowerCase();
+    if (!q) return DIAL_CODES;
+    return DIAL_CODES.filter((d) => d.name.toLowerCase().includes(q) || d.code.includes(q));
+  }, [dialSearch]);
 
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+      if (!rootRef.current?.contains(e.target as Node)) { setOpen(false); setDialSearch(""); }
     }
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
@@ -415,32 +606,43 @@ function TelField({
           {open && (
             <div style={{
               position: "absolute", zIndex: 500, top: "calc(100% + 3px)", left: 0,
-              width: "13.5rem", border: "1px solid #c8c8e8", borderRadius: 6,
+              width: "16rem", border: "1px solid #c8c8e8", borderRadius: 6,
               background: "#fff", boxShadow: "0 6px 20px rgba(0,0,145,.1)",
-              maxHeight: 260, overflowY: "auto",
             }}>
-              {DIAL_CODES.map((d) => (
-                <button
-                  key={d.code}
-                  type="button"
-                  onMouseEnter={() => setHoveredCode(d.code)}
-                  onMouseLeave={() => setHoveredCode(null)}
-                  onClick={() => { onCodeChange(d.code); setOpen(false); }}
-                  style={{
-                    display: "flex", alignItems: "center", gap: "0.5rem",
-                    width: "100%", padding: "0.35rem 0.6rem",
-                    border: 0, borderBottom: "1px solid #f5f5f5",
-                    background: d.code === code ? "#f0f0ff" : hoveredCode === d.code ? "#f5f5ff" : "white",
-                    cursor: "pointer", fontSize: "0.82rem",
-                    fontFamily: "inherit", textAlign: "left",
-                    fontWeight: d.code === code ? 700 : 400,
-                  }}
-                >
-                  <span style={{ fontSize: "1.1rem" }}>{d.flag}</span>
-                  <span style={{ flex: 1 }}>{d.name}</span>
-                  <span style={{ color: "#888", fontSize: "0.78rem" }}>{d.code}</span>
-                </button>
-              ))}
+              <input
+                value={dialSearch}
+                onChange={(e) => setDialSearch(e.target.value)}
+                placeholder="Rechercher un pays…"
+                style={SD_SEARCH}
+                autoFocus
+              />
+              <div style={{ maxHeight: 240, overflowY: "auto" }}>
+                {filteredDial.map((d) => (
+                  <button
+                    key={d.name}
+                    type="button"
+                    onMouseEnter={() => setHoveredName(d.name)}
+                    onMouseLeave={() => setHoveredName(null)}
+                    onClick={() => { onCodeChange(d.name); setOpen(false); setDialSearch(""); }}
+                    style={{
+                      display: "flex", alignItems: "center", gap: "0.5rem",
+                      width: "100%", padding: "0.35rem 0.6rem",
+                      border: 0, borderBottom: "1px solid #f5f5f5",
+                      background: d.name === code ? "#f0f0ff" : hoveredName === d.name ? "#f5f5ff" : "white",
+                      cursor: "pointer", fontSize: "0.82rem",
+                      fontFamily: "inherit", textAlign: "left",
+                      fontWeight: d.name === code ? 700 : 400,
+                    }}
+                  >
+                    <span style={{ fontSize: "1.1rem" }}>{d.flag}</span>
+                    <span style={{ flex: 1 }}>{d.name}</span>
+                    <span style={{ color: "#888", fontSize: "0.78rem" }}>{d.code}</span>
+                  </button>
+                ))}
+                {filteredDial.length === 0 && (
+                  <div style={{ padding: "0.5rem 0.6rem", fontSize: "0.8rem", color: "#999" }}>Aucun résultat.</div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -450,7 +652,6 @@ function TelField({
           className="ins-input"
           value={value}
           onChange={(e) => onValueChange(e.target.value)}
-          placeholder="Numéro"
           style={{ flex: 1 }}
         />
       </div>
@@ -886,14 +1087,17 @@ export default function InscriptionPage() {
         "Prenom", "Nom_de_famille", "Genre", "Majeur",
         "Email", "Adresse",
         "Precarite_de_logement", "Foyer",
-        "Regularite_situation", "Bpi",
+        "Regularite_situation",
       ] as const;
       for (const k of strFields) {
         if (form[k]) fields[k] = form[k];
       }
 
-      // Téléphone : indicatif + numéro
-      if (form.Tel.trim()) fields.Tel = `${form.TelCode} ${form.Tel}`.trim();
+      // Téléphone : indicatif + numéro (TelCode = nom du pays → résoudre le +XX)
+      if (form.Tel.trim()) {
+        const dialCode = DIAL_CODES.find((d) => d.name === form.TelCode)?.code ?? "";
+        fields.Tel = `${dialCode} ${form.Tel}`.trim();
+      }
 
       // Refs (rowId)
       if (form.Nationalite !== null) fields.Nationalite = form.Nationalite;
@@ -909,7 +1113,8 @@ export default function InscriptionPage() {
       // Toggles (booléens)
       if (form.Consentement_volontaire !== null) fields.Consentement_volontaire = form.Consentement_volontaire;
       if (form.Engagement_orienteur   !== null) fields.Engagement_orienteur   = form.Engagement_orienteur;
-      fields.Primo_arrivant = form.Primo_arrivant;
+      if (form.Primo_arrivant         !== null) fields.Primo_arrivant         = form.Primo_arrivant;
+      if (form.Bpi                    !== null) fields.Bpi                    = form.Bpi;
 
       // ChoiceLists
       if (form.Pret_a_se_former.length > 0) {
@@ -1051,7 +1256,7 @@ export default function InscriptionPage() {
                     searchable
                   />
                 </FieldWrap>
-                <TextField label="Adresse de domiciliation" value={form.Adresse} onChange={(v) => set("Adresse", v)} required placeholder="Description" />
+                <TextField label="Adresse de domiciliation" value={form.Adresse} onChange={(v) => set("Adresse", v)} required />
                 <ChoiceField label="Situation de précarité du logement" choices={ch("Precarite_de_logement")} value={form.Precarite_de_logement} onChange={(v) => set("Precarite_de_logement", v)} required />
                 <InfoBox>
                   <strong>À NOTER :</strong>
@@ -1059,12 +1264,14 @@ export default function InscriptionPage() {
                   <br />- Une pièce justificative pourra vous être demandée, cf. page FAQ "Les étapes du programme EMILE" &gt; "Justificatifs de la situation d'hébergement"
                 </InfoBox>
 
-                <ToggleOuiNon
-                  label="Candidat·e volontaire pour une insertion professionnelle et une mobilité géographique via le programme EMILE, et d'accord pour que ses données personnelles soient partagées aux équipes du programme EMILE"
-                  value={form.Consentement_volontaire}
-                  onChange={(v) => set("Consentement_volontaire", v)}
-                  required
-                />
+                <div className="ins-consent-frame">
+                  <ToggleOuiNon
+                    label="Candidat·e volontaire pour une insertion professionnelle et une mobilité géographique via le programme EMILE, et d'accord pour que ses données personnelles soient partagées aux équipes du programme EMILE"
+                    value={form.Consentement_volontaire}
+                    onChange={(v) => set("Consentement_volontaire", v)}
+                    required
+                  />
+                </div>
 
                 <SectionTitle title="Autres informations" />
                 <FieldWrap label="Niveau de langue" required>
@@ -1080,22 +1287,23 @@ export default function InscriptionPage() {
                 <ChoiceField label="Composition du foyer" choices={ch("Foyer")} value={form.Foyer} onChange={(v) => set("Foyer", v)} required />
 
                 <OuiNonField
-                  label="En situation régulière (personne française ou étrangère en situation régulière. Les papiers administratifs des personnes accompagnatrices majeures doivent également être valides.)"
+                  label="En situation régulière"
+                  description="Personne française ou étrangère en situation régulière. Les papiers administratifs des personnes accompagnatrices majeures doivent également être valides."
                   value={form.Regularite_situation}
                   onChange={(v) => set("Regularite_situation", v)}
                   required
                 />
 
-                <CheckboxField
+                <ToggleOuiNon
                   label="Personne primo-arrivante"
+                  description="Toute personne extra-européenne résidant pour la première fois et depuis moins de 5 ans en France."
                   value={form.Primo_arrivant}
                   onChange={(v) => set("Primo_arrivant", v)}
-                  description="(toute personne extra-européenne résidant pour la première fois et depuis moins de 5 ans en France)"
                 />
-                <CheckboxField
+                <ToggleOuiNon
                   label="Bénéficiaire de la Protection Internationale (BPI)"
-                  value={form.Bpi === "Oui"}
-                  onChange={(v) => set("Bpi", v ? "Oui" : "")}
+                  value={form.Bpi}
+                  onChange={(v) => set("Bpi", v)}
                 />
 
                 <MultiChoiceField
