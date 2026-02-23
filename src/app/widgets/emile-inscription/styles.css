@@ -174,11 +174,12 @@
   width: 100%;
 }
 
-/* ── Ligne 2 colonnes ───────────────────────────────────────── */
-.ins-row-2 {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 0.75rem;
+/* ── Hint âge calculé ───────────────────────────────────────── */
+.ins-age-hint {
+  font-size: 0.75rem;
+  color: #000091;
+  font-weight: 600;
+  margin-top: 0.15rem;
 }
 
 /* ── Label ──────────────────────────────────────────────────── */

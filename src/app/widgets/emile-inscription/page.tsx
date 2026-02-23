@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import "./styles.css";
 import { initGristOrMock } from "@/lib/grist/init";
 import {
@@ -78,6 +78,165 @@ function computeAge(dateIso: string): number | null {
 
 function choicesToOptions(choices: string[]): Option[] {
   return choices.map((label, i) => ({ id: i + 1, label, q: label.toLowerCase() }));
+}
+
+/* ─── Pays ───────────────────────────────────────────────────── */
+type PaysOption = Option & { typeNationalite: string };
+
+const PINNED_PAYS = [
+  "France",
+  "Afghanistan", "Algérie", "Cameroun",
+  "Congo (la République démocratique du)", "Côte d'Ivoire",
+  "Guinée", "Haïti", "Maroc", "Sénégal", "Tunisie",
+];
+
+const TYPE_TAG: Record<string, { bg: string; color: string }> = {
+  "France":           { bg: "#dbeafe", color: "#1d4ed8" },
+  "UE (hors France)": { bg: "#dcfce7", color: "#166534" },
+  "Extra-UE":         { bg: "#fef3c7", color: "#92400e" },
+};
+
+/* Styles partagés avec SearchDropdown */
+const SD_TRIGGER: React.CSSProperties = {
+  width: "100%", textAlign: "left", height: "1.875rem",
+  padding: "0 1.75rem 0 0.5rem", borderRadius: 4,
+  border: "1px solid #d0d0d0", background: "#f9f9f9",
+  cursor: "pointer", fontSize: "0.82rem",
+  fontFamily: "Marianne, arial, sans-serif", color: "#1e1e1e",
+  position: "relative", display: "flex", alignItems: "center",
+  boxSizing: "border-box", whiteSpace: "nowrap",
+  overflow: "hidden", textOverflow: "ellipsis",
+};
+const SD_PANEL: React.CSSProperties = {
+  position: "absolute", zIndex: 500, top: "calc(100% + 3px)", left: 0,
+  minWidth: "100%", border: "1px solid #c8c8e8", borderRadius: 6,
+  background: "#fff", boxShadow: "0 6px 20px rgba(0,0,145,.1)", overflow: "hidden",
+};
+const SD_SEARCH: React.CSSProperties = {
+  width: "100%", padding: "0.3rem 0.5rem", border: "none",
+  borderBottom: "1px solid #eee", fontSize: "0.8rem",
+  fontFamily: "Marianne, arial, sans-serif", outline: "none",
+  boxSizing: "border-box",
+};
+
+function NationaliteDropdown({
+  options, valueId, onChange, loading = false, required = false,
+}: {
+  options: PaysOption[]; valueId: number | null;
+  onChange: (id: number | null) => void; loading?: boolean; required?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ]       = useState("");
+  const rootRef         = useRef<HTMLDivElement | null>(null);
+
+  const selected = valueId != null ? options.find((o) => o.id === valueId) ?? null : null;
+
+  /* Pays épinglés (dans l'ordre PINNED_PAYS) */
+  const pinnedOptions = useMemo(() =>
+    PINNED_PAYS.map((name) => options.find((o) => o.label === name)).filter((o): o is PaysOption => !!o),
+    [options],
+  );
+  const pinnedIds = useMemo(() => new Set(pinnedOptions.map((o) => o.id)), [pinnedOptions]);
+  const otherOptions = useMemo(() => options.filter((o) => !pinnedIds.has(o.id)), [options, pinnedIds]);
+
+  /* Filtrage selon recherche */
+  const qq = q.trim().toLowerCase();
+  const filteredPinned = qq ? pinnedOptions.filter((o) => (o.q ?? o.label).toLowerCase().includes(qq)) : pinnedOptions;
+  const filteredOther  = qq ? otherOptions.filter((o) => (o.q ?? o.label).toLowerCase().includes(qq)).slice(0, 80) : otherOptions.slice(0, 80);
+
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (!rootRef.current?.contains(e.target as Node)) { setOpen(false); setQ(""); }
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
+
+  function renderOption(o: PaysOption) {
+    const tag = TYPE_TAG[o.typeNationalite];
+    const isSelected = valueId === o.id;
+    return (
+      <button
+        key={o.id}
+        type="button"
+        onClick={() => { onChange(o.id); setOpen(false); setQ(""); }}
+        style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          width: "100%", textAlign: "left", padding: "0.35rem 0.6rem",
+          border: 0, borderBottom: "1px solid #f5f5f5",
+          background: isSelected ? "#f0f0ff" : "white",
+          cursor: "pointer", fontSize: "0.82rem",
+          fontFamily: "Marianne, arial, sans-serif", color: "#1e1e1e",
+          fontWeight: isSelected ? 700 : 400,
+        }}
+      >
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.label}</span>
+        {o.typeNationalite && (
+          <span style={{
+            fontSize: "0.62rem", fontWeight: 700, padding: "0.1rem 0.35rem",
+            borderRadius: 3, marginLeft: "0.5rem", flexShrink: 0,
+            background: tag?.bg ?? "#f3f4f6", color: tag?.color ?? "#555",
+            whiteSpace: "nowrap",
+          }}>
+            {o.typeNationalite}
+          </span>
+        )}
+      </button>
+    );
+  }
+
+  function Divider() {
+    return (
+      <div style={{
+        padding: "0.2rem 0.6rem", fontSize: "0.7rem", fontWeight: 600,
+        color: "#aaa", textTransform: "uppercase", letterSpacing: "0.05em",
+        background: "#f9f9f9", borderBottom: "1px solid #eee",
+      }}>
+        Autres pays
+      </div>
+    );
+  }
+
+  return (
+    <div className="ins-field">
+      <label className="ins-label">
+        Nationalité{required && <span className="ins-required"> *</span>}
+      </label>
+      <div ref={rootRef} style={{ position: "relative" }}>
+        <button
+          type="button"
+          style={loading && options.length === 0 ? { ...SD_TRIGGER, background: "#f3f3f3", color: "#999", cursor: "default" } : SD_TRIGGER}
+          onClick={() => { if (!(loading && options.length === 0)) setOpen((v) => !v); }}
+        >
+          {selected
+            ? <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{selected.label}</span>
+            : <span style={{ opacity: 0.5 }}>{loading && options.length === 0 ? "Chargement…" : "Sélectionner"}</span>
+          }
+          <span style={{ position: "absolute", right: "0.4rem", top: "50%", transform: "translateY(-50%)", fontSize: "0.65rem", color: "#888", pointerEvents: "none" }}>▾</span>
+        </button>
+
+        {open && (
+          <div style={SD_PANEL}>
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Rechercher un pays…"
+              style={SD_SEARCH}
+              autoFocus
+            />
+            <div style={{ maxHeight: 280, overflowY: "auto" }}>
+              {filteredPinned.map(renderOption)}
+              {filteredPinned.length > 0 && filteredOther.length > 0 && <Divider />}
+              {filteredOther.map(renderOption)}
+              {filteredPinned.length === 0 && filteredOther.length === 0 && (
+                <div style={{ padding: "0.5rem 0.6rem", fontSize: "0.8rem", color: "#999" }}>Aucun résultat.</div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 /* ─── Composants UI génériques ───────────────────────────────── */
@@ -285,8 +444,8 @@ export default function InscriptionPage() {
   const [cols, setCols]       = useState<ColMeta[]>([]);
   const [colRowIdMap, setColRowIdMap] = useState<Map<number, { colId: string }>>(new Map());
 
-  // Options pour Nationalite (Ref:pays)
-  const [paysOptions, setPaysOptions]   = useState<Option[]>([]);
+  // Options pour Nationalite (Ref:Pays)
+  const [paysOptions, setPaysOptions]   = useState<PaysOption[]>([]);
   const [paysLoading, setPaysLoading]   = useState(false);
 
   const [form, setForm]               = useState<FormData>(INITIAL);
@@ -349,20 +508,31 @@ export default function InscriptionPage() {
     }).catch(() => {});
   }, [docApi]);
 
-  /* ── Chargement pays (Ref:pays) ── */
+  /* ── Chargement pays (Ref:Pays) avec Type_de_nationalite ── */
   useEffect(() => {
     if (!docApi || cols.length === 0 || colRowIdMap.size === 0) return;
     const nationaliteCol = cols.find((c) => c.colId === "Nationalite");
     if (!nationaliteCol) return;
 
     setPaysLoading(true);
-    ensureRefCache(docApi, nationaliteCol, colRowIdMap)
-      .then((cache) => {
-        const opts: Option[] = (cache?.rows ?? []).map((r) => ({
+    Promise.all([
+      ensureRefCache(docApi, nationaliteCol, colRowIdMap),
+      docApi.fetchTable("Pays"),
+    ])
+      .then(([cache, table]) => {
+        // Map id → Type_de_nationalite depuis la table brute
+        const typeMap = new Map<number, string>();
+        for (let i = 0; i < table.id.length; i++) {
+          typeMap.set(table.id[i] as number, (table["Type_de_nationalite"]?.[i] ?? "").toString());
+        }
+        const opts: PaysOption[] = (cache?.rows ?? []).map((r) => ({
           id: r.id,
           label: r.label,
           q: r.q,
+          typeNationalite: typeMap.get(r.id) ?? "",
         }));
+        // Tri alphabétique
+        opts.sort((a, b) => a.label.localeCompare(b.label, "fr"));
         setPaysOptions(opts);
       })
       .catch(() => {})
@@ -542,11 +712,10 @@ export default function InscriptionPage() {
 
                 <SectionTitle title="Informations administratives" />
 
-                <TextField label="Prénom" value={form.Prenom} onChange={(v) => set("Prenom", v)} required placeholder="Jean" />
-                <TextField label="Nom" value={form.Nom_de_famille} onChange={(v) => set("Nom_de_famille", v)} required placeholder="Dupont" />
+                <TextField label="Prénom" value={form.Prenom} onChange={(v) => set("Prenom", v)} required />
+                <TextField label="Nom" value={form.Nom_de_famille} onChange={(v) => set("Nom_de_famille", v)} required />
                 <ChoiceField label="Genre" choices={ch("Genre")} value={form.Genre} onChange={(v) => set("Genre", v)} required />
-                <RefField
-                  label="Nationalité"
+                <NationaliteDropdown
                   options={paysOptions}
                   valueId={form.Nationalite}
                   onChange={(id) => set("Nationalite", id)}
@@ -554,16 +723,22 @@ export default function InscriptionPage() {
                   required
                 />
 
-                <div className="ins-row-2">
-                  <TextField label="Date de naissance" value={form.Date_de_naissance} onChange={(v) => set("Date_de_naissance", v)} type="date" required />
-                  <TextField label="Âge" value={age !== null ? String(age) : ""} readOnly placeholder="—" />
+                <div className="ins-field">
+                  <label className="ins-label">Date de naissance<span className="ins-required"> *</span></label>
+                  <input
+                    type="date"
+                    className="ins-input"
+                    value={form.Date_de_naissance}
+                    onChange={(e) => set("Date_de_naissance", e.target.value)}
+                  />
+                  {age !== null && <span className="ins-age-hint">{age} ans</span>}
                 </div>
 
                 <OuiNonField label="Candidat·e majeur·e" value={form.Majeur} onChange={(v) => set("Majeur", v)} required />
 
                 <SectionTitle title="Coordonnées du / de la candidat·e" />
-                <TextField label="Email" value={form.Email} onChange={(v) => set("Email", v)} type="email" required placeholder="prenom.nom@exemple.fr" />
-                <TextField label="Téléphone" value={form.Tel} onChange={(v) => set("Tel", v)} type="tel" required placeholder="06XXXXXXXX" />
+                <TextField label="Email" value={form.Email} onChange={(v) => set("Email", v)} type="email" required />
+                <TextField label="Téléphone" value={form.Tel} onChange={(v) => set("Tel", v)} type="tel" required />
               </>
             )}
 
