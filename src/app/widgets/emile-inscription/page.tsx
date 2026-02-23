@@ -382,9 +382,9 @@ const BIRTH_YEARS = Array.from(
 );
 
 function DateNaissanceField({
-  value, onChange, required = false,
+  value, onChange, required = false, genre = "",
 }: {
-  value: string; onChange: (v: string) => void; required?: boolean;
+  value: string; onChange: (v: string) => void; required?: boolean; genre?: string;
 }) {
   const [yStr, mStr, dStr] = value ? value.split("-") : ["", "", ""];
 
@@ -439,7 +439,19 @@ function DateNaissanceField({
           ))}
         </select>
       </div>
-      {age !== null && <span className="ins-age-hint">{age} ans</span>}
+      {age !== null && (
+        <div className="ins-age-badge-row">
+          <span className="ins-age-badge ins-age-badge--age">
+            <i className="fa-solid fa-cake-candles" aria-hidden="true" /> {age} ans
+          </span>
+          <span className={`ins-age-badge ins-age-badge--${age >= 18 ? "majeur" : "mineur"}`}>
+            {age >= 18
+              ? (genre === "Femme" ? "Majeure ✓" : genre === "Homme" ? "Majeur ✓" : "Majeur·e ✓")
+              : (genre === "Femme" ? "Mineure" : genre === "Homme" ? "Mineur" : "Mineur·e")
+            }
+          </span>
+        </div>
+      )}
     </div>
   );
 }
@@ -692,7 +704,6 @@ export default function InscriptionPage() {
       if (!form.Date_de_naissance)     return "La date de naissance est requise.";
       if (!form.Genre)                 return "Le genre est requis.";
       if (!form.Nationalite)           return "La nationalité est requise.";
-      if (!form.Majeur)                return "Veuillez indiquer si le/la candidat·e est majeur·e.";
       if (!form.Email.trim())          return "L'email est requis.";
       if (!/^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/.test(form.Email.trim()))
                                        return "L'adresse email n'est pas valide.";
@@ -868,10 +879,10 @@ export default function InscriptionPage() {
                 <DateNaissanceField
                   value={form.Date_de_naissance}
                   onChange={(v) => set("Date_de_naissance", v)}
+                  genre={form.Genre}
                   required
                 />
 
-                <OuiNonField label="Candidat·e majeur·e" value={form.Majeur} onChange={(v) => set("Majeur", v)} required />
 
                 <SectionTitle title="Coordonnées du / de la candidat·e" />
                 <TextField label="Email" value={form.Email} onChange={(v) => set("Email", v)} type="email" required />

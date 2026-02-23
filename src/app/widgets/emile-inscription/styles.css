@@ -186,13 +186,27 @@
 .ins-date-select--day  { flex: 0 0 5rem; }
 .ins-date-select--year { flex: 0 0 5.8rem; }
 
-/* ── Hint âge calculé ───────────────────────────────────────── */
-.ins-age-hint {
-  font-size: 0.75rem;
-  color: #000091;
-  font-weight: 600;
-  margin-top: 0.15rem;
+/* ── Badges âge + statut ────────────────────────────────────── */
+.ins-age-badge-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.45rem;
+  flex-wrap: wrap;
 }
+.ins-age-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 99px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+}
+.ins-age-badge--age    { background: #e8eeff; color: #000091; }
+.ins-age-badge--majeur { background: #d1fae5; color: #065f46; }
+.ins-age-badge--mineur { background: #fef3c7; color: #92400e; }
 
 /* ── Label ──────────────────────────────────────────────────── */
 .ins-label {
