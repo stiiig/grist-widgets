@@ -1,33 +1,43 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import "./styles.css";
 import { initGristOrMock } from "@/lib/grist/init";
-import { GristDocAPI } from "@/lib/grist/meta";
+import {
+  loadColumnsMetaFor,
+  encodeListCell,
+  isoDateToUnixSeconds,
+  ColMeta,
+  GristDocAPI,
+} from "@/lib/grist/meta";
 
-const TABLE_ID = "CANDIDATS";
+const TABLE_ID   = "CANDIDATS";
+const TOTAL_STEPS = 3;
 
-/* ─── Types ────────────────────────────────────────────────── */
+/* ─── Types ─────────────────────────────────────────────────── */
 type FormData = {
+  // Étape 1 — Identité
   Prenom: string;
   Nom_de_famille: string;
-  Date_de_naissance: string;   // "YYYY-MM-DD" → converti en unixSeconds avant envoi
+  Date_de_naissance: string;       // "YYYY-MM-DD" côté form
   Genre: string;
   Nationalite: string;
-  Adresse: string;
+  Majeur: string;                  // "Oui" | "Non"
   Email: string;
   Tel: string;
-  Regularite_situation: string;
+  // Étape 2 — Situation
+  Departement_domicile_inscription: string;
+  Adresse: string;
+  Precarite_de_logement: string;
+  Consentement_volontaire: boolean | null;  // Toggle
   Niveau_de_langue: string;
-  Niveau_etudes_reconnu_en_France: string;
-  Situation_face_emploi: string;
-  Situation_financiere: string;
-  Situation_hebergement: string;
-  Vehicule: string;
-  Permis: string;
-  PMR: string;
-  RQTH: string;
-  Motivation_candidat: string;
+  Foyer: string;
+  Regularite_situation: string;    // "Oui" | "Non"
+  Primo_arrivant: boolean;         // Toggle
+  Bpi: string;                     // Choice
+  Pret_a_se_former: string[];      // ChoiceList
+  // Étape 3 — Engagement
+  Engagement_orienteur: boolean | null;    // Toggle
 };
 
 const INITIAL: FormData = {
@@ -36,147 +46,255 @@ const INITIAL: FormData = {
   Date_de_naissance: "",
   Genre: "",
   Nationalite: "",
-  Adresse: "",
+  Majeur: "",
   Email: "",
   Tel: "",
-  Regularite_situation: "",
+  Departement_domicile_inscription: "",
+  Adresse: "",
+  Precarite_de_logement: "",
+  Consentement_volontaire: null,
   Niveau_de_langue: "",
-  Niveau_etudes_reconnu_en_France: "",
-  Situation_face_emploi: "",
-  Situation_financiere: "",
-  Situation_hebergement: "",
-  Vehicule: "",
-  Permis: "",
-  PMR: "",
-  RQTH: "",
-  Motivation_candidat: "",
+  Foyer: "",
+  Regularite_situation: "",
+  Primo_arrivant: false,
+  Bpi: "",
+  Pret_a_se_former: [],
+  Engagement_orienteur: null,
 };
 
-/* ─── Choix ─────────────────────────────────────────────────── */
-const CHOICES: Partial<Record<keyof FormData, string[]>> = {
-  Genre: ["Homme", "Femme", "Autre", "Non renseigné"],
-  Regularite_situation: ["Régulier", "Irrégulier", "En cours de régularisation", "Non renseigné"],
-  Niveau_de_langue: ["A1", "A2", "B1", "B2", "C1", "C2", "Francophone natif", "Non renseigné"],
-  Niveau_etudes_reconnu_en_France: [
-    "Aucun diplôme", "CAP/BEP", "Bac", "Bac+2", "Bac+3", "Bac+4", "Bac+5 et plus", "Non renseigné",
-  ],
-  Situation_face_emploi: [
-    "Sans emploi", "En emploi", "En formation", "En recherche d'emploi", "Inactif", "Non renseigné",
-  ],
-  Situation_financiere: [
-    "RSA", "ARE", "AAH", "Sans ressources", "Revenus d'activité", "Autre", "Non renseigné",
-  ],
-  Situation_hebergement: [
-    "Propriétaire", "Locataire", "Hébergé par un tiers", "Sans domicile fixe",
-    "Hébergement d'urgence", "Non renseigné",
-  ],
-  Vehicule: ["Oui", "Non", "Non renseigné"],
-  Permis: ["Oui", "Non", "En cours", "Non renseigné"],
-  PMR: ["Oui", "Non", "Non renseigné"],
-  RQTH: ["Oui", "Non", "En cours", "Non renseigné"],
-};
-
-/* ─── Helper : date ISO → unix seconds ─────────────────────── */
-function isoToUnix(iso: string): number | null {
-  if (!iso) return null;
-  const ms = Date.parse(iso);
-  return isNaN(ms) ? null : Math.floor(ms / 1000);
+/* ─── Helpers ────────────────────────────────────────────────── */
+function computeAge(dateIso: string): number | null {
+  if (!dateIso) return null;
+  const birth = new Date(dateIso);
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+  return age >= 0 ? age : null;
 }
 
-/* ─── Composants UI ─────────────────────────────────────────── */
+/* ─── Composants UI ──────────────────────────────────────────── */
 
-function TextInput({
-  label, name, value, onChange, type = "text", required = false, placeholder = "",
+function StepHeader({ step, title, subtitle }: { step: number; title: string; subtitle?: string }) {
+  return (
+    <div className="ins-step-header">
+      <h2 className="ins-step-title">
+        {title} <span className="ins-step-badge">(étape {step}/{TOTAL_STEPS})</span>
+      </h2>
+      {subtitle && <p className="ins-step-subtitle">{subtitle}</p>}
+    </div>
+  );
+}
+
+function SectionTitle({ title }: { title: string }) {
+  return <h3 className="ins-section-title">{title}</h3>;
+}
+
+function InfoBox({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="ins-infobox">
+      <i className="fa-solid fa-circle-info ins-infobox__icon" aria-hidden="true" />
+      <div className="ins-infobox__text">{children}</div>
+    </div>
+  );
+}
+
+function TextField({
+  label, value, onChange, type = "text", required = false,
+  placeholder = "", readOnly = false,
 }: {
-  label: string; name: keyof FormData; value: string;
-  onChange: (k: keyof FormData, v: string) => void;
-  type?: string; required?: boolean; placeholder?: string;
+  label: string; value: string; onChange?: (v: string) => void;
+  type?: string; required?: boolean; placeholder?: string; readOnly?: boolean;
 }) {
   return (
     <div className="ins-field">
-      <label className="ins-label" htmlFor={name}>
+      <label className="ins-label">
         {label}{required && <span className="ins-required"> *</span>}
       </label>
       <input
-        id={name} name={name} type={type}
-        className="ins-input"
+        type={type}
+        className={`ins-input${readOnly ? " ins-input--readonly" : ""}`}
         value={value}
-        onChange={(e) => onChange(name, e.target.value)}
+        onChange={readOnly ? undefined : (e) => onChange?.(e.target.value)}
         placeholder={placeholder}
-        required={required}
+        readOnly={readOnly}
       />
     </div>
   );
 }
 
-function SelectInput({
-  label, name, value, onChange, required = false,
+function SelectField({
+  label, value, onChange, choices, required = false,
 }: {
-  label: string; name: keyof FormData; value: string;
-  onChange: (k: keyof FormData, v: string) => void;
-  required?: boolean;
+  label: string; value: string; onChange: (v: string) => void;
+  choices: string[]; required?: boolean;
 }) {
-  const options = CHOICES[name] ?? [];
   return (
     <div className="ins-field">
-      <label className="ins-label" htmlFor={name}>
+      <label className="ins-label">
         {label}{required && <span className="ins-required"> *</span>}
       </label>
       <select
-        id={name} name={name}
         className="ins-select"
         value={value}
-        onChange={(e) => onChange(name, e.target.value)}
-        required={required}
+        onChange={(e) => onChange(e.target.value)}
       >
-        <option value="">— Choisir —</option>
-        {options.map((o) => <option key={o} value={o}>{o}</option>)}
+        <option value="">Sélectionner</option>
+        {choices.map((c) => <option key={c} value={c}>{c}</option>)}
       </select>
     </div>
   );
 }
 
-function Textarea({
-  label, name, value, onChange, rows = 4,
+function OuiNonField({
+  label, value, onChange, required = false, description,
 }: {
-  label: string; name: keyof FormData; value: string;
-  onChange: (k: keyof FormData, v: string) => void;
-  rows?: number;
+  label: string; value: string; onChange: (v: string) => void;
+  required?: boolean; description?: string;
 }) {
   return (
     <div className="ins-field ins-field--wide">
-      <label className="ins-label" htmlFor={name}>{label}</label>
-      <textarea
-        id={name} name={name}
-        className="ins-textarea"
-        value={value}
-        onChange={(e) => onChange(name, e.target.value)}
-        rows={rows}
-      />
+      <label className="ins-label">
+        {label}{required && <span className="ins-required"> *</span>}
+      </label>
+      {description && <p className="ins-field-desc">{description}</p>}
+      <div className="ins-ouinon">
+        <button
+          type="button"
+          className={`ins-ouinon-btn${value === "Oui" ? " ins-ouinon-btn--active" : ""}`}
+          onClick={() => onChange("Oui")}
+        >Oui</button>
+        <button
+          type="button"
+          className={`ins-ouinon-btn${value === "Non" ? " ins-ouinon-btn--active" : ""}`}
+          onClick={() => onChange("Non")}
+        >Non</button>
+      </div>
     </div>
   );
 }
 
-function SectionTitle({ icon, title }: { icon: string; title: string }) {
+function ToggleOuiNon({
+  label, value, onChange, required = false, description,
+}: {
+  label: string; value: boolean | null; onChange: (v: boolean) => void;
+  required?: boolean; description?: string;
+}) {
   return (
-    <div className="ins-section-title">
-      <i className={`${icon} ins-section-icon`} aria-hidden="true" />
-      <span>{title}</span>
+    <div className="ins-field ins-field--wide">
+      <label className="ins-label">
+        {label}{required && <span className="ins-required"> *</span>}
+      </label>
+      {description && <p className="ins-field-desc">{description}</p>}
+      <div className="ins-ouinon">
+        <button
+          type="button"
+          className={`ins-ouinon-btn${value === true ? " ins-ouinon-btn--active" : ""}`}
+          onClick={() => onChange(true)}
+        >Oui</button>
+        <button
+          type="button"
+          className={`ins-ouinon-btn${value === false ? " ins-ouinon-btn--active" : ""}`}
+          onClick={() => onChange(false)}
+        >Non</button>
+      </div>
     </div>
   );
 }
 
-/* ─── Page principale ───────────────────────────────────────── */
+function CheckboxField({
+  label, value, onChange, description,
+}: {
+  label: string; value: boolean; onChange: (v: boolean) => void; description?: string;
+}) {
+  return (
+    <div className="ins-field ins-field--wide">
+      <label className="ins-checkbox-label">
+        <input
+          type="checkbox"
+          className="ins-checkbox"
+          checked={value}
+          onChange={(e) => onChange(e.target.checked)}
+        />
+        <span className="ins-checkbox-text">
+          {label}
+          {description && <span className="ins-field-desc"> {description}</span>}
+        </span>
+      </label>
+    </div>
+  );
+}
+
+function ChoiceListField({
+  label, value, onChange, choices, required = false,
+}: {
+  label: string; value: string[]; onChange: (v: string[]) => void;
+  choices: string[]; required?: boolean;
+}) {
+  return (
+    <div className="ins-field ins-field--wide">
+      <label className="ins-label">
+        {label}{required && <span className="ins-required"> *</span>}
+      </label>
+      <div className="ins-choicelist">
+        {choices.map((c) => (
+          <label key={c} className="ins-checkbox-label">
+            <input
+              type="checkbox"
+              className="ins-checkbox"
+              checked={value.includes(c)}
+              onChange={(e) => {
+                if (e.target.checked) onChange([...value, c]);
+                else onChange(value.filter((x) => x !== c));
+              }}
+            />
+            <span className="ins-checkbox-text">{c}</span>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ValidationError({ message }: { message: string }) {
+  if (!message) return null;
+  return (
+    <div className="ins-validation-error">
+      <i className="fa-solid fa-triangle-exclamation" aria-hidden="true" />
+      {message}
+    </div>
+  );
+}
+
+/* ─── Page principale ────────────────────────────────────────── */
 
 export default function InscriptionPage() {
   const [mode, setMode]     = useState<string>("boot");
   const [docApi, setDocApi] = useState<GristDocAPI | null>(null);
-  const [form, setForm]     = useState<FormData>(INITIAL);
-  const [submitting, setSubmitting] = useState(false);
-  const [done, setDone]     = useState(false);
-  const [error, setError]   = useState("");
+  const [cols, setCols]     = useState<ColMeta[]>([]);
 
-  /* ── Init Grist (identique à EMILE) ── */
+  const [form, setForm]           = useState<FormData>(INITIAL);
+  const [step, setStep]           = useState(1);
+  const [submitting, setSubmitting] = useState(false);
+  const [done, setDone]           = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const [validError, setValidError]   = useState("");
+
+  /* ── Choix dynamiques depuis Grist ── */
+  const choicesMap = useMemo(() => {
+    const m = new Map<string, string[]>();
+    for (const c of cols) {
+      const raw = c.widgetOptionsParsed?.choices;
+      if (Array.isArray(raw) && raw.length > 0) m.set(c.colId, raw.map(String));
+    }
+    return m;
+  }, [cols]);
+
+  function ch(colId: string): string[] {
+    return choicesMap.get(colId) ?? [];
+  }
+
+  /* ── Init Grist ── */
   useEffect(() => {
     (async () => {
       try {
@@ -197,44 +315,116 @@ export default function InscriptionPage() {
         setMode(result.mode);
         setDocApi(result.docApi);
       } catch (e: any) {
-        setError(`Erreur init: ${e?.message ?? String(e)}`);
+        setSubmitError(`Erreur init: ${e?.message ?? String(e)}`);
         setMode("none");
       }
     })();
   }, []);
 
-  function set(key: keyof FormData, value: string) {
+  /* ── Chargement colonnes ── */
+  useEffect(() => {
+    if (!docApi) return;
+    loadColumnsMetaFor(docApi, TABLE_ID).then(setCols).catch(() => {});
+  }, [docApi]);
+
+  /* ── Setters ── */
+  function set<K extends keyof FormData>(key: K, value: FormData[K]) {
     setForm((f) => ({ ...f, [key]: value }));
+    setValidError("");
   }
 
+  /* ── Validation par étape ── */
+  function validateStep(s: number): string | null {
+    if (s === 1) {
+      if (!form.Prenom.trim())         return "Le prénom est requis.";
+      if (!form.Nom_de_famille.trim()) return "Le nom est requis.";
+      if (!form.Date_de_naissance)     return "La date de naissance est requise.";
+      if (!form.Genre)                 return "Le genre est requis.";
+      if (!form.Nationalite)           return "La nationalité est requise.";
+      if (!form.Majeur)                return "Veuillez indiquer si le/la candidat·e est majeur·e.";
+      if (!form.Email.trim())          return "L'email est requis.";
+      if (!form.Tel.trim())            return "Le téléphone est requis.";
+    }
+    if (s === 2) {
+      if (!form.Departement_domicile_inscription) return "Le département est requis.";
+      if (!form.Adresse.trim())                   return "L'adresse est requise.";
+      if (!form.Precarite_de_logement)            return "La situation de précarité est requise.";
+      if (form.Consentement_volontaire === null)   return "Le consentement EMILE est requis.";
+      if (!form.Niveau_de_langue)                 return "Le niveau de langue est requis.";
+      if (!form.Foyer)                            return "La composition du foyer est requise.";
+      if (!form.Regularite_situation)             return "La situation régulière est requise.";
+    }
+    if (s === 3) {
+      if (form.Engagement_orienteur === null) return "Veuillez indiquer votre engagement.";
+    }
+    return null;
+  }
+
+  function nextStep() {
+    const err = validateStep(step);
+    if (err) { setValidError(err); return; }
+    setValidError("");
+    setStep((s) => s + 1);
+    window.scrollTo(0, 0);
+  }
+
+  function prevStep() {
+    setValidError("");
+    setStep((s) => s - 1);
+    window.scrollTo(0, 0);
+  }
+
+  /* ── Soumission ── */
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!docApi) {
-      setError("Grist non disponible.");
-      return;
-    }
+    const err = validateStep(3);
+    if (err) { setValidError(err); return; }
+    if (!docApi) { setSubmitError("Grist non disponible."); return; }
+
     setSubmitting(true);
-    setError("");
+    setSubmitError("");
     try {
-      // Construire les champs à envoyer (on omet les champs vides)
       const fields: Record<string, any> = {};
-      for (const [key, val] of Object.entries(form) as [keyof FormData, string][]) {
-        if (key === "Date_de_naissance") {
-          const unix = isoToUnix(val);
-          if (unix !== null) fields[key] = unix;
-        } else if (val !== "") {
-          fields[key] = val;
-        }
+
+      // Champs texte / choice
+      const strFields = [
+        "Prenom", "Nom_de_famille", "Genre", "Nationalite", "Majeur",
+        "Email", "Tel", "Departement_domicile_inscription", "Adresse",
+        "Precarite_de_logement", "Niveau_de_langue", "Foyer",
+        "Regularite_situation", "Bpi",
+      ] as const;
+      for (const k of strFields) {
+        if (form[k]) fields[k] = form[k];
+      }
+
+      // Date → unix seconds
+      if (form.Date_de_naissance) {
+        const unix = isoDateToUnixSeconds(form.Date_de_naissance);
+        if (unix) fields.Date_de_naissance = unix;
+      }
+
+      // Toggles (booléens)
+      if (form.Consentement_volontaire !== null) fields.Consentement_volontaire = form.Consentement_volontaire;
+      if (form.Engagement_orienteur !== null)   fields.Engagement_orienteur   = form.Engagement_orienteur;
+      fields.Primo_arrivant = form.Primo_arrivant;
+
+      // ChoiceList
+      if (form.Pret_a_se_former.length > 0) {
+        fields.Pret_a_se_former = encodeListCell(form.Pret_a_se_former);
       }
 
       await docApi.applyUserActions([["AddRecord", TABLE_ID, null, fields]]);
       setDone(true);
     } catch (e: any) {
-      setError(e?.message ?? "Une erreur est survenue.");
+      setSubmitError(e?.message ?? "Une erreur est survenue.");
     } finally {
       setSubmitting(false);
     }
   }
+
+  /* ────────────────────────────────────────────────────────────
+     RENDER
+  ──────────────────────────────────────────────────────────── */
 
   /* ── Écran de confirmation ── */
   if (done) {
@@ -250,14 +440,14 @@ export default function InscriptionPage() {
         <div className="ins-body ins-body--center">
           <div className="ins-confirm">
             <i className="fa-solid fa-circle-check ins-confirm__icon" aria-hidden="true" />
-            <h2 className="ins-confirm__title">Dossier envoyé !</h2>
+            <h2 className="ins-confirm__title">Dossier créé !</h2>
             <p className="ins-confirm__text">
               Le candidat a bien été ajouté dans Grist.
             </p>
             <button
               type="button"
               className="ins-btn ins-btn--secondary"
-              onClick={() => { setForm(INITIAL); setDone(false); setError(""); }}
+              onClick={() => { setForm(INITIAL); setDone(false); setStep(1); setValidError(""); setSubmitError(""); }}
             >
               <i className="fa-solid fa-rotate-left" aria-hidden="true" />
               Nouveau candidat
@@ -267,6 +457,9 @@ export default function InscriptionPage() {
       </div>
     );
   }
+
+  /* ── États de chargement / erreur ── */
+  const age = computeAge(form.Date_de_naissance);
 
   return (
     <div className="ins-shell">
@@ -287,6 +480,7 @@ export default function InscriptionPage() {
             <i className="fa-solid fa-spinner fa-spin" />
           </div>
         </div>
+
       ) : mode === "none" || !docApi ? (
         <div className="ins-body">
           <div className="fr-alert fr-alert--warning">
@@ -294,84 +488,231 @@ export default function InscriptionPage() {
             <p>Ce widget doit être ouvert dans Grist.</p>
           </div>
         </div>
+
       ) : (
-        <>
-          <div className="ins-intro">
-            <p>
-              Remplissez ce formulaire pour créer un nouveau dossier candidat dans EMILE.
-              Les champs marqués <span className="ins-required">*</span> sont obligatoires.
-            </p>
-          </div>
-          <div className="ins-body">
-            <form className="ins-form" onSubmit={handleSubmit} noValidate>
+        <div className="ins-body">
 
-              <SectionTitle icon="fa-solid fa-user" title="Identité" />
-              <div className="ins-grid">
-                <TextInput label="Prénom" name="Prenom" value={form.Prenom} onChange={set} required />
-                <TextInput label="Nom de famille" name="Nom_de_famille" value={form.Nom_de_famille} onChange={set} required />
-                <TextInput label="Date de naissance" name="Date_de_naissance" value={form.Date_de_naissance} onChange={set} type="date" required />
-                <SelectInput label="Genre" name="Genre" value={form.Genre} onChange={set} />
-                <TextInput label="Nationalité" name="Nationalite" value={form.Nationalite} onChange={set} placeholder="Ex: Française, Marocaine…" />
-                <SelectInput label="Régularité de situation" name="Regularite_situation" value={form.Regularite_situation} onChange={set} />
-              </div>
-
-              <SectionTitle icon="fa-solid fa-address-card" title="Coordonnées" />
-              <div className="ins-grid">
-                <TextInput label="Adresse" name="Adresse" value={form.Adresse} onChange={set} placeholder="Numéro, rue, ville, code postal" />
-                <TextInput label="Email" name="Email" value={form.Email} onChange={set} type="email" placeholder="exemple@mail.fr" />
-                <TextInput label="Téléphone" name="Tel" value={form.Tel} onChange={set} type="tel" placeholder="06 XX XX XX XX" />
-              </div>
-
-              <SectionTitle icon="fa-solid fa-briefcase" title="Situation" />
-              <div className="ins-grid">
-                <SelectInput label="Situation face à l'emploi" name="Situation_face_emploi" value={form.Situation_face_emploi} onChange={set} />
-                <SelectInput label="Situation financière" name="Situation_financiere" value={form.Situation_financiere} onChange={set} />
-                <SelectInput label="Situation d'hébergement" name="Situation_hebergement" value={form.Situation_hebergement} onChange={set} />
-                <SelectInput label="Niveau de langue" name="Niveau_de_langue" value={form.Niveau_de_langue} onChange={set} />
-                <SelectInput label="Niveau d'études (reconnu en France)" name="Niveau_etudes_reconnu_en_France" value={form.Niveau_etudes_reconnu_en_France} onChange={set} />
-              </div>
-
-              <SectionTitle icon="fa-solid fa-car" title="Mobilité & Santé" />
-              <div className="ins-grid">
-                <SelectInput label="Véhicule" name="Vehicule" value={form.Vehicule} onChange={set} />
-                <SelectInput label="Permis de conduire" name="Permis" value={form.Permis} onChange={set} />
-                <SelectInput label="PMR (Personne à Mobilité Réduite)" name="PMR" value={form.PMR} onChange={set} />
-                <SelectInput label="RQTH" name="RQTH" value={form.RQTH} onChange={set} />
-              </div>
-
-              <SectionTitle icon="fa-solid fa-star" title="Motivation" />
-              <div className="ins-grid">
-                <Textarea
-                  label="Motivation et projet du candidat (optionnel)"
-                  name="Motivation_candidat"
-                  value={form.Motivation_candidat}
-                  onChange={set}
-                  rows={5}
-                />
-              </div>
-
-              {error && (
-                <div className="fr-alert fr-alert--error" style={{ marginTop: "1rem" }}>
-                  <p className="fr-alert__title">Erreur</p>
-                  <p>{error}</p>
+          {/* ── Barre de progression ── */}
+          <div className="ins-progress">
+            {[1, 2, 3].map((s) => (
+              <div key={s} className={`ins-progress__step${s === step ? " active" : s < step ? " done" : ""}`}>
+                <div className="ins-progress__dot">
+                  {s < step ? <i className="fa-solid fa-check" /> : s}
                 </div>
-              )}
-
-              <div className="ins-submit-row">
-                <button type="submit" className="ins-btn ins-btn--primary" disabled={submitting}>
-                  {submitting ? (
-                    <><i className="fa-solid fa-spinner fa-spin" aria-hidden="true" /> Enregistrement…</>
-                  ) : (
-                    <><i className="fa-solid fa-floppy-disk" aria-hidden="true" /> Créer le dossier</>
-                  )}
-                </button>
+                <span className="ins-progress__label">
+                  {s === 1 ? "Identité" : s === 2 ? "Situation" : "Engagement"}
+                </span>
               </div>
-
-            </form>
+            ))}
+            <div className="ins-progress__bar">
+              <div className="ins-progress__fill" style={{ width: `${((step - 1) / (TOTAL_STEPS - 1)) * 100}%` }} />
+            </div>
           </div>
-        </>
-      )}
 
+          <form className="ins-form" onSubmit={handleSubmit} noValidate>
+
+            {/* ══════════════════════════════════════════════
+                ÉTAPE 1 — Identité
+            ══════════════════════════════════════════════ */}
+            {step === 1 && (
+              <>
+                <StepHeader
+                  step={1}
+                  title="Identité du / de la candidat·e"
+                  subtitle="Toutes les informations sont obligatoires."
+                />
+
+                <SectionTitle title="Informations administratives" />
+
+                <TextField label="Prénom" value={form.Prenom} onChange={(v) => set("Prenom", v)} required placeholder="Jean" />
+                <TextField label="Nom" value={form.Nom_de_famille} onChange={(v) => set("Nom_de_famille", v)} required placeholder="Dupont" />
+                <SelectField label="Genre" value={form.Genre} onChange={(v) => set("Genre", v)} choices={ch("Genre")} required />
+                <SelectField label="Nationalité" value={form.Nationalite} onChange={(v) => set("Nationalite", v)} choices={ch("Nationalite")} required />
+
+                <div className="ins-row-2">
+                  <div>
+                    <TextField
+                      label="Date de naissance"
+                      value={form.Date_de_naissance}
+                      onChange={(v) => set("Date_de_naissance", v)}
+                      type="date"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <TextField
+                      label="Âge"
+                      value={age !== null ? String(age) : ""}
+                      readOnly
+                      placeholder="—"
+                    />
+                  </div>
+                </div>
+
+                <OuiNonField
+                  label="Candidat·e majeur·e"
+                  value={form.Majeur}
+                  onChange={(v) => set("Majeur", v)}
+                  required
+                />
+
+                <SectionTitle title="Coordonnées du / de la candidat·e" />
+
+                <TextField label="Email" value={form.Email} onChange={(v) => set("Email", v)} type="email" required placeholder="prenom.nom@exemple.fr" />
+                <TextField label="Téléphone" value={form.Tel} onChange={(v) => set("Tel", v)} type="tel" required placeholder="06XXXXXXXX" />
+              </>
+            )}
+
+            {/* ══════════════════════════════════════════════
+                ÉTAPE 2 — Situation
+            ══════════════════════════════════════════════ */}
+            {step === 2 && (
+              <>
+                <StepHeader
+                  step={2}
+                  title="Situation du / de la candidat·e"
+                  subtitle="Informations obligatoires *"
+                />
+
+                <SectionTitle title="Domiciliation" />
+
+                <SelectField
+                  label="Département du domicile actuel"
+                  value={form.Departement_domicile_inscription}
+                  onChange={(v) => set("Departement_domicile_inscription", v)}
+                  choices={ch("Departement_domicile_inscription")}
+                  required
+                />
+                <TextField
+                  label="Adresse de domiciliation"
+                  value={form.Adresse}
+                  onChange={(v) => set("Adresse", v)}
+                  required
+                  placeholder="Description"
+                />
+                <SelectField
+                  label="Situation de précarité du logement"
+                  value={form.Precarite_de_logement}
+                  onChange={(v) => set("Precarite_de_logement", v)}
+                  choices={ch("Precarite_de_logement")}
+                  required
+                />
+                <InfoBox>
+                  <strong>À NOTER :</strong>
+                  <br />- Pour bien comprendre les différentes situations de précarité du logement, cf. FAQ &gt; "Inscrire un·e candidat·e"
+                  <br />- Une pièce justificative pourra vous être demandée, cf. page FAQ "Les étapes du programme EMILE" &gt; "Justificatifs de la situation d'hébergement"
+                </InfoBox>
+
+                <ToggleOuiNon
+                  label="Candidat·e volontaire pour une insertion professionnelle et une mobilité géographique via le programme EMILE, et d'accord pour que ses données personnelles soient partagées aux équipes du programme EMILE"
+                  value={form.Consentement_volontaire}
+                  onChange={(v) => set("Consentement_volontaire", v)}
+                  required
+                />
+
+                <SectionTitle title="Autres informations" />
+
+                <SelectField
+                  label="Niveau de langue"
+                  value={form.Niveau_de_langue}
+                  onChange={(v) => set("Niveau_de_langue", v)}
+                  choices={ch("Niveau_de_langue")}
+                  required
+                />
+                <SelectField
+                  label="Composition du foyer"
+                  value={form.Foyer}
+                  onChange={(v) => set("Foyer", v)}
+                  choices={ch("Foyer")}
+                  required
+                />
+
+                <OuiNonField
+                  label="En situation régulière (personne française ou étrangère en situation régulière. Les papiers administratifs des personnes accompagnatrices majeures doivent également être valides.)"
+                  value={form.Regularite_situation}
+                  onChange={(v) => set("Regularite_situation", v)}
+                  required
+                />
+
+                <CheckboxField
+                  label="Personne primo-arrivante"
+                  value={form.Primo_arrivant}
+                  onChange={(v) => set("Primo_arrivant", v)}
+                  description="(toute personne extra-européenne résidant pour la première fois et depuis moins de 5 ans en France)"
+                />
+
+                <CheckboxField
+                  label="Bénéficiaire de la Protection Internationale (BPI)"
+                  value={form.Bpi === "Oui"}
+                  onChange={(v) => set("Bpi", v ? "Oui" : "")}
+                />
+
+                <SelectField
+                  label="La personne serait-elle prête à se former sur l'un de ces secteurs d'activité ?"
+                  value={form.Pret_a_se_former[0] ?? ""}
+                  onChange={(v) => set("Pret_a_se_former", v ? [v] : [])}
+                  choices={ch("Pret_a_se_former")}
+                />
+                <InfoBox>
+                  Si le / la candidat·e est intéressé·e par un autre secteur d'activité, vous pourrez renseigner les informations dans son dossier après l'inscription.
+                </InfoBox>
+              </>
+            )}
+
+            {/* ══════════════════════════════════════════════
+                ÉTAPE 3 — Engagement orienteur
+            ══════════════════════════════════════════════ */}
+            {step === 3 && (
+              <>
+                <StepHeader
+                  step={3}
+                  title="Engagement de l'orienteur / l'orienteuse"
+                />
+
+                <ToggleOuiNon
+                  label="Je suis engagé·e et disponible pour co-accompagner le / la candidat·e"
+                  value={form.Engagement_orienteur}
+                  onChange={(v) => set("Engagement_orienteur", v)}
+                  required
+                />
+              </>
+            )}
+
+            {/* ── Erreurs ── */}
+            <ValidationError message={validError} />
+            {submitError && (
+              <div className="fr-alert fr-alert--error" style={{ marginTop: "1rem" }}>
+                <p className="fr-alert__title">Erreur</p>
+                <p>{submitError}</p>
+              </div>
+            )}
+
+            {/* ── Navigation ── */}
+            <div className="ins-nav-row">
+              {step > 1 && (
+                <button type="button" className="ins-btn ins-btn--secondary" onClick={prevStep}>
+                  <i className="fa-solid fa-arrow-left" aria-hidden="true" />
+                  Précédent
+                </button>
+              )}
+              {step < TOTAL_STEPS ? (
+                <button type="button" className="ins-btn ins-btn--primary" onClick={nextStep}>
+                  Suivant
+                  <i className="fa-solid fa-arrow-right" aria-hidden="true" />
+                </button>
+              ) : (
+                <button type="submit" className="ins-btn ins-btn--primary" disabled={submitting}>
+                  {submitting
+                    ? <><i className="fa-solid fa-spinner fa-spin" aria-hidden="true" /> Enregistrement…</>
+                    : <>Valider</>
+                  }
+                </button>
+              )}
+            </div>
+
+          </form>
+        </div>
+      )}
     </div>
   );
 }
