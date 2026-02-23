@@ -130,6 +130,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.9rem;
+  overflow: visible;
 }
 
 /* ── En-tête d'étape ────────────────────────────────────────── */
