@@ -444,7 +444,6 @@ export default function InscriptionPage() {
   // Options pour Nationalite (Ref:Pays)
   const [paysOptions, setPaysOptions]   = useState<PaysOption[]>([]);
   const [paysLoading, setPaysLoading]   = useState(false);
-  const [paysDebug, setPaysDebug]       = useState<string>("");
 
   const [form, setForm]               = useState<FormData>(INITIAL);
   const [step, setStep]               = useState(1);
@@ -506,12 +505,8 @@ export default function InscriptionPage() {
   useEffect(() => {
     if (!docApi) return;
     setPaysLoading(true);
-    setPaysDebug("");
     docApi.fetchTable("PAYS")
       .then((table: any) => {
-        const cols = Object.keys(table);
-        const rowCount = (table.id as any[])?.length ?? 0;
-        setPaysDebug(`OK — ${rowCount} lignes, colonnes: ${cols.join(", ")}`);
         const ids = table.id as number[];
         const opts: PaysOption[] = [];
         for (let i = 0; i < ids.length; i++) {
@@ -524,9 +519,7 @@ export default function InscriptionPage() {
         opts.sort((a, b) => a.label.localeCompare(b.label, "fr"));
         setPaysOptions(opts);
       })
-      .catch((err: any) => {
-        setPaysDebug(`ERREUR: ${err?.message ?? String(err)}`);
-      })
+      .catch(() => {})
       .finally(() => setPaysLoading(false));
   }, [docApi]);
 
@@ -713,12 +706,6 @@ export default function InscriptionPage() {
                   loading={paysLoading}
                   required
                 />
-                {paysDebug && (
-                  <div style={{ fontSize: "0.72rem", color: paysDebug.startsWith("ERREUR") ? "#b91c1c" : "#555", background: "#f9f9f9", border: "1px solid #e0e0e0", borderRadius: 4, padding: "0.3rem 0.5rem", fontFamily: "monospace", wordBreak: "break-all" }}>
-                    🐛 {paysDebug}
-                  </div>
-                )}
-
                 <div className="ins-field">
                   <label className="ins-label">Date de naissance<span className="ins-required"> *</span></label>
                   <input
