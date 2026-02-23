@@ -282,7 +282,8 @@
   border-color: #000091;
   color: #000091;
 }
-.ins-ouinon-btn--active {
+.ins-ouinon-btn--active,
+.ins-ouinon-btn--active:hover {
   background: #000091;
   border-color: #000091;
   color: #fff;
