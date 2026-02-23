@@ -242,6 +242,11 @@ function NationaliteDropdown({
   );
 }
 
+/* Style inline appliqué sur le bouton actif (priorité absolue sur tout CSS externe) */
+const OUINON_ACTIVE: React.CSSProperties = {
+  background: "#000091", borderColor: "#000091", color: "#fff",
+};
+
 /* ─── Composants UI génériques ───────────────────────────────── */
 
 function StepHeader({ step, title, subtitle }: { step: number; title: string; subtitle?: string }) {
@@ -797,8 +802,8 @@ function GenreField({
         Genre{required && <span className="ins-required"> *</span>}
       </label>
       <div className="ins-ouinon">
-        <button type="button" className={`ins-ouinon-btn${value === "Femme" ? " ins-ouinon-btn--active" : ""}`} onClick={() => onChange("Femme")}>Femme</button>
-        <button type="button" className={`ins-ouinon-btn${value === "Homme" ? " ins-ouinon-btn--active" : ""}`} onClick={() => onChange("Homme")}>Homme</button>
+        <button type="button" className={`ins-ouinon-btn${value === "Femme" ? " ins-ouinon-btn--active" : ""}`} style={value === "Femme" ? OUINON_ACTIVE : undefined} onClick={() => onChange("Femme")}>Femme</button>
+        <button type="button" className={`ins-ouinon-btn${value === "Homme" ? " ins-ouinon-btn--active" : ""}`} style={value === "Homme" ? OUINON_ACTIVE : undefined} onClick={() => onChange("Homme")}>Homme</button>
       </div>
     </div>
   );
@@ -817,8 +822,8 @@ function OuiNonField({
       </label>
       {description && <p className="ins-field-desc">{description}</p>}
       <div className="ins-ouinon">
-        <button type="button" className={`ins-ouinon-btn${value === "Oui" ? " ins-ouinon-btn--active" : ""}`} onClick={() => onChange("Oui")}>Oui</button>
-        <button type="button" className={`ins-ouinon-btn${value === "Non" ? " ins-ouinon-btn--active" : ""}`} onClick={() => onChange("Non")}>Non</button>
+        <button type="button" className={`ins-ouinon-btn${value === "Oui" ? " ins-ouinon-btn--active" : ""}`} style={value === "Oui" ? OUINON_ACTIVE : undefined} onClick={() => onChange("Oui")}>Oui</button>
+        <button type="button" className={`ins-ouinon-btn${value === "Non" ? " ins-ouinon-btn--active" : ""}`} style={value === "Non" ? OUINON_ACTIVE : undefined} onClick={() => onChange("Non")}>Non</button>
       </div>
     </div>
   );
@@ -837,8 +842,8 @@ function ToggleOuiNon({
       </label>
       {description && <p className="ins-field-desc">{description}</p>}
       <div className="ins-ouinon">
-        <button type="button" className={`ins-ouinon-btn${value === true ? " ins-ouinon-btn--active" : ""}`} onClick={() => onChange(true)}>Oui</button>
-        <button type="button" className={`ins-ouinon-btn${value === false ? " ins-ouinon-btn--active" : ""}`} onClick={() => onChange(false)}>Non</button>
+        <button type="button" className={`ins-ouinon-btn${value === true ? " ins-ouinon-btn--active" : ""}`} style={value === true ? OUINON_ACTIVE : undefined} onClick={() => onChange(true)}>Oui</button>
+        <button type="button" className={`ins-ouinon-btn${value === false ? " ins-ouinon-btn--active" : ""}`} style={value === false ? OUINON_ACTIVE : undefined} onClick={() => onChange(false)}>Non</button>
       </div>
     </div>
   );
