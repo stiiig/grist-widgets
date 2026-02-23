@@ -123,9 +123,10 @@ function NationaliteDropdown({
   options: PaysOption[]; valueId: number | null;
   onChange: (id: number | null) => void; loading?: boolean; required?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
-  const [q, setQ]       = useState("");
-  const rootRef         = useRef<HTMLDivElement | null>(null);
+  const [open, setOpen]         = useState(false);
+  const [q, setQ]               = useState("");
+  const [hoveredId, setHoveredId] = useState<number | null>(null);
+  const rootRef                 = useRef<HTMLDivElement | null>(null);
 
   const selected = valueId != null ? options.find((o) => o.id === valueId) ?? null : null;
 
@@ -158,11 +159,13 @@ function NationaliteDropdown({
         key={o.id}
         type="button"
         onClick={() => { onChange(o.id); setOpen(false); setQ(""); }}
+        onMouseEnter={() => setHoveredId(o.id)}
+        onMouseLeave={() => setHoveredId(null)}
         style={{
           display: "flex", alignItems: "center", justifyContent: "space-between",
           width: "100%", textAlign: "left", padding: "0.35rem 0.6rem",
           border: 0, borderBottom: "1px solid #f5f5f5",
-          background: isSelected ? "#f0f0ff" : "white",
+          background: isSelected ? "#f0f0ff" : hoveredId === o.id ? "#f5f5ff" : "white",
           cursor: "pointer", fontSize: "0.82rem",
           fontFamily: "Marianne, arial, sans-serif", color: "#1e1e1e",
           fontWeight: isSelected ? 700 : 400,

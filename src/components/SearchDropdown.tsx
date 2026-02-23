@@ -99,6 +99,7 @@ export function SearchDropdown(props: {
 
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
+  const [hoveredId, setHoveredId] = useState<number | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   const selected = useMemo(
@@ -168,7 +169,13 @@ export function SearchDropdown(props: {
                 key={o.id}
                 type="button"
                 onClick={() => { onChange(o.id); setOpen(false); setQ(""); }}
-                style={{ ...optionBtn, background: valueId === o.id ? "#f0f0ff" : "white", fontWeight: valueId === o.id ? 700 : 400 }}
+                onMouseEnter={() => setHoveredId(o.id)}
+                onMouseLeave={() => setHoveredId(null)}
+                style={{
+                  ...optionBtn,
+                  background: valueId === o.id ? "#f0f0ff" : hoveredId === o.id ? "#f5f5ff" : "white",
+                  fontWeight: valueId === o.id ? 700 : 400,
+                }}
               >
                 {o.label}
               </button>
@@ -197,6 +204,7 @@ export function SearchMultiDropdown(props: {
 
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
+  const [hoveredId, setHoveredId] = useState<number | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   const valueSet = useMemo(() => new Set(valueIds), [valueIds]);
@@ -262,6 +270,8 @@ export function SearchMultiDropdown(props: {
             {filtered.map((o) => (
               <label
                 key={o.id}
+                onMouseEnter={() => setHoveredId(o.id)}
+                onMouseLeave={() => setHoveredId(null)}
                 style={{
                   display: "flex",
                   gap: "0.5rem",
@@ -271,7 +281,7 @@ export function SearchMultiDropdown(props: {
                   alignItems: "center",
                   fontSize: "0.82rem",
                   fontFamily: "Marianne, arial, sans-serif",
-                  background: valueSet.has(o.id) ? "#f0f0ff" : "white",
+                  background: valueSet.has(o.id) ? "#f0f0ff" : hoveredId === o.id ? "#f5f5ff" : "white",
                   fontWeight: valueSet.has(o.id) ? 700 : 400,
                 }}
               >
