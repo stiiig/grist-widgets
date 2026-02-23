@@ -369,6 +369,81 @@ function TextField({
   );
 }
 
+/* ─── Sélecteur de date de naissance ────────────────────── */
+const MONTHS_FR = [
+  "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
+  "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre",
+];
+const MAX_BIRTH_YEAR = new Date().getFullYear() - 15;
+const MIN_BIRTH_YEAR = new Date().getFullYear() - 100;
+const BIRTH_YEARS = Array.from(
+  { length: MAX_BIRTH_YEAR - MIN_BIRTH_YEAR + 1 },
+  (_, i) => MAX_BIRTH_YEAR - i,
+);
+
+function DateNaissanceField({
+  value, onChange, required = false,
+}: {
+  value: string; onChange: (v: string) => void; required?: boolean;
+}) {
+  const [yStr, mStr, dStr] = value ? value.split("-") : ["", "", ""];
+
+  const daysInMonth = yStr && mStr
+    ? new Date(parseInt(yStr), parseInt(mStr), 0).getDate()
+    : 31;
+  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+
+  function update(y: string, m: string, d: string) {
+    if (!y || !m || !d) { onChange(""); return; }
+    const maxDay = new Date(parseInt(y), parseInt(m), 0).getDate();
+    const clampedDay = Math.min(parseInt(d), maxDay);
+    onChange(`${y}-${m}-${String(clampedDay).padStart(2, "0")}`);
+  }
+
+  const age = computeAge(value);
+
+  return (
+    <div className="ins-field">
+      <label className="ins-label">
+        Date de naissance{required && <span className="ins-required"> *</span>}
+      </label>
+      <div className="ins-date-row">
+        <select
+          className="ins-select ins-date-select ins-date-select--day"
+          value={dStr ?? ""}
+          onChange={(e) => update(yStr ?? "", mStr ?? "", e.target.value)}
+        >
+          <option value="">Jour</option>
+          {days.map((d) => (
+            <option key={d} value={String(d).padStart(2, "0")}>{d}</option>
+          ))}
+        </select>
+        <select
+          className="ins-select ins-date-select"
+          value={mStr ?? ""}
+          onChange={(e) => update(yStr ?? "", e.target.value, dStr ?? "")}
+        >
+          <option value="">Mois</option>
+          {MONTHS_FR.map((name, i) => (
+            <option key={i + 1} value={String(i + 1).padStart(2, "0")}>{name}</option>
+          ))}
+        </select>
+        <select
+          className="ins-select ins-date-select ins-date-select--year"
+          value={yStr ?? ""}
+          onChange={(e) => update(e.target.value, mStr ?? "", dStr ?? "")}
+        >
+          <option value="">Année</option>
+          {BIRTH_YEARS.map((y) => (
+            <option key={y} value={String(y)}>{y}</option>
+          ))}
+        </select>
+      </div>
+      {age !== null && <span className="ins-age-hint">{age} ans</span>}
+    </div>
+  );
+}
+
 function GenreField({
   value, onChange, required = false,
 }: {
@@ -733,8 +808,6 @@ export default function InscriptionPage() {
     );
   }
 
-  const age = computeAge(form.Date_de_naissance);
-
   return (
     <div className="ins-shell">
       <header className="ins-header">
@@ -792,16 +865,11 @@ export default function InscriptionPage() {
                   loading={paysLoading}
                   required
                 />
-                <div className="ins-field">
-                  <label className="ins-label">Date de naissance<span className="ins-required"> *</span></label>
-                  <input
-                    type="date"
-                    className="ins-input"
-                    value={form.Date_de_naissance}
-                    onChange={(e) => set("Date_de_naissance", e.target.value)}
-                  />
-                  {age !== null && <span className="ins-age-hint">{age} ans</span>}
-                </div>
+                <DateNaissanceField
+                  value={form.Date_de_naissance}
+                  onChange={(v) => set("Date_de_naissance", v)}
+                  required
+                />
 
                 <OuiNonField label="Candidat·e majeur·e" value={form.Majeur} onChange={(v) => set("Majeur", v)} required />
 
