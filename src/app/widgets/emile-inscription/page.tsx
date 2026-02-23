@@ -822,12 +822,19 @@ export default function InscriptionPage() {
         </header>
         <div className="ins-body ins-body--center">
           <div className="ins-confirm">
-            <i className="fa-solid fa-circle-check ins-confirm__icon" aria-hidden="true" />
-            <h2 className="ins-confirm__title">Dossier créé !</h2>
-            <p className="ins-confirm__text">Le candidat a bien été ajouté dans Grist.</p>
-            <button type="button" className="ins-btn ins-btn--secondary"
+            <h2 className="ins-confirm__title">Merci pour votre confiance&nbsp;!</h2>
+            <p className="ins-confirm__text">
+              L&apos;inscription est bien enregistrée et l&apos;équipe EMILE va procéder à l&apos;analyse de
+              l&apos;éligibilité du dossier pour le / la candidat·e.
+            </p>
+            <p className="ins-confirm__text">
+              D&apos;ici quelques instants, vous recevrez un email avec le statut du dossier de votre
+              candidat·e (éligible ou non-éligible) ainsi que les instructions, le cas échéant, pour la
+              suite du traitement du dossier.
+            </p>
+            <button type="button" className="ins-btn ins-btn--primary"
               onClick={() => { setForm(INITIAL); setDone(false); setStep(1); setValidError(""); setSubmitError(""); }}>
-              <i className="fa-solid fa-rotate-left" aria-hidden="true" /> Nouveau candidat
+              <i className="fa-solid fa-circle-plus" aria-hidden="true" /> Nouvelle inscription
             </button>
           </div>
         </div>
