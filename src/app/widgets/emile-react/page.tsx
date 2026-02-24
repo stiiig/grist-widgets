@@ -3,6 +3,7 @@
 import "./styles.css";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import logoEmile from "./logo-emile-white.png";
 import { initGristOrMock } from "@/lib/grist/init";
 import {
@@ -68,9 +69,11 @@ const OUINON_ACTIVE: React.CSSProperties = {
   background: "#000091", borderColor: "#000091", color: "#fff",
 };
 
-/* ─── InfoPopover ────────────────────────────────────── */
+/* ─── InfoPopover (portal → jamais coupé par overflow) ── */
 function InfoPopover({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const btnRef  = useRef<HTMLButtonElement | null>(null);
   const rootRef = useRef<HTMLSpanElement | null>(null);
 
   useEffect(() => {
@@ -81,23 +84,31 @@ function InfoPopover({ children }: { children: React.ReactNode }) {
     return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
 
+  function calcPos() {
+    if (btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + 4, left: r.left });
+    }
+  }
+
   return (
     <span
       ref={rootRef}
       onMouseLeave={() => setOpen(false)}
-      style={{ position: "relative", display: "inline-flex", verticalAlign: "middle", marginLeft: "0.35rem" }}
+      style={{ display: "inline-flex", verticalAlign: "middle", marginLeft: "0.35rem" }}
     >
       <button
+        ref={btnRef}
         type="button"
-        onMouseEnter={() => setOpen(true)}
-        onClick={(e) => { e.preventDefault(); setOpen((v) => !v); }}
+        onMouseEnter={() => { calcPos(); setOpen(true); }}
+        onClick={(e) => { e.preventDefault(); if (!open) { calcPos(); setOpen(true); } else setOpen(false); }}
         style={{ background: "none", border: "none", cursor: "pointer", color: "#000091", fontSize: "0.85rem", padding: "0 0.1rem", display: "inline-flex", alignItems: "center", lineHeight: 1 }}
       >
         <i className="fa-solid fa-circle-info" aria-hidden="true" />
       </button>
-      {open && (
+      {open && pos && typeof document !== "undefined" && createPortal(
         <div style={{
-          position: "absolute", zIndex: 600, top: "calc(100% + 4px)", left: 0,
+          position: "fixed", zIndex: 9999, top: pos.top, left: pos.left,
           width: "22rem", maxWidth: "calc(100vw - 2rem)",
           background: "#fff", border: "1px solid #c8c8e8", borderRadius: 6,
           boxShadow: "0 6px 20px rgba(0,0,145,.12)",
@@ -106,7 +117,8 @@ function InfoPopover({ children }: { children: React.ReactNode }) {
           whiteSpace: "normal",
         }}>
           {children}
-        </div>
+        </div>,
+        document.body
       )}
     </span>
   );
@@ -618,11 +630,74 @@ function TelSpecialField({ value, onChange, disabled, col }: {
   );
 }
 
-/* ─── Date de naissance (3 dropdowns) ────────────────── */
+/* ─── Date (3 dropdowns — générique + naissance) ─────── */
 const MONTHS_FR = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
 const MAX_BIRTH_YEAR = new Date().getFullYear() - 15;
 const MIN_BIRTH_YEAR = new Date().getFullYear() - 100;
 const BIRTH_YEARS = Array.from({ length: MAX_BIRTH_YEAR - MIN_BIRTH_YEAR + 1 }, (_, i) => MAX_BIRTH_YEAR - i);
+
+const THIS_YEAR = new Date().getFullYear();
+const GENERIC_YEARS = Array.from({ length: THIS_YEAR + 5 - 1900 + 1 }, (_, i) => THIS_YEAR + 5 - i);
+
+function GenericDateField({ value, onChange, disabled, col }: {
+  value: number | null; onChange: (v: number | null) => void;
+  disabled: boolean; col: ColMeta;
+}) {
+  const isoFromUnix = (v: number | null) => (v ? unixSecondsToISODate(v) : "");
+
+  const [selY, setSelY] = useState(() => { const p = isoFromUnix(value).split("-"); return p[0] ?? ""; });
+  const [selM, setSelM] = useState(() => { const p = isoFromUnix(value).split("-"); return p[1] ?? ""; });
+  const [selD, setSelD] = useState(() => { const p = isoFromUnix(value).split("-"); return p[2] ?? ""; });
+
+  useEffect(() => {
+    const iso = isoFromUnix(value);
+    const p = iso ? iso.split("-") : ["", "", ""];
+    setSelY(p[0] ?? ""); setSelM(p[1] ?? ""); setSelD(p[2] ?? "");
+  }, [value]);
+
+  function commit(y: string, m: string, d: string) {
+    if (y && m && d) {
+      const maxDay = new Date(parseInt(y), parseInt(m), 0).getDate();
+      const clampedDay = Math.min(parseInt(d), maxDay);
+      const iso = `${y}-${m}-${String(clampedDay).padStart(2, "0")}`;
+      onChange(isoDateToUnixSeconds(iso) ?? null);
+    } else {
+      onChange(null);
+    }
+  }
+
+  const daysInMonth = selY && selM ? new Date(parseInt(selY), parseInt(selM), 0).getDate() : 31;
+  const dayOptions   = useMemo(() => Array.from({ length: daysInMonth }, (_, i) => ({ id: i + 1, label: String(i + 1) })), [daysInMonth]);
+  const monthOptions = useMemo(() => MONTHS_FR.map((name, i) => ({ id: i + 1, label: name })), []);
+  const yearOptions  = useMemo(() => GENERIC_YEARS.map((y) => ({ id: y, label: String(y) })), []);
+
+  const dayId   = selD ? parseInt(selD, 10) : null;
+  const monthId = selM ? parseInt(selM, 10) : null;
+  const yearId  = selY ? parseInt(selY, 10) : null;
+
+  return (
+    <div className="emile-field">
+      <FieldLabel col={col} disabled={disabled} />
+      <div style={{ display: "flex", gap: "0.4rem" }}>
+        <div style={{ flex: "1 1 0%" }}>
+          <SearchDropdown options={dayOptions} valueId={dayId}
+            onChange={(id) => { if (!id) return; const d = String(id).padStart(2, "0"); setSelD(d); commit(selY, selM, d); }}
+            placeholder="Jour" searchable={true} disabled={disabled} />
+        </div>
+        <div style={{ flex: "1 1 0%" }}>
+          <SearchDropdown options={monthOptions} valueId={monthId}
+            onChange={(id) => { if (!id) return; const m = String(id).padStart(2, "0"); setSelM(m); commit(selY, m, selD); }}
+            placeholder="Mois" searchable={true} disabled={disabled} />
+        </div>
+        <div style={{ flex: "1 1 0%" }}>
+          <SearchDropdown options={yearOptions} valueId={yearId}
+            onChange={(id) => { if (!id) return; const y = String(id); setSelY(y); commit(y, selM, selD); }}
+            placeholder="Année" searchable={true} disabled={disabled} />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function DateNaissanceSpecialField({ value, onChange, disabled, col, genreValue }: {
   value: number | null; onChange: (v: number | null) => void;
@@ -1137,19 +1212,15 @@ function Field(props: {
     );
   }
 
-  /* ── Date (générique) ──────────────────────────────── */
+  /* ── Date générique (triptique Jour/Mois/Année) ────── */
   if (isDate) {
     return (
-      <div className={wrapCls}>
-        <FieldLabel col={col} disabled={disabled} />
-        <input
-          className="emile-input"
-          type="date"
-          value={unixSecondsToISODate(value)}
-          onChange={(e) => onChange(isoDateToUnixSeconds(e.target.value))}
-          disabled={disabled}
-        />
-      </div>
+      <GenericDateField
+        value={typeof value === "number" ? value : null}
+        onChange={onChange}
+        disabled={disabled}
+        col={col}
+      />
     );
   }
 
