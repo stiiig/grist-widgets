@@ -142,10 +142,12 @@ export default function EtablissementPage() {
 
   /* ── Validation ─────────────────────────────────────────────── */
   function validate(): string | null {
-    if (!form.Nom.trim())             return "Le nom de l'établissement est requis.";
-    if (!form.Dispositif)             return "Le dispositif est requis.";
-    if (!form.Departement)            return "Le département est requis.";
-    if (!form.Organisme_gestionnaire) return "L'organisme gestionnaire est requis.";
+    if (
+      !form.Nom.trim() ||
+      !form.Dispositif ||
+      !form.Departement ||
+      !form.Organisme_gestionnaire
+    ) return "Tous les champs sont requis.";
     return null;
   }
 
