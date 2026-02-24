@@ -1257,8 +1257,8 @@ export default function InscriptionPage() {
   return (
     <div className="ins-shell">
       <header className="ins-header">
-        <div className="ins-header__logo"><i className="fa-solid fa-landmark" aria-hidden="true" />DDT31</div>
-        <span className="ins-header__appname">EMILE — Inscription</span>
+        <div className="ins-header__logo"><i className="fa-solid fa-landmark" aria-hidden="true" />EMILE</div>
+        <span className="ins-header__appname">Inscription candidat·e</span>
       </header>
 
       {mode === "boot" ? (
