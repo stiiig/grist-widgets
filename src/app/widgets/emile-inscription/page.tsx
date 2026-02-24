@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import "./styles.css";
-import logoEmile from "./logo-emile.png";
+import logoEmile from "./logo-emile-white.png";
 import { initGristOrMock } from "@/lib/grist/init";
 import {
   loadColumnsMetaFor,
