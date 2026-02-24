@@ -58,6 +58,7 @@ export default function EtablissementPage() {
   const [organismeOptions,   setOrganismeOptions] = useState<Option[]>([]);
   const [dptsLoading,        setDptsLoading]      = useState(true);
   const [colsLoading,        setColsLoading]      = useState(true);
+  const [deptDiag,           setDeptDiag]         = useState<string | null>(null);
 
   /* ── Effet 1 : init Grist (identique à emile-inscription) ───── */
   useEffect(() => {
@@ -89,6 +90,7 @@ export default function EtablissementPage() {
   useEffect(() => {
     if (!docApi) return;
     setDptsLoading(true);
+    setDeptDiag(null);
     docApi.fetchTable("DPTS_REGIONS")
       .then((table: any) => {
         const ids = table.id as number[];
@@ -109,8 +111,14 @@ export default function EtablissementPage() {
         }
         opts.sort((a, b) => deptSortKey(a.tagLeft) - deptSortKey(b.tagLeft));
         setDeptOptions(opts);
+        if (opts.length === 0) {
+          const cols = Object.keys(table).join(", ");
+          setDeptDiag(`0 résultats sur ${ids.length} lignes. Colonnes: ${cols}`);
+        }
       })
-      .catch(() => {})
+      .catch((err: any) => {
+        setDeptDiag(`Erreur fetchTable: ${err?.message ?? String(err)}`);
+      })
       .finally(() => setDptsLoading(false));
   }, [docApi]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -275,6 +283,11 @@ export default function EtablissementPage() {
               placeholder={dptsLoading ? "Chargement…" : "Rechercher un département"}
               disabled={dptsLoading}
             />
+            {deptDiag && (
+              <div style={{ marginTop: "0.3rem", fontSize: "0.75rem", color: "#c0392b", background: "#fdf3f2", border: "1px solid #f5c6c0", borderRadius: 4, padding: "0.3rem 0.5rem", wordBreak: "break-all" }}>
+                🔍 {deptDiag}
+              </div>
+            )}
           </div>
 
           {/* Dispositif / Type */}
