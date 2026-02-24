@@ -15,12 +15,14 @@ const TABLE_ID = "ETABLISSEMENTS";
 
 /* ─── Types ──────────────────────────────────────────────────── */
 type FormData = {
+  Nom:                    string;
   Dispositif:             string;
   Departement:            number | null;   // Ref:DPTS_REGIONS → rowId
   Organisme_gestionnaire: string;
 };
 
 const INITIAL: FormData = {
+  Nom:                    "",
   Dispositif:             "",
   Departement:            null,
   Organisme_gestionnaire: "",
@@ -119,6 +121,7 @@ export default function EtablissementPage() {
 
   /* ── Validation ─────────────────────────────────────────────── */
   function validate(): string | null {
+    if (!form.Nom.trim())             return "Le nom de l'établissement est requis.";
     if (!form.Dispositif)             return "Le dispositif est requis.";
     if (!form.Departement)            return "Le département est requis.";
     if (!form.Organisme_gestionnaire) return "L'organisme gestionnaire est requis.";
@@ -138,6 +141,7 @@ export default function EtablissementPage() {
     try {
       await docApi.applyUserActions([
         ["AddRecord", TABLE_ID, null, {
+          Nom:                    form.Nom.trim(),
           Dispositif:             form.Dispositif,
           Departement:            form.Departement,
           Organisme_gestionnaire: form.Organisme_gestionnaire,
@@ -178,7 +182,8 @@ export default function EtablissementPage() {
               L&apos;entrée suivante a bien été ajoutée dans EMILE&nbsp;:
             </p>
             <div className="ae-done__name">
-              {form.Dispositif}
+              <i className="fa-solid fa-school" style={{ marginRight: "0.5rem" }} />
+              {form.Nom}
               {deptOpt && (
                 <span style={{ fontWeight: 400, marginLeft: "0.5rem", opacity: 0.8 }}>
                   — {deptOpt.tagLeft} {deptOpt.label}
@@ -208,6 +213,21 @@ export default function EtablissementPage() {
       <main className="ae-body">
 
         <form className="ae-form" onSubmit={handleSubmit}>
+
+          {/* Nom */}
+          <div className="ae-field">
+            <label className="ae-label">
+              Nom de l&apos;établissement <span className="ae-required">*</span>
+            </label>
+            <input
+              className="ae-input"
+              type="text"
+              value={form.Nom}
+              onChange={(e) => set("Nom", e.target.value)}
+              placeholder="Ex : Collège Jean Moulin"
+              autoFocus
+            />
+          </div>
 
           {/* Dispositif */}
           <div className="ae-field">
