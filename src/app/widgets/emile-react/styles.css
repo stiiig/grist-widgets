@@ -448,3 +448,26 @@ body {
 /* Ensure hidden inline messages never render */
 .fr-error-text[hidden],
 .fr-warning-text[hidden] { display: none !important; }
+
+/* ── Boutons Oui / Non / choix courts ───────────────────── */
+.emile-ouinon {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.emile-ouinon-btn {
+  padding: 0.3rem 1.2rem;
+  border: 1.5px solid #c1c1c1;
+  border-radius: 4px;
+  background: #fff;
+  font-size: 0.82rem;
+  font-family: inherit;
+  font-weight: 500;
+  color: #1e1e1e;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.emile-ouinon-btn:disabled { opacity: 0.5; cursor: default; }
+.emile-ouinon-btn:not(:disabled):hover { border-color: #000091; color: #000091; }
+.emile-ouinon-btn--active,
+.emile-ouinon-btn--active:hover { background: #000091; border-color: #000091; color: #fff; }

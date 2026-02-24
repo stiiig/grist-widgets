@@ -185,7 +185,7 @@ export function SearchDropdown(props: {
                     background: "#e8eef8", color: "#000091", whiteSpace: "nowrap",
                   }}>{o.tagLeft}</span>
                 )}
-                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{o.label}</span>
+                <span style={{ whiteSpace: "normal", wordBreak: "break-word", flex: 1 }}>{o.label}</span>
                 {o.tag && (
                   <span style={{
                     fontSize: "0.62rem", fontWeight: 600, padding: "0.1rem 0.35rem",
