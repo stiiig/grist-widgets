@@ -56,6 +56,7 @@ export default function EtablissementPage() {
   const [deptOptions,        setDeptOptions]                  = useState<Option[]>([]);
   const [organismeOptions,   setOrganismeOptions]             = useState<Option[]>([]);
   const [dataLoading,        setDataLoading]                  = useState(true);
+  const [initError,          setInitError]                    = useState<string | null>(null);
 
   /* ── Init Grist + chargement ────────────────────────────────── */
   useEffect(() => {
@@ -69,9 +70,11 @@ export default function EtablissementPage() {
       try {
         /* Colonnes Choice de la table ETABLISSEMENTS */
         const cols = await loadColumnsMetaFor(api, TABLE_ID);
+        console.log("[EtablissementPage] colonnes trouvées:", cols.map((c) => `${c.colId} (${c.type})`));
 
         const dispCol = cols.find((c) => c.colId === "Dispositif");
         const orgaCol = cols.find((c) => c.colId === "Organisme_gestionnaire");
+        console.log("[EtablissementPage] dispCol:", dispCol?.colId, "orgaCol:", orgaCol?.colId);
 
         if (dispCol) {
           const choices = normalizeChoices(dispCol.widgetOptionsParsed?.choices);
@@ -101,8 +104,9 @@ export default function EtablissementPage() {
         }
         opts.sort((a, b) => deptSortKey(a.tagLeft) - deptSortKey(b.tagLeft));
         setDeptOptions(opts);
-      } catch (err) {
+      } catch (err: any) {
         console.error("[EtablissementPage] Erreur chargement:", err);
+        setInitError(err?.message ?? String(err));
       } finally {
         setDataLoading(false);
       }
@@ -272,6 +276,14 @@ export default function EtablissementPage() {
               disabled={dataLoading && organismeOptions.length === 0}
             />
           </div>
+
+          {/* Erreur init Grist (debug) */}
+          {initError && (
+            <div className="ae-validation-error">
+              <i className="fa-solid fa-circle-exclamation" />
+              <span><strong>Erreur chargement :</strong> {initError}</span>
+            </div>
+          )}
 
           {/* Erreur de validation */}
           {error && (
