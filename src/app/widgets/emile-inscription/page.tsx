@@ -1320,14 +1320,13 @@ export default function InscriptionPage() {
                   </>}
                 />
 
-                <div className="ins-consent-frame">
-                  <ToggleOuiNon
-                    label="Candidat·e volontaire pour une insertion professionnelle et une mobilité géographique via le programme EMILE, et d'accord pour que ses données personnelles soient partagées aux équipes du programme EMILE"
-                    value={form.Consentement_volontaire}
-                    onChange={(v) => set("Consentement_volontaire", v)}
-                    required
-                  />
-                </div>
+                <SectionTitle title="Programme EMILE" />
+                <ToggleOuiNon
+                  label="Candidat·e volontaire pour une insertion professionnelle et une mobilité géographique via le programme EMILE, et d'accord pour que ses données personnelles soient partagées aux équipes du programme EMILE"
+                  value={form.Consentement_volontaire}
+                  onChange={(v) => set("Consentement_volontaire", v)}
+                  required
+                />
 
                 <SectionTitle title="Autres informations" />
                 <FieldWrap label="Niveau de langue" required>
