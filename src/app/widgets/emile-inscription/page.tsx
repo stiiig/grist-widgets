@@ -1163,11 +1163,13 @@ function EligibilityScreen({
     },
     {
       id: "territoire",
-      label: "Département de domicile éligible (territoire de départ)",
+      label: "Territoire de départ",
       ok: form.Departement_domicile_inscription == null
         ? null
         : dptsIsDepart.get(form.Departement_domicile_inscription) === true,
-      detail: deptLabel ? `${deptNum ? `(${deptNum}) ` : ""}${deptLabel}` : undefined,
+      detail: deptLabel
+        ? [deptNum ? `(${deptNum})` : null, deptLabel, deptOpt?.tag ?? null].filter(Boolean).join(" — ")
+        : undefined,
     },
     {
       id: "majeur",
@@ -1332,7 +1334,7 @@ function EligibilityScreen({
                   background: isOk ? "#dcfce7" : isNok ? "#fee2e2" : "#f3f4f6",
                   color: isOk ? "#15803d" : isNok ? "#b91c1c" : "#9ca3af",
                 }}>
-                  {isOk ? "OK" : isNok ? "Non OK" : "—"}
+                  {isOk ? "Éligible" : isNok ? "Non éligible" : "—"}
                 </span>
               </div>
             );
@@ -1381,15 +1383,35 @@ function EligibilityScreen({
         </div>
       </div>
 
-      {/* ── Bouton nouvelle inscription ── */}
-      <div style={W}>
+      {/* ── Message si non éligible ── */}
+      {failingCount > 0 && (
+        <div style={{
+          ...W,
+          display: "flex", alignItems: "flex-start", gap: "0.65rem",
+          background: "#fff7ed", border: "1px solid #fed7aa",
+          borderRadius: "0.5rem", padding: "0.75rem 1rem",
+        }}>
+          <i className="fa-solid fa-envelope" style={{ color: "#ea580c", fontSize: "1rem", flexShrink: 0, marginTop: "0.05rem" }} />
+          <div style={{ fontSize: "0.82rem", color: "#7c2d12", lineHeight: 1.5 }}>
+            Pour avoir plus d&apos;explications sur cette situation, vous pouvez nous envoyer un message en répondant à l&apos;email que vous venez de recevoir.
+          </div>
+        </div>
+      )}
+
+      {/* ── Lien retour accueil ── */}
+      <div style={{ ...W, textAlign: "center" }}>
         <button
           type="button"
-          className="ins-btn ins-btn--primary"
           onClick={onNew}
-          style={{ width: "100%", justifyContent: "center", marginLeft: 0 }}
+          style={{
+            background: "none", border: "none", cursor: "pointer",
+            color: "#000091", fontSize: "0.83rem", fontFamily: "inherit",
+            display: "inline-flex", alignItems: "center", gap: "0.35rem",
+            padding: "0.3rem 0", textDecoration: "underline", textUnderlineOffset: "3px",
+          }}
         >
-          <i className="fa-solid fa-circle-plus" aria-hidden="true" /> Nouvelle inscription
+          <i className="fa-solid fa-arrow-left" style={{ fontSize: "0.7rem" }} />
+          Revenir à l&apos;accueil
         </button>
       </div>
 
