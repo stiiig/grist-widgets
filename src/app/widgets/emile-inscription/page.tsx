@@ -1119,6 +1119,274 @@ function ValidationError({ message }: { message: string }) {
   );
 }
 
+/* ─── Ecran d'éligibilité (écran final) ─────────────────────── */
+function EligibilityScreen({
+  form,
+  dptsOptions,
+  dptsIsDepart,
+  niveauEligibilite,
+  onNew,
+}: {
+  form: FormData;
+  dptsOptions: Option[];
+  dptsIsDepart: Map<number, boolean>;
+  niveauEligibilite: Map<number, string>;
+  onNew: () => void;
+}) {
+  const age      = computeAge(form.Date_de_naissance);
+  const deptOpt  = form.Departement_domicile_inscription != null
+    ? dptsOptions.find((o) => o.id === form.Departement_domicile_inscription) ?? null
+    : null;
+  const deptLabel = deptOpt?.label ?? null;
+  const deptNum   = deptOpt?.tagLeft ?? null;
+
+  const isFemme = form.Genre === "Femme";
+  const isHomme = form.Genre === "Homme";
+  const e = isFemme ? "e" : isHomme ? "" : "·e";
+
+  type Criterion = { id: string; label: string; ok: boolean | null; detail?: string };
+  const criteria: Criterion[] = [
+    {
+      id: "engagement",
+      label: "Orienteur·se co-accompagnant·e engagé·e",
+      ok: form.Engagement_orienteur === null ? null : form.Engagement_orienteur,
+    },
+    {
+      id: "territoire",
+      label: "Département de domicile éligible (territoire de départ)",
+      ok: form.Departement_domicile_inscription == null
+        ? null
+        : dptsIsDepart.get(form.Departement_domicile_inscription) === true,
+      detail: deptLabel ? `${deptNum ? `(${deptNum}) ` : ""}${deptLabel}` : undefined,
+    },
+    {
+      id: "majeur",
+      label: `Candidat${e} majeur${e} (18 ans ou plus)`,
+      ok: age == null ? null : age >= 18,
+      detail: age != null ? `${age} an${age > 1 ? "s" : ""}` : undefined,
+    },
+    {
+      id: "langue",
+      label: "Niveau de langue éligible",
+      ok: form.Niveau_de_langue == null
+        ? null
+        : (niveauEligibilite.get(form.Niveau_de_langue) ?? "").toLowerCase() === "oui",
+    },
+    {
+      id: "logement",
+      label: "Situation de précarité du logement avérée",
+      ok: !form.Precarite_de_logement
+        ? null
+        : form.Precarite_de_logement !== "Aucun des choix ne correspond à la situation",
+      detail: form.Precarite_de_logement || undefined,
+    },
+    {
+      id: "regularite",
+      label: "En situation régulière",
+      ok: !form.Regularite_situation
+        ? null
+        : form.Regularite_situation === "Oui",
+    },
+    {
+      id: "volontariat",
+      label: "Volontariat pour le programme EMILE",
+      ok: form.Consentement_volontaire === null ? null : form.Consentement_volontaire,
+    },
+  ];
+
+  const failingCount = criteria.filter((c) => c.ok === false).length;
+  const unknownCount = criteria.filter((c) => c.ok === null).length;
+  const eligible     = failingCount === 0 && unknownCount === 0;
+
+  const fullName = [form.Prenom, form.Nom_de_famille]
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .join(" ")
+    .toUpperCase() || "CANDIDAT·E";
+
+  const W: React.CSSProperties = { maxWidth: 560, width: "100%", margin: "0 auto" };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "0.9rem" }}>
+
+      {/* ── Notice succès ── */}
+      <div style={{
+        ...W,
+        display: "flex", alignItems: "flex-start", gap: "0.7rem",
+        background: "#f0fdf4", border: "1px solid #bbf7d0",
+        borderRadius: "0.5rem", padding: "0.75rem 1rem",
+      }}>
+        <i className="fa-solid fa-circle-check" style={{ color: "#16a34a", fontSize: "1.1rem", flexShrink: 0, marginTop: "0.05rem" }} />
+        <div>
+          <div style={{ fontWeight: 700, fontSize: "0.85rem", color: "#15803d" }}>
+            Inscription enregistrée avec succès
+          </div>
+          <div style={{ fontSize: "0.78rem", color: "#555", marginTop: "0.15rem", lineHeight: 1.4 }}>
+            D&apos;ici quelques instants, un email sera envoyé avec le statut du dossier et les instructions pour la suite.
+          </div>
+        </div>
+      </div>
+
+      {/* ── Carte candidat·e ── */}
+      <div style={{
+        ...W,
+        background: "#000091", borderRadius: "0.75rem",
+        padding: "1rem 1.25rem", color: "#fff",
+        display: "flex", alignItems: "center", gap: "0.9rem",
+      }}>
+        <div style={{
+          width: 44, height: 44, borderRadius: "50%",
+          background: "rgba(255,255,255,0.18)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          flexShrink: 0, fontSize: "1.2rem",
+        }}>
+          <i className="fa-solid fa-user-tie" />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 700, fontSize: "1rem", marginBottom: "0.3rem", letterSpacing: "0.03em" }}>
+            {fullName}
+          </div>
+          <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
+            {age != null && (
+              <span style={{
+                background: "rgba(255,255,255,0.18)", borderRadius: 99,
+                padding: "0.1rem 0.55rem", fontSize: "0.72rem", fontWeight: 600,
+              }}>
+                <i className="fa-solid fa-cake-candles" style={{ marginRight: "0.3rem", fontSize: "0.65rem" }} />
+                {age} an{age > 1 ? "s" : ""}
+              </span>
+            )}
+            {deptLabel && (
+              <span style={{
+                background: "rgba(255,255,255,0.18)", borderRadius: 99,
+                padding: "0.1rem 0.55rem", fontSize: "0.72rem", fontWeight: 600,
+              }}>
+                <i className="fa-solid fa-location-dot" style={{ marginRight: "0.3rem", fontSize: "0.65rem" }} />
+                {deptNum ? `(${deptNum}) ` : ""}{deptLabel}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Critères ── */}
+      <div style={W}>
+        <div style={{
+          fontSize: "0.72rem", fontWeight: 700, color: "#888",
+          textTransform: "uppercase", letterSpacing: "0.07em",
+          marginBottom: "0.55rem",
+        }}>
+          Vérification des critères d&apos;éligibilité
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+          {criteria.map((c) => {
+            const isOk  = c.ok === true;
+            const isNok = c.ok === false;
+            return (
+              <div key={c.id} style={{
+                display: "flex", alignItems: "center", gap: "0.7rem",
+                background: isOk ? "#f0fdf4" : isNok ? "#fef2f2" : "#fff",
+                border: `1px solid ${isOk ? "#bbf7d0" : isNok ? "#fecaca" : "#e5e5e5"}`,
+                borderRadius: "0.5rem",
+                padding: "0.55rem 0.8rem",
+              }}>
+                <span style={{
+                  width: 26, height: 26, borderRadius: "50%", flexShrink: 0,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: "0.75rem",
+                  background: isOk ? "#16a34a" : isNok ? "#dc2626" : "#d1d5db",
+                  color: "#fff",
+                }}>
+                  {isOk
+                    ? <i className="fa-solid fa-check" />
+                    : isNok
+                    ? <i className="fa-solid fa-xmark" />
+                    : <i className="fa-solid fa-minus" />
+                  }
+                </span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: "0.82rem", color: "#1e1e1e", lineHeight: 1.3 }}>{c.label}</div>
+                  {c.detail && (
+                    <div style={{
+                      fontSize: "0.7rem", color: "#777", marginTop: "0.1rem",
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    }}>
+                      {c.detail}
+                    </div>
+                  )}
+                </div>
+                <span style={{
+                  fontSize: "0.65rem", fontWeight: 700, padding: "0.12rem 0.45rem",
+                  borderRadius: 99, flexShrink: 0, textTransform: "uppercase",
+                  letterSpacing: "0.04em",
+                  background: isOk ? "#dcfce7" : isNok ? "#fee2e2" : "#f3f4f6",
+                  color: isOk ? "#15803d" : isNok ? "#b91c1c" : "#9ca3af",
+                }}>
+                  {isOk ? "OK" : isNok ? "Non OK" : "—"}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Résultat global ── */}
+      <div style={{
+        ...W,
+        borderRadius: "0.75rem",
+        padding: "1rem 1.2rem",
+        background: eligible ? "#f0fdf4" : failingCount > 0 ? "#fef2f2" : "#f8fafc",
+        border: `2px solid ${eligible ? "#16a34a" : failingCount > 0 ? "#dc2626" : "#cbd5e1"}`,
+        display: "flex", alignItems: "center", gap: "0.85rem",
+      }}>
+        <span style={{
+          width: 44, height: 44, borderRadius: "50%", flexShrink: 0,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: "1.3rem",
+          background: eligible ? "#16a34a" : failingCount > 0 ? "#dc2626" : "#94a3b8",
+          color: "#fff",
+        }}>
+          <i className={`fa-solid ${eligible ? "fa-circle-check" : failingCount > 0 ? "fa-circle-xmark" : "fa-circle-question"}`} />
+        </span>
+        <div>
+          <div style={{
+            fontWeight: 700, fontSize: "1rem",
+            color: eligible ? "#15803d" : failingCount > 0 ? "#b91c1c" : "#334155",
+          }}>
+            {eligible
+              ? `Candidat${e} éligible au programme EMILE`
+              : failingCount > 0
+              ? `Candidat${e} non éligible`
+              : "Éligibilité incomplète"
+            }
+          </div>
+          <div style={{ fontSize: "0.78rem", color: "#555", marginTop: "0.25rem", lineHeight: 1.4 }}>
+            {eligible
+              ? "Tous les critères sont remplis. Le dossier peut être traité."
+              : failingCount > 0
+              ? `${failingCount} critère${failingCount > 1 ? "s" : ""} non rempli${failingCount > 1 ? "s" : ""}. Le dossier ne peut pas être traité en l'état.`
+              : "Certains critères n'ont pas pu être vérifiés automatiquement."
+            }
+          </div>
+        </div>
+      </div>
+
+      {/* ── Bouton nouvelle inscription ── */}
+      <div style={W}>
+        <button
+          type="button"
+          className="ins-btn ins-btn--primary"
+          onClick={onNew}
+          style={{ width: "100%", justifyContent: "center", marginLeft: 0 }}
+        >
+          <i className="fa-solid fa-circle-plus" aria-hidden="true" /> Nouvelle inscription
+        </button>
+      </div>
+
+    </div>
+  );
+}
+
 /* ─── Page principale ────────────────────────────────────────── */
 
 export default function InscriptionPage() {
@@ -1145,6 +1413,8 @@ export default function InscriptionPage() {
   const [submitError, setSubmitError] = useState("");
   const [validError, setValidError]   = useState("");
   const [showFaq, setShowFaq]         = useState(false);
+  const [dptsIsDepart, setDptsIsDepart]           = useState<Map<number, boolean>>(new Map());
+  const [niveauEligibilite, setNiveauEligibilite] = useState<Map<number, string>>(new Map());
 
   /* ── Choix dynamiques depuis métadonnées Grist ── */
   const choicesMap = useMemo(() => {
@@ -1196,6 +1466,7 @@ export default function InscriptionPage() {
         const ids = table.id as number[];
         const optsDepart: Option[] = [];
         const optsAutres: Option[] = [];
+        const departMap = new Map<number, boolean>();
         for (let i = 0; i < ids.length; i++) {
           const id = ids[i];
           const label = String(table["Nom_departement"]?.[i] ?? "").trim();
@@ -1203,6 +1474,7 @@ export default function InscriptionPage() {
           const numero   = String(table["Numero"]?.[i] ?? "").trim() || undefined;
           const region   = String(table["Nom_region"]?.[i] ?? "").trim() || undefined;
           const isDepart = table["Territoire_depart"]?.[i] === "Oui";
+          departMap.set(id, isDepart);
           const opt: Option = { id, label, q: `${numero ?? ""} ${label}`.toLowerCase(), tagLeft: numero, tag: region };
           if (isDepart) optsDepart.push(opt);
           else optsAutres.push(opt);
@@ -1211,6 +1483,7 @@ export default function InscriptionPage() {
           (a.tagLeft ?? "").localeCompare(b.tagLeft ?? "", "fr", { numeric: true });
         optsDepart.sort(sortFn);
         optsAutres.sort(sortFn);
+        setDptsIsDepart(departMap);
         setDptsOptions([...optsDepart, ...optsAutres]);
       })
       .catch(() => {})
@@ -1225,13 +1498,17 @@ export default function InscriptionPage() {
       .then((table: any) => {
         const ids = table.id as number[];
         const opts: Option[] = [];
+        const eligMap = new Map<number, string>();
         for (let i = 0; i < ids.length; i++) {
           const id = ids[i];
           const label = String(table["Niveau_de_langue"]?.[i] ?? "").trim();
           if (!label) continue;
           const code = String(table["Code_langue"]?.[i] ?? "").trim() || undefined;
+          const elig = String(table["Eligibilite"]?.[i] ?? "").trim();
+          eligMap.set(id, elig);
           opts.push({ id, label, q: `${code ?? ""} ${label}`.toLowerCase(), tagLeft: code });
         }
+        setNiveauEligibilite(eligMap);
         setNiveauOptions(opts);
       })
       .catch(() => {})
@@ -1400,23 +1677,14 @@ export default function InscriptionPage() {
           </button>
         </header>
         {showFaq && docApi && <FAQPanel docApi={docApi} onClose={() => setShowFaq(false)} />}
-        <div className="ins-body ins-body--center">
-          <div className="ins-confirm">
-            <h2 className="ins-confirm__title">Merci pour votre confiance&nbsp;!</h2>
-            <p className="ins-confirm__text">
-              L&apos;inscription est bien enregistrée et l&apos;équipe EMILE va procéder à l&apos;analyse de
-              l&apos;éligibilité du dossier pour le / la candidat·e.
-            </p>
-            <p className="ins-confirm__text">
-              D&apos;ici quelques instants, vous recevrez un email avec le statut du dossier de votre
-              candidat·e (éligible ou non-éligible) ainsi que les instructions, le cas échéant, pour la
-              suite du traitement du dossier.
-            </p>
-            <button type="button" className="ins-btn ins-btn--primary"
-              onClick={() => { setForm(INITIAL); setDone(false); setStep(1); setValidError(""); setSubmitError(""); }}>
-              <i className="fa-solid fa-circle-plus" aria-hidden="true" /> Nouvelle inscription
-            </button>
-          </div>
+        <div className="ins-body">
+          <EligibilityScreen
+            form={form}
+            dptsOptions={dptsOptions}
+            dptsIsDepart={dptsIsDepart}
+            niveauEligibilite={niveauEligibilite}
+            onNew={() => { setForm(INITIAL); setDone(false); setStep(1); setValidError(""); setSubmitError(""); }}
+          />
         </div>
       </div>
     );
