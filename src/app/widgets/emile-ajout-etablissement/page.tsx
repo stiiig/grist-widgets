@@ -221,25 +221,7 @@ export default function EtablissementPage() {
               type="text"
               value={form.Nom}
               onChange={(e) => set("Nom", e.target.value)}
-              placeholder="Ex : Collège Jean Moulin"
               autoFocus
-            />
-          </div>
-
-          {/* Dispositif */}
-          <div className="ae-field">
-            <label className="ae-label">
-              Dispositif <span className="ae-required">*</span>
-            </label>
-            <SearchDropdown
-              options={dispositifOptions}
-              valueId={dispositifOptions.find((o) => o.label === form.Dispositif)?.id ?? null}
-              onChange={(id) => {
-                const found = dispositifOptions.find((o) => o.id === id);
-                set("Dispositif", found?.label ?? "");
-              }}
-              placeholder={dataLoading && dispositifOptions.length === 0 ? "Chargement…" : "Sélectionner le dispositif"}
-              disabled={dataLoading && dispositifOptions.length === 0}
             />
           </div>
 
@@ -254,6 +236,23 @@ export default function EtablissementPage() {
               onChange={(id) => set("Departement", id)}
               placeholder={dataLoading && deptOptions.length === 0 ? "Chargement…" : "Rechercher un département"}
               disabled={dataLoading && deptOptions.length === 0}
+            />
+          </div>
+
+          {/* Dispositif / Type */}
+          <div className="ae-field">
+            <label className="ae-label">
+              Dispositif / Type <span className="ae-required">*</span>
+            </label>
+            <SearchDropdown
+              options={dispositifOptions}
+              valueId={dispositifOptions.find((o) => o.label === form.Dispositif)?.id ?? null}
+              onChange={(id) => {
+                const found = dispositifOptions.find((o) => o.id === id);
+                set("Dispositif", found?.label ?? "");
+              }}
+              placeholder={dataLoading && dispositifOptions.length === 0 ? "Chargement…" : "Sélectionner le dispositif"}
+              disabled={dataLoading && dispositifOptions.length === 0}
             />
           </div>
 
