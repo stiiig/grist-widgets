@@ -261,9 +261,10 @@ function InfoPopover({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <span ref={rootRef} style={{ position: "relative", display: "inline-flex", verticalAlign: "middle", marginLeft: "0.35rem" }}>
+    <span ref={rootRef} onMouseLeave={() => setOpen(false)} style={{ position: "relative", display: "inline-flex", verticalAlign: "middle", marginLeft: "0.35rem" }}>
       <button
         type="button"
+        onMouseEnter={() => setOpen(true)}
         onClick={(e) => { e.preventDefault(); setOpen((v) => !v); }}
         style={{
           background: "none", border: "none", cursor: "pointer",
@@ -853,15 +854,16 @@ function GenreField({
 }
 
 function OuiNonField({
-  label, value, onChange, required = false, description,
+  label, value, onChange, required = false, description, info,
 }: {
   label: string; value: string; onChange: (v: string) => void;
-  required?: boolean; description?: string;
+  required?: boolean; description?: string; info?: React.ReactNode;
 }) {
   return (
     <div className="ins-field ins-field--wide">
       <label className="ins-label">
         {label}{required && <span className="ins-required"> *</span>}
+        {info && <InfoPopover>{info}</InfoPopover>}
       </label>
       {description && <p className="ins-field-desc">{description}</p>}
       <div className="ins-ouinon">
@@ -873,15 +875,16 @@ function OuiNonField({
 }
 
 function ToggleOuiNon({
-  label, value, onChange, required = false, description,
+  label, value, onChange, required = false, description, info,
 }: {
   label: string; value: boolean | null; onChange: (v: boolean) => void;
-  required?: boolean; description?: string;
+  required?: boolean; description?: string; info?: React.ReactNode;
 }) {
   return (
     <div className="ins-field ins-field--wide">
       <label className="ins-label">
         {label}{required && <span className="ins-required"> *</span>}
+        {info && <InfoPopover>{info}</InfoPopover>}
       </label>
       {description && <p className="ins-field-desc">{description}</p>}
       <div className="ins-ouinon">
@@ -997,12 +1000,13 @@ export default function InscriptionPage() {
         const opts: Option[] = [];
         for (let i = 0; i < ids.length; i++) {
           const id = ids[i];
-          const label = String(table["Numero_et_nom"]?.[i] ?? "").trim();
+          const label = String(table["Nom_departement"]?.[i] ?? "").trim();
           if (!label) continue;
-          const region = String(table["Nom_region"]?.[i] ?? "").trim() || undefined;
-          opts.push({ id, label, q: label.toLowerCase(), tag: region });
+          const numero  = String(table["Numero"]?.[i] ?? "").trim() || undefined;
+          const region  = String(table["Nom_region"]?.[i] ?? "").trim() || undefined;
+          opts.push({ id, label, q: `${numero ?? ""} ${label}`.toLowerCase(), tagLeft: numero, tag: region });
         }
-        opts.sort((a, b) => a.label.localeCompare(b.label, "fr"));
+        opts.sort((a, b) => (a.tagLeft ?? "").localeCompare(b.tagLeft ?? "", "fr", { numeric: true }));
         setDptsOptions(opts);
       })
       .catch(() => {})
@@ -1340,7 +1344,7 @@ export default function InscriptionPage() {
 
                 <OuiNonField
                   label="En situation régulière"
-                  description="Personne française ou étrangère en situation régulière. Les papiers administratifs des personnes accompagnatrices majeures doivent également être valides."
+                  info="Personne française ou étrangère en situation régulière. Les papiers administratifs des personnes accompagnatrices majeures doivent également être valides."
                   value={form.Regularite_situation}
                   onChange={(v) => set("Regularite_situation", v)}
                   required
@@ -1348,7 +1352,7 @@ export default function InscriptionPage() {
 
                 <ToggleOuiNon
                   label="Personne primo-arrivante"
-                  description="Toute personne extra-européenne résidant pour la première fois et depuis moins de 5 ans en France."
+                  info="Toute personne extra-européenne résidant pour la première fois et depuis moins de 5 ans en France."
                   value={form.Primo_arrivant}
                   onChange={(v) => set("Primo_arrivant", v)}
                 />

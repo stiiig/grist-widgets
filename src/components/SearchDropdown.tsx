@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
-export type Option = { id: number; label: string; q?: string; tag?: string };
+export type Option = { id: number; label: string; q?: string; tagLeft?: string; tag?: string };
 
 /* ─── styles partagés ─────────────────────────────────── */
 
@@ -173,17 +173,24 @@ export function SearchDropdown(props: {
                 onMouseLeave={() => setHoveredId(null)}
                 style={{
                   ...optionBtn,
-                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.4rem",
                   background: valueId === o.id ? "#f0f0ff" : hoveredId === o.id ? "#f5f5ff" : "white",
                   fontWeight: valueId === o.id ? 700 : 400,
                 }}
               >
-                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.label}</span>
+                {o.tagLeft && (
+                  <span style={{
+                    fontSize: "0.62rem", fontWeight: 700, padding: "0.1rem 0.35rem",
+                    borderRadius: 3, flexShrink: 0,
+                    background: "#e8eef8", color: "#000091", whiteSpace: "nowrap",
+                  }}>{o.tagLeft}</span>
+                )}
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{o.label}</span>
                 {o.tag && (
                   <span style={{
                     fontSize: "0.62rem", fontWeight: 600, padding: "0.1rem 0.35rem",
-                    borderRadius: 3, marginLeft: "0.5rem", flexShrink: 0,
-                    background: "#e8eef8", color: "#444", whiteSpace: "nowrap",
+                    borderRadius: 3, flexShrink: 0,
+                    background: "#f0f0f8", color: "#555", whiteSpace: "nowrap",
                   }}>{o.tag}</span>
                 )}
               </button>
