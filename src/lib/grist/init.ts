@@ -8,7 +8,7 @@ export type InitResult = {
 
 export async function initGristOrMock(
   opts: {
-    requiredAccess?: "read table" | "full";
+    requiredAccess?: "read table" | "write table" | "full";
     onRecord?: (rec: any, mapping?: any) => void;
     onApplyUserActions?: (actions: any[]) => void;
   } = {}

@@ -70,7 +70,7 @@ export default function OrienteurPage() {
             document.head.appendChild(s);
           });
         }
-        const result = await initGristOrMock({ requiredAccess: "full" });
+        const result = await initGristOrMock({ requiredAccess: "write table" });
         setMode(result.mode);
         setDocApi(result.docApi);
       } catch {
