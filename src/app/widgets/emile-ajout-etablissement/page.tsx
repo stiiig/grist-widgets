@@ -56,13 +56,13 @@ export default function EtablissementPage() {
   const [dispositifOptions, setDispositifOptions] = useState<Option[]>([]);
   const [deptOptions,        setDeptOptions]      = useState<Option[]>([]);
   const [organismeOptions,   setOrganismeOptions] = useState<Option[]>([]);
-  const [dataLoading,        setDataLoading]      = useState(true);
+  const [dptsLoading,        setDptsLoading]      = useState(true);
+  const [colsLoading,        setColsLoading]      = useState(true);
 
-  /* ── Init + chargement (effet unique) ───────────────────────── */
+  /* ── Effet 1 : init Grist (identique à emile-inscription) ───── */
   useEffect(() => {
     (async () => {
       try {
-        /* 1. Charger grist-plugin-api.js si besoin */
         if (typeof window !== "undefined" && !(window as any).grist) {
           await new Promise<void>((resolve, reject) => {
             const existing = document.querySelector('script[data-grist-plugin-api="1"]') as HTMLScriptElement | null;
@@ -76,53 +76,58 @@ export default function EtablissementPage() {
             document.head.appendChild(s);
           });
         }
-
-        /* 2. Initialiser Grist */
-        const { docApi: api, mode: m } = await initGristOrMock({ requiredAccess: "full" });
-        setMode(m);
-        setDocApi(api);
-
-        /* Pas de contexte Grist → on déverrouille les dropdowns */
-        if (!api) { setDataLoading(false); return; }
-
-        /* 3a. DPTS_REGIONS → dropdown département (indépendant) */
-        try {
-          const dpts = await api.fetchTable("DPTS_REGIONS");
-          const opts: Option[] = [];
-          for (let i = 0; i < dpts.id.length; i++) {
-            const id     = dpts.id[i];
-            const nom    = String(dpts.Nom?.[i]    ?? "").trim();
-            const numero = String(dpts.Numero?.[i] ?? "").trim();
-            const region = String(dpts.Region?.[i] ?? "").trim();
-            if (!nom) continue;
-            opts.push({
-              id,
-              label:   nom,
-              tagLeft: numero,
-              tag:     region,
-              q:       `${numero} ${nom} ${region}`.toLowerCase(),
-            });
-          }
-          opts.sort((a, b) => deptSortKey(a.tagLeft) - deptSortKey(b.tagLeft));
-          setDeptOptions(opts);
-        } catch { /* ignore */ }
-
-        /* 3b. Colonnes Choice (indépendant) */
-        try {
-          const cols = await loadColumnsMetaFor(api, TABLE_ID);
-          const dispCol = cols.find((c) => c.colId === "Dispositif");
-          if (dispCol) setDispositifOptions(choicesToOptions(normalizeChoices(dispCol.widgetOptionsParsed?.choices)));
-          const orgaCol = cols.find((c) => c.colId === "Organisme_gestionnaire");
-          if (orgaCol) setOrganismeOptions(choicesToOptions(normalizeChoices(orgaCol.widgetOptionsParsed?.choices)));
-        } catch { /* ignore */ }
-
-      } catch {
+        const result = await initGristOrMock({ requiredAccess: "full" });
+        setMode(result.mode);
+        setDocApi(result.docApi);
+      } catch (e: any) {
         setMode("none");
-      } finally {
-        setDataLoading(false);
       }
     })();
   }, []);
+
+  /* ── Effet 2 : DPTS_REGIONS (identique à emile-inscription) ─── */
+  useEffect(() => {
+    if (!docApi) return;
+    setDptsLoading(true);
+    docApi.fetchTable("DPTS_REGIONS")
+      .then((table: any) => {
+        const ids = table.id as number[];
+        const opts: Option[] = [];
+        for (let i = 0; i < ids.length; i++) {
+          const id     = ids[i];
+          const nom    = String(table.Nom?.[i]    ?? "").trim();
+          const numero = String(table.Numero?.[i] ?? "").trim();
+          const region = String(table.Region?.[i] ?? "").trim();
+          if (!nom) continue;
+          opts.push({
+            id,
+            label:   nom,
+            tagLeft: numero,
+            tag:     region,
+            q:       `${numero} ${nom} ${region}`.toLowerCase(),
+          });
+        }
+        opts.sort((a, b) => deptSortKey(a.tagLeft) - deptSortKey(b.tagLeft));
+        setDeptOptions(opts);
+      })
+      .catch(() => {})
+      .finally(() => setDptsLoading(false));
+  }, [docApi]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* ── Effet 3 : colonnes Choice ───────────────────────────────── */
+  useEffect(() => {
+    if (!docApi) return;
+    setColsLoading(true);
+    loadColumnsMetaFor(docApi, TABLE_ID)
+      .then((cols) => {
+        const dispCol = cols.find((c) => c.colId === "Dispositif");
+        if (dispCol) setDispositifOptions(choicesToOptions(normalizeChoices(dispCol.widgetOptionsParsed?.choices)));
+        const orgaCol = cols.find((c) => c.colId === "Organisme_gestionnaire");
+        if (orgaCol) setOrganismeOptions(choicesToOptions(normalizeChoices(orgaCol.widgetOptionsParsed?.choices)));
+      })
+      .catch(() => {})
+      .finally(() => setColsLoading(false));
+  }, [docApi]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── Mise à jour du formulaire ──────────────────────────────── */
   function set<K extends keyof FormData>(key: K, value: FormData[K]) {
@@ -176,6 +181,8 @@ export default function EtablissementPage() {
 
   /* ── Libellés pour l'écran done ─────────────────────────────── */
   const deptOpt = deptOptions.find((o) => o.id === form.Departement);
+
+  const dataLoading = dptsLoading || colsLoading;
 
   /* ── Spinner boot ───────────────────────────────────────────── */
   if (mode === "boot") {
@@ -265,8 +272,8 @@ export default function EtablissementPage() {
               options={deptOptions}
               valueId={form.Departement}
               onChange={(id) => set("Departement", id)}
-              placeholder={dataLoading ? "Chargement…" : "Rechercher un département"}
-              disabled={dataLoading}
+              placeholder={dptsLoading ? "Chargement…" : "Rechercher un département"}
+              disabled={dptsLoading}
             />
           </div>
 
@@ -282,8 +289,8 @@ export default function EtablissementPage() {
                 const found = dispositifOptions.find((o) => o.id === id);
                 set("Dispositif", found?.label ?? "");
               }}
-              placeholder={dataLoading ? "Chargement…" : "Sélectionner le dispositif"}
-              disabled={dataLoading}
+              placeholder={colsLoading ? "Chargement…" : "Sélectionner le dispositif"}
+              disabled={colsLoading}
             />
           </div>
 
@@ -299,8 +306,8 @@ export default function EtablissementPage() {
                 const found = organismeOptions.find((o) => o.id === id);
                 set("Organisme_gestionnaire", found?.label ?? "");
               }}
-              placeholder={dataLoading ? "Chargement…" : "Sélectionner l'organisme"}
-              disabled={dataLoading}
+              placeholder={colsLoading ? "Chargement…" : "Sélectionner l'organisme"}
+              disabled={colsLoading}
             />
           </div>
 
