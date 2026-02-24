@@ -1464,8 +1464,7 @@ export default function InscriptionPage() {
     docApi.fetchTable("DPTS_REGIONS")
       .then((table: any) => {
         const ids = table.id as number[];
-        const optsDepart: Option[] = [];
-        const optsAutres: Option[] = [];
+        const opts: Option[] = [];
         const departMap = new Map<number, boolean>();
         for (let i = 0; i < ids.length; i++) {
           const id = ids[i];
@@ -1475,16 +1474,11 @@ export default function InscriptionPage() {
           const region   = String(table["Nom_region"]?.[i] ?? "").trim() || undefined;
           const isDepart = table["Territoire_depart"]?.[i] === "Oui";
           departMap.set(id, isDepart);
-          const opt: Option = { id, label, q: `${numero ?? ""} ${label}`.toLowerCase(), tagLeft: numero, tag: region };
-          if (isDepart) optsDepart.push(opt);
-          else optsAutres.push(opt);
+          opts.push({ id, label, q: `${numero ?? ""} ${label}`.toLowerCase(), tagLeft: numero, tag: region });
         }
-        const sortFn = (a: Option, b: Option) =>
-          (a.tagLeft ?? "").localeCompare(b.tagLeft ?? "", "fr", { numeric: true });
-        optsDepart.sort(sortFn);
-        optsAutres.sort(sortFn);
+        opts.sort((a, b) => (a.tagLeft ?? "").localeCompare(b.tagLeft ?? "", "fr", { numeric: true }));
         setDptsIsDepart(departMap);
-        setDptsOptions([...optsDepart, ...optsAutres]);
+        setDptsOptions(opts);
       })
       .catch(() => {})
       .finally(() => setDptsLoading(false));
