@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import "./styles.css";
 import logoEmile from "./logo-emile-white.png";
 import { initGristOrMock } from "@/lib/grist/init";
@@ -248,9 +249,11 @@ const OUINON_ACTIVE: React.CSSProperties = {
   background: "#000091", borderColor: "#000091", color: "#fff",
 };
 
-/* ─── InfoPopover ────────────────────────────────────────────── */
+/* ─── InfoPopover (portal → jamais coupé par overflow) ──────── */
 function InfoPopover({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
+  const [pos, setPos]   = useState<{ top: number; left: number } | null>(null);
+  const btnRef  = useRef<HTMLButtonElement | null>(null);
   const rootRef = useRef<HTMLSpanElement | null>(null);
 
   useEffect(() => {
@@ -261,23 +264,27 @@ function InfoPopover({ children }: { children: React.ReactNode }) {
     return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
 
+  function calcPos() {
+    if (btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + 4, left: r.left });
+    }
+  }
+
   return (
-    <span ref={rootRef} onMouseLeave={() => setOpen(false)} style={{ position: "relative", display: "inline-flex", verticalAlign: "middle", marginLeft: "0.35rem" }}>
+    <span ref={rootRef} onMouseLeave={() => setOpen(false)} style={{ display: "inline-flex", verticalAlign: "middle", marginLeft: "0.35rem" }}>
       <button
+        ref={btnRef}
         type="button"
-        onMouseEnter={() => setOpen(true)}
-        onClick={(e) => { e.preventDefault(); setOpen((v) => !v); }}
-        style={{
-          background: "none", border: "none", cursor: "pointer",
-          color: "#000091", fontSize: "0.9rem", padding: "0 0.1rem",
-          display: "inline-flex", alignItems: "center", lineHeight: 1,
-        }}
+        onMouseEnter={() => { calcPos(); setOpen(true); }}
+        onClick={(e) => { e.preventDefault(); if (!open) { calcPos(); setOpen(true); } else setOpen(false); }}
+        style={{ background: "none", border: "none", cursor: "pointer", color: "#000091", fontSize: "0.9rem", padding: "0 0.1rem", display: "inline-flex", alignItems: "center", lineHeight: 1 }}
       >
         <i className="fa-solid fa-circle-info" aria-hidden="true" />
       </button>
-      {open && (
+      {open && pos && typeof document !== "undefined" && createPortal(
         <div style={{
-          position: "absolute", zIndex: 600, top: "calc(100% + 4px)", left: 0,
+          position: "fixed", zIndex: 9999, top: pos.top, left: pos.left,
           width: "22rem", maxWidth: "calc(100vw - 2rem)",
           background: "#fff", border: "1px solid #c8c8e8", borderRadius: 6,
           boxShadow: "0 6px 20px rgba(0,0,145,.12)",
@@ -285,9 +292,157 @@ function InfoPopover({ children }: { children: React.ReactNode }) {
           fontSize: "0.82rem", lineHeight: 1.55, color: "#1e1e1e", fontWeight: 400,
         }}>
           {children}
-        </div>
+        </div>,
+        document.body
       )}
     </span>
+  );
+}
+
+/* ─── FAQ Panel ──────────────────────────────────────────────── */
+type FAQItem = {
+  id: number;
+  titre: string;
+  contenu: string;
+  section: string;
+  obligatoire: string;
+};
+
+function FAQPanel({ docApi, onClose }: { docApi: GristDocAPI; onClose: () => void }) {
+  const [items, setItems]               = useState<FAQItem[]>([]);
+  const [loading, setLoading]           = useState(true);
+  const [search, setSearch]             = useState("");
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set());
+  const [expandedIds, setExpandedIds]   = useState<Set<number>>(new Set());
+
+  useEffect(() => {
+    docApi.fetchTable("FAQ").then((table: any) => {
+      const ids = table.id as number[];
+      const next: FAQItem[] = [];
+      for (let i = 0; i < ids.length; i++) {
+        const titre = String(table["Titre"]?.[i] ?? "").trim();
+        if (!titre) continue;
+        next.push({
+          id:          ids[i],
+          titre,
+          contenu:     String(table["Contenu"]?.[i] ?? "").trim(),
+          section:     String(table["Section_de_la_question"]?.[i] ?? "Général").trim() || "Général",
+          obligatoire: String(table["Obligatoire_ou_non"]?.[i] ?? "").trim(),
+        });
+      }
+      setItems(next);
+      setOpenSections(new Set(next.map((x) => x.section)));
+    }).catch(() => {}).finally(() => setLoading(false));
+  }, [docApi]);
+
+  const q = search.trim().toLowerCase();
+  const filtered = q
+    ? items.filter((x) =>
+        x.titre.toLowerCase().includes(q) ||
+        x.contenu.toLowerCase().includes(q) ||
+        x.section.toLowerCase().includes(q)
+      )
+    : items;
+
+  const grouped = useMemo(() => {
+    const map = new Map<string, FAQItem[]>();
+    for (const item of filtered) {
+      if (!map.has(item.section)) map.set(item.section, []);
+      map.get(item.section)!.push(item);
+    }
+    return map;
+  }, [filtered]);
+
+  function toggleSection(s: string) {
+    setOpenSections((prev) => { const next = new Set(prev); next.has(s) ? next.delete(s) : next.add(s); return next; });
+  }
+  function toggleItem(id: number) {
+    setExpandedIds((prev) => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
+  }
+  const isObligatoire = (v: string) =>
+    v.toLowerCase().includes("oui") || v.toLowerCase().includes("obligatoire");
+
+  return createPortal(
+    <div onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      style={{ position: "fixed", inset: 0, zIndex: 8000, background: "rgba(0,0,0,0.28)", display: "flex", justifyContent: "flex-end" }}>
+      <div style={{ width: 400, maxWidth: "100vw", background: "#fff", display: "flex", flexDirection: "column", boxShadow: "-4px 0 28px rgba(0,0,0,0.18)", height: "100%" }}>
+
+        <div style={{ background: "#000091", color: "#fff", padding: "0 1.2rem", height: "3rem", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.55rem" }}>
+            <i className="fa-solid fa-circle-question" style={{ fontSize: "1rem" }} />
+            <span style={{ fontWeight: 700, fontSize: "0.95rem", letterSpacing: "0.02em" }}>FAQ EMILE</span>
+            {!loading && (
+              <span style={{ fontSize: "0.7rem", opacity: 0.75, background: "rgba(255,255,255,0.18)", borderRadius: 99, padding: "0.1rem 0.5rem" }}>
+                {items.length} fiche{items.length > 1 ? "s" : ""}
+              </span>
+            )}
+          </div>
+          <button type="button" onClick={onClose}
+            style={{ background: "none", border: "none", color: "#fff", cursor: "pointer", fontSize: "1.15rem", padding: "0.2rem", display: "flex", alignItems: "center", lineHeight: 1 }}>
+            <i className="fa-solid fa-xmark" />
+          </button>
+        </div>
+
+        <div style={{ padding: "0.65rem 1rem", borderBottom: "1px solid #eee", flexShrink: 0 }}>
+          <div style={{ position: "relative" }}>
+            <i className="fa-solid fa-magnifying-glass" style={{ position: "absolute", left: "0.6rem", top: "50%", transform: "translateY(-50%)", color: "#bbb", fontSize: "0.78rem", pointerEvents: "none" }} />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher une fiche…" autoFocus
+              style={{ width: "100%", boxSizing: "border-box", padding: "0.42rem 0.6rem 0.42rem 2rem", border: "1px solid #d0d0d0", borderRadius: 6, fontSize: "0.83rem", fontFamily: "Marianne, arial, sans-serif", outline: "none" }} />
+          </div>
+        </div>
+
+        <div style={{ flex: 1, overflowY: "auto" }}>
+          {loading ? (
+            <div style={{ padding: "3rem", textAlign: "center", color: "#bbb" }}>
+              <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: "1.2rem" }} />
+            </div>
+          ) : grouped.size === 0 ? (
+            <div style={{ padding: "2.5rem 1rem", textAlign: "center", color: "#999", fontSize: "0.85rem" }}>
+              {q ? <>Aucun résultat pour <b>« {search} »</b></> : "Aucune fiche disponible."}
+            </div>
+          ) : (
+            Array.from(grouped.entries()).map(([section, secItems]) => (
+              <div key={section}>
+                <button type="button" onClick={() => toggleSection(section)}
+                  style={{ width: "100%", textAlign: "left", padding: "0.55rem 1rem", background: "#f4f4f8", border: 0, borderBottom: "1px solid #e5e5f0", borderTop: "1px solid #e5e5f0", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", fontFamily: "Marianne, arial, sans-serif" }}>
+                  <span style={{ fontWeight: 700, fontSize: "0.72rem", textTransform: "uppercase", letterSpacing: "0.07em", color: "#000091" }}>{section}</span>
+                  <span style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                    <span style={{ fontSize: "0.68rem", color: "#888", background: "#e8e8f0", borderRadius: 99, padding: "0.1rem 0.4rem", fontWeight: 600 }}>{secItems.length}</span>
+                    <i className={`fa-solid fa-chevron-${openSections.has(section) ? "up" : "down"}`} style={{ fontSize: "0.68rem", color: "#888" }} />
+                  </span>
+                </button>
+                {openSections.has(section) && secItems.map((item) => {
+                  const expanded = expandedIds.has(item.id);
+                  const oblig    = isObligatoire(item.obligatoire);
+                  return (
+                    <div key={item.id} style={{ borderBottom: "1px solid #f0f0f0" }}>
+                      <button type="button" onClick={() => toggleItem(item.id)}
+                        style={{ width: "100%", textAlign: "left", padding: "0.65rem 1rem", background: expanded ? "#f6f6ff" : "#fff", border: 0, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "0.5rem", cursor: "pointer", fontFamily: "Marianne, arial, sans-serif", transition: "background 0.1s" }}>
+                        <span style={{ display: "flex", flexDirection: "column", gap: "0.28rem", flex: 1 }}>
+                          <span style={{ fontWeight: 600, fontSize: "0.84rem", color: "#1e1e1e", lineHeight: 1.4 }}>{item.titre}</span>
+                          {item.obligatoire && (
+                            <span style={{ display: "inline-flex", alignSelf: "flex-start", fontSize: "0.62rem", fontWeight: 700, padding: "0.1rem 0.45rem", borderRadius: 3, background: oblig ? "#fef2f2" : "#f3f4f6", color: oblig ? "#dc2626" : "#6b7280", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                              {oblig ? "● Obligatoire" : `○ ${item.obligatoire}`}
+                            </span>
+                          )}
+                        </span>
+                        <i className={`fa-solid fa-chevron-${expanded ? "up" : "down"}`} style={{ fontSize: "0.68rem", color: "#aaa", marginTop: "0.3rem", flexShrink: 0 }} />
+                      </button>
+                      {expanded && item.contenu && (
+                        <div style={{ padding: "0.5rem 1rem 0.9rem 1rem", background: "#f6f6ff", fontSize: "0.82rem", lineHeight: 1.65, color: "#333", whiteSpace: "pre-wrap", borderTop: "1px solid #eeeeff" }}>
+                          {item.contenu}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }
 
@@ -989,6 +1144,7 @@ export default function InscriptionPage() {
   const [done, setDone]               = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [validError, setValidError]   = useState("");
+  const [showFaq, setShowFaq]         = useState(false);
 
   /* ── Choix dynamiques depuis métadonnées Grist ── */
   const choicesMap = useMemo(() => {
@@ -1232,7 +1388,13 @@ export default function InscriptionPage() {
         <header className="ins-header">
           <img src={logoEmile.src} alt="EMILE" style={{ height: "2rem", width: "auto" }} />
           <span className="ins-header__appname">Inscription candidat·e</span>
+          <div style={{ flex: 1 }} />
+          <button type="button" className="ins-faq-btn" onClick={() => setShowFaq(true)}>
+            <i className="fa-solid fa-circle-question" aria-hidden="true" />
+            FAQ
+          </button>
         </header>
+        {showFaq && docApi && <FAQPanel docApi={docApi} onClose={() => setShowFaq(false)} />}
         <div className="ins-body ins-body--center">
           <div className="ins-confirm">
             <h2 className="ins-confirm__title">Merci pour votre confiance&nbsp;!</h2>
@@ -1260,7 +1422,13 @@ export default function InscriptionPage() {
       <header className="ins-header">
         <img src={logoEmile.src} alt="EMILE" style={{ height: "2rem", width: "auto" }} />
         <span className="ins-header__appname">Inscription candidat·e</span>
+        <div style={{ flex: 1 }} />
+        <button type="button" className="ins-faq-btn" onClick={() => setShowFaq(true)}>
+          <i className="fa-solid fa-circle-question" aria-hidden="true" />
+          FAQ
+        </button>
       </header>
+      {showFaq && docApi && <FAQPanel docApi={docApi} onClose={() => setShowFaq(false)} />}
 
       {mode === "boot" ? (
         <div className="ins-body ins-body--center">
