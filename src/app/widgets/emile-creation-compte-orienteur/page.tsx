@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import "./styles.css";
-import logoEmile from "../emile-inscription/logo-emile.png";
+import logoEmile from "../emile-inscription/logo-emile-white.png";
 import { initGristOrMock } from "@/lib/grist/init";
 import {
   loadColumnsMetaFor,
@@ -157,6 +157,11 @@ export default function OrienteurPage() {
   if (done) {
     return (
       <div className="occ-shell">
+        <header className="occ-header">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={logoEmile.src} alt="EMILE" style={{ height: "2rem", width: "auto" }} />
+          <span className="occ-header__appname">Création compte orienteur·ice</span>
+        </header>
         <main className="occ-body occ-body--center">
           <div className="occ-done">
             <i className="fa-solid fa-circle-check" style={{ fontSize: "2.5rem", color: "#18753c" }} />
@@ -196,14 +201,12 @@ export default function OrienteurPage() {
   /* ── Rendu principal ────────────────────────────────────────── */
   return (
     <div className="occ-shell">
+      <header className="occ-header">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={logoEmile.src} alt="EMILE" style={{ height: "2rem", width: "auto" }} />
+        <span className="occ-header__appname">Création compte orienteur·ice</span>
+      </header>
       <main className="occ-body">
-
-        {/* En-tête de page */}
-        <div className="occ-page-header">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={logoEmile.src} alt="EMILE" className="occ-logo" />
-          <h1 className="occ-page-header__title">Création d&apos;un compte orienteur·ice</h1>
-        </div>
 
         {/* Barre de progression */}
         <div className="occ-progress">

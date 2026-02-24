@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import "./styles.css";
-import logoEmile from "../emile-inscription/logo-emile.png";
+import logoEmile from "../emile-inscription/logo-emile-white.png";
 import { initGristOrMock } from "@/lib/grist/init";
 import {
   loadColumnsMetaFor,
@@ -137,6 +137,11 @@ export default function EtablissementPage() {
   if (done) {
     return (
       <div className="ae-shell">
+        <header className="ae-header">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={logoEmile.src} alt="EMILE" style={{ height: "2rem", width: "auto" }} />
+          <span className="ae-header__appname">Ajout d&apos;un établissement</span>
+        </header>
         <main className="ae-body ae-body--center">
           <div className="ae-done">
             <i className="fa-solid fa-circle-check" style={{ fontSize: "2.5rem", color: "#18753c" }} />
@@ -167,14 +172,12 @@ export default function EtablissementPage() {
   /* ── Rendu principal ────────────────────────────────────────── */
   return (
     <div className="ae-shell">
+      <header className="ae-header">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={logoEmile.src} alt="EMILE" style={{ height: "2rem", width: "auto" }} />
+        <span className="ae-header__appname">Ajout d&apos;un établissement</span>
+      </header>
       <main className="ae-body">
-
-        {/* En-tête de page */}
-        <div className="ae-page-header">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={logoEmile.src} alt="EMILE" className="ae-logo" />
-          <h1 className="ae-page-header__title">Ajout d&apos;un établissement</h1>
-        </div>
 
         {/* Formulaire */}
         <form className="ae-form" onSubmit={handleSubmit}>
