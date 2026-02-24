@@ -50,13 +50,13 @@ export default function OrienteurPage() {
   /* Options chargées depuis Grist */
   const [etablOptions,    setEtablOptions]    = useState<Option[]>([]);
   const [fonctionOptions, setFonctionOptions] = useState<Option[]>([]);
-  const [dataLoading,     setDataLoading]     = useState(true);
+  const [etablLoading,    setEtablLoading]    = useState(true);
+  const [colsLoading,     setColsLoading]     = useState(true);
 
-  /* ── Init + chargement (effet unique) ───────────────────────── */
+  /* ── Effet 1 : init Grist (identique à emile-inscription) ───── */
   useEffect(() => {
     (async () => {
       try {
-        /* 1. Charger grist-plugin-api.js si besoin */
         if (typeof window !== "undefined" && !(window as any).grist) {
           await new Promise<void>((resolve, reject) => {
             const existing = document.querySelector('script[data-grist-plugin-api="1"]') as HTMLScriptElement | null;
@@ -70,42 +70,48 @@ export default function OrienteurPage() {
             document.head.appendChild(s);
           });
         }
-
-        /* 2. Initialiser Grist */
-        const { docApi: api, mode: m } = await initGristOrMock({ requiredAccess: "full" });
-        setMode(m);
-        setDocApi(api);
-
-        /* Pas de contexte Grist → on déverrouille les dropdowns */
-        if (!api) { setDataLoading(false); return; }
-
-        /* 3a. ETABLISSEMENTS → dropdown (indépendant) */
-        try {
-          const etablTable = await api.fetchTable("ETABLISSEMENTS");
-          const opts: Option[] = [];
-          for (let i = 0; i < etablTable.id.length; i++) {
-            const id  = etablTable.id[i];
-            const nom = etablTable.Nom?.[i] ?? `Établissement ${id}`;
-            if (nom) opts.push({ id, label: String(nom), q: String(nom).toLowerCase() });
-          }
-          opts.sort((a, b) => a.label.localeCompare(b.label, "fr", { sensitivity: "base" }));
-          setEtablOptions(opts);
-        } catch { /* ignore */ }
-
-        /* 3b. Choice Fonction (indépendant) */
-        try {
-          const cols = await loadColumnsMetaFor(api, TABLE_ID);
-          const fonctionCol = cols.find((c) => c.colId === "Fonction");
-          if (fonctionCol) setFonctionOptions(choicesToOptions(normalizeChoices(fonctionCol.widgetOptionsParsed?.choices)));
-        } catch { /* ignore */ }
-
+        const result = await initGristOrMock({ requiredAccess: "full" });
+        setMode(result.mode);
+        setDocApi(result.docApi);
       } catch {
         setMode("none");
-      } finally {
-        setDataLoading(false);
       }
     })();
   }, []);
+
+  /* ── Effet 2 : ETABLISSEMENTS → colonne Nom_etablissement ────── */
+  useEffect(() => {
+    if (!docApi) return;
+    setEtablLoading(true);
+    docApi.fetchTable("ETABLISSEMENTS")
+      .then((table: any) => {
+        const ids = table.id as number[];
+        const opts: Option[] = [];
+        for (let i = 0; i < ids.length; i++) {
+          const id  = ids[i];
+          const nom = String(table.Nom_etablissement?.[i] ?? "").trim();
+          if (!nom) continue;
+          opts.push({ id, label: nom, q: nom.toLowerCase() });
+        }
+        opts.sort((a, b) => a.label.localeCompare(b.label, "fr", { sensitivity: "base" }));
+        setEtablOptions(opts);
+      })
+      .catch(() => {})
+      .finally(() => setEtablLoading(false));
+  }, [docApi]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* ── Effet 3 : colonne Choice Fonction ───────────────────────── */
+  useEffect(() => {
+    if (!docApi) return;
+    setColsLoading(true);
+    loadColumnsMetaFor(docApi, TABLE_ID)
+      .then((cols) => {
+        const fonctionCol = cols.find((c) => c.colId === "Fonction");
+        if (fonctionCol) setFonctionOptions(choicesToOptions(normalizeChoices(fonctionCol.widgetOptionsParsed?.choices)));
+      })
+      .catch(() => {})
+      .finally(() => setColsLoading(false));
+  }, [docApi]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── Mise à jour du formulaire ──────────────────────────────── */
   function set<K extends keyof FormData>(key: K, value: FormData[K]) {
@@ -273,20 +279,20 @@ export default function OrienteurPage() {
                 <label className="occ-label">
                   Établissement <span className="occ-required">*</span>
                 </label>
+                <p className="occ-field-desc">La structure dans laquelle vous travaillez.</p>
                 <SearchDropdown
                   options={etablOptions}
                   valueId={form.Etablissement}
                   onChange={(id) => set("Etablissement", id)}
-                  placeholder={dataLoading ? "Chargement…" : "Rechercher un établissement…"}
-                  disabled={dataLoading}
+                  placeholder={etablLoading ? "Chargement…" : "Rechercher un établissement…"}
+                  disabled={etablLoading}
                 />
               </div>
 
               <div className="occ-infobox">
                 <i className="fa-solid fa-circle-info occ-infobox__icon" />
                 <span>
-                  Si votre établissement n&apos;apparaît pas dans la liste, contactez votre DDT
-                  pour qu&apos;il soit ajouté dans EMILE.
+                  Si votre établissement n&apos;apparaît pas dans la liste, ajoutez-le maintenant.
                 </span>
               </div>
             </>
