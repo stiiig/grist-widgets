@@ -18,7 +18,7 @@ type FormData = {
   Etablissement: number | null;  // Ref:ETABLISSEMENTS → rowId
   Fonction: string;
   Prenom: string;
-  Nom_de_famille: string;
+  Nom: string;
   Tel: string;
   Email: string;
 };
@@ -27,7 +27,7 @@ const INITIAL: FormData = {
   Etablissement: null,
   Fonction: "",
   Prenom: "",
-  Nom_de_famille: "",
+  Nom: "",
   Tel: "",
   Email: "",
 };
@@ -125,12 +125,14 @@ export default function OrienteurPage() {
   }
 
   function validateStep2(): string | null {
-    if (!form.Fonction.trim())       return "La fonction est requise.";
-    if (!form.Prenom.trim())         return "Le prénom est requis.";
-    if (!form.Nom_de_famille.trim()) return "Le nom est requis.";
-    if (!form.Email.trim())          return "L'adresse email est requise.";
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.Email.trim()))
-      return "L'adresse email n'est pas valide.";
+    if (!form.Fonction.trim()) return "La fonction est requise.";
+    if (!form.Prenom.trim())   return "Le prénom est requis.";
+    if (!form.Nom.trim())      return "Le nom de famille est requis.";
+    if (!form.Email.trim())    return "L'adresse email est requise.";
+    if (!/^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/.test(form.Email.trim()))
+                               return "L'adresse email n'est pas valide.";
+    if (form.Tel.trim() && form.Tel.replace(/\D/g, "").length < 6)
+                               return "Le téléphone doit contenir au moins 6 chiffres.";
     return null;
   }
 
@@ -159,16 +161,16 @@ export default function OrienteurPage() {
       await docApi.applyUserActions([
         ["AddRecord", TABLE_ID, null, {
           Etablissement:  form.Etablissement,
-          Fonction:       form.Fonction,
-          Prenom:         form.Prenom.trim(),
-          Nom_de_famille: form.Nom_de_famille.trim(),
-          Tel:            form.Tel.trim(),
-          Email:          form.Email.trim(),
+          Fonction: form.Fonction,
+          Prenom:   form.Prenom.trim(),
+          Nom:      form.Nom.trim(),
+          Tel:      form.Tel.trim(),
+          Email:    form.Email.trim(),
         }],
       ]);
       setDone(true);
-    } catch (e: any) {
-      setError(`Erreur: ${e?.message ?? String(e)}`);
+    } catch {
+      setError("Une erreur est survenue lors de l'enregistrement. Veuillez réessayer.");
     } finally {
       setSubmitting(false);
     }
@@ -358,13 +360,13 @@ export default function OrienteurPage() {
                 </div>
                 <div className="occ-field">
                   <label className="occ-label">
-                    Nom <span className="occ-required">*</span>
+                    Nom de famille <span className="occ-required">*</span>
                   </label>
                   <input
                     className="occ-input"
                     type="text"
-                    value={form.Nom_de_famille}
-                    onChange={(e) => set("Nom_de_famille", e.target.value)}
+                    value={form.Nom}
+                    onChange={(e) => set("Nom", e.target.value)}
                     placeholder="Nom de famille"
                     autoComplete="family-name"
                   />
@@ -374,14 +376,25 @@ export default function OrienteurPage() {
               {/* Téléphone */}
               <div className="occ-field">
                 <label className="occ-label">Téléphone</label>
-                <input
-                  className="occ-input"
-                  type="tel"
-                  value={form.Tel}
-                  onChange={(e) => set("Tel", e.target.value)}
-                  placeholder="06 xx xx xx xx"
-                  autoComplete="tel"
-                />
+                <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                  <span style={{
+                    display: "inline-flex", alignItems: "center", gap: "0.3rem",
+                    height: "2.25rem", padding: "0 0.6rem",
+                    background: "#f0f0f0", border: "1px solid #c1c1c1", borderRadius: "4px",
+                    fontSize: "0.85rem", color: "#333", flexShrink: 0, whiteSpace: "nowrap",
+                  }}>
+                    🇫🇷 +33
+                  </span>
+                  <input
+                    className="occ-input"
+                    type="tel"
+                    value={form.Tel}
+                    onChange={(e) => set("Tel", e.target.value)}
+                    placeholder="6 xx xx xx xx"
+                    autoComplete="tel"
+                    style={{ flex: 1 }}
+                  />
+                </div>
               </div>
 
               {/* Email */}
