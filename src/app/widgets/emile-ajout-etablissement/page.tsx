@@ -214,15 +214,21 @@ export default function EtablissementPage() {
             <i className="fa-solid fa-circle-check" style={{ fontSize: "2.5rem", color: "#18753c" }} />
             <h1 className="ae-done__title">Enregistrement réussi&nbsp;!</h1>
             <p className="ae-done__subtitle">
-              L&apos;entrée suivante a bien été ajoutée dans EMILE&nbsp;:
+              L&apos;établissement suivant a bien été ajouté au programme EMILE&nbsp;:
             </p>
             <div className="ae-done__name">
               <i className="fa-solid fa-school" style={{ marginRight: "0.5rem" }} />
               {form.Nom_etablissement}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem", marginTop: "0.5rem", fontSize: "0.9rem", color: "#555" }}>
               {deptOpt && (
-                <span style={{ fontWeight: 400, marginLeft: "0.5rem", opacity: 0.8 }}>
-                  — {deptOpt.tagLeft} {deptOpt.label}
-                </span>
+                <span><strong>Département&nbsp;:</strong> {deptOpt.label}</span>
+              )}
+              {form.Organisme_gestionnaire && (
+                <span><strong>Organisme gestionnaire&nbsp;:</strong> {form.Organisme_gestionnaire}</span>
+              )}
+              {form.Dispositif && (
+                <span><strong>Dispositif&nbsp;:</strong> {form.Dispositif}</span>
               )}
             </div>
             <div className="ae-done__actions">
