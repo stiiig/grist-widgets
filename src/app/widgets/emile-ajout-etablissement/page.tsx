@@ -15,14 +15,14 @@ const TABLE_ID = "ETABLISSEMENTS";
 
 /* ─── Types ──────────────────────────────────────────────────── */
 type FormData = {
-  Nom:                    string;
+  Nom_etablissement:      string;
   Dispositif:             string;
   Departement:            number | null;   // Ref:DPTS_REGIONS → rowId
   Organisme_gestionnaire: string;
 };
 
 const INITIAL: FormData = {
-  Nom:                    "",
+  Nom_etablissement:      "",
   Dispositif:             "",
   Departement:            null,
   Organisme_gestionnaire: "",
@@ -137,7 +137,7 @@ export default function EtablissementPage() {
   /* ── Validation ─────────────────────────────────────────────── */
   function validate(): string | null {
     if (
-      !form.Nom.trim() ||
+      !form.Nom_etablissement.trim() ||
       !form.Dispositif ||
       !form.Departement ||
       !form.Organisme_gestionnaire
@@ -158,15 +158,15 @@ export default function EtablissementPage() {
     try {
       await docApi.applyUserActions([
         ["AddRecord", TABLE_ID, null, {
-          Nom:                    form.Nom.trim(),
+          Nom_etablissement:      form.Nom_etablissement.trim(),
           Dispositif:             form.Dispositif,
           Departement:            form.Departement,
           Organisme_gestionnaire: form.Organisme_gestionnaire,
         }],
       ]);
       setDone(true);
-    } catch (e: any) {
-      setError(`Erreur: ${e?.message ?? String(e)}`);
+    } catch {
+      setError("Une erreur est survenue lors de l'enregistrement. Veuillez réessayer.");
     } finally {
       setSubmitting(false);
     }
@@ -218,7 +218,7 @@ export default function EtablissementPage() {
             </p>
             <div className="ae-done__name">
               <i className="fa-solid fa-school" style={{ marginRight: "0.5rem" }} />
-              {form.Nom}
+              {form.Nom_etablissement}
               {deptOpt && (
                 <span style={{ fontWeight: 400, marginLeft: "0.5rem", opacity: 0.8 }}>
                   — {deptOpt.tagLeft} {deptOpt.label}
@@ -257,8 +257,8 @@ export default function EtablissementPage() {
             <input
               className="ae-input"
               type="text"
-              value={form.Nom}
-              onChange={(e) => set("Nom", e.target.value)}
+              value={form.Nom_etablissement}
+              onChange={(e) => set("Nom_etablissement", e.target.value)}
               autoFocus
             />
           </div>
