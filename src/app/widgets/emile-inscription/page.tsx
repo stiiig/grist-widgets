@@ -1247,7 +1247,7 @@ function EligibilityScreen({
           display: "flex", alignItems: "center", justifyContent: "center",
           flexShrink: 0, fontSize: "1.2rem",
         }}>
-          <i className={`fa-solid ${isFemme ? "fa-user-hair-long" : "fa-user-tie"}`} />
+          <i className="fa-solid fa-user" />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontWeight: 700, fontSize: "1rem", marginBottom: "0.3rem", letterSpacing: "0.03em" }}>
