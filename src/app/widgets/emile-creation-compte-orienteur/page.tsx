@@ -182,8 +182,8 @@ export default function OrienteurPage() {
         }],
       ]);
       setDone(true);
-    } catch {
-      setError("Une erreur est survenue lors de l'enregistrement. Veuillez réessayer.");
+    } catch (e: any) {
+      setError(e?.message ?? "Une erreur est survenue lors de l'enregistrement. Veuillez réessayer.");
     } finally {
       setSubmitting(false);
     }
