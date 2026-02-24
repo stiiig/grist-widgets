@@ -119,8 +119,9 @@ export default function EtablissementPage() {
 
   /* ── Validation ─────────────────────────────────────────────── */
   function validate(): string | null {
-    if (!form.Dispositif)  return "Le dispositif est requis.";
-    if (!form.Departement) return "Le département est requis.";
+    if (!form.Dispositif)             return "Le dispositif est requis.";
+    if (!form.Departement)            return "Le département est requis.";
+    if (!form.Organisme_gestionnaire) return "L'organisme gestionnaire est requis.";
     return null;
   }
 
@@ -241,7 +242,9 @@ export default function EtablissementPage() {
 
           {/* Organisme gestionnaire */}
           <div className="ae-field">
-            <label className="ae-label">Organisme gestionnaire</label>
+            <label className="ae-label">
+              Organisme gestionnaire <span className="ae-required">*</span>
+            </label>
             <SearchDropdown
               options={organismeOptions}
               valueId={organismeOptions.find((o) => o.label === form.Organisme_gestionnaire)?.id ?? null}
