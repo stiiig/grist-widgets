@@ -1134,14 +1134,18 @@ function EligibilityScreen({
   form,
   dptsOptions,
   dptsIsDepart,
+  niveauOptions,
   niveauEligibilite,
+  paysOptions,
   id2,
   onNew,
 }: {
   form: FormData;
   dptsOptions: Option[];
   dptsIsDepart: Map<number, boolean>;
+  niveauOptions: Option[];
   niveauEligibilite: Map<number, string>;
+  paysOptions: PaysOption[];
   id2?: string | null;
   onNew: () => void;
 }) {
@@ -1150,7 +1154,13 @@ function EligibilityScreen({
     ? dptsOptions.find((o) => o.id === form.Departement_domicile_inscription) ?? null
     : null;
   const deptLabel = deptOpt?.label ?? null;
-  const deptNum   = deptOpt?.tagLeft ?? null;
+
+  const niveauLabel      = form.Niveau_de_langue != null
+    ? niveauOptions.find((o) => o.id === form.Niveau_de_langue)?.label ?? null
+    : null;
+  const nationaliteLabel = form.Nationalite != null
+    ? paysOptions.find((o) => o.id === form.Nationalite)?.label ?? null
+    : null;
 
   const isFemme = form.Genre === "Femme";
   const isHomme = form.Genre === "Homme";
@@ -1170,12 +1180,12 @@ function EligibilityScreen({
         ? null
         : dptsIsDepart.get(form.Departement_domicile_inscription) === true,
       detail: deptLabel
-        ? [deptNum ? `(${deptNum})` : null, deptLabel, deptOpt?.tag ?? null].filter(Boolean).join(" — ")
+        ? [deptLabel, deptOpt?.tag ?? null].filter(Boolean).join(" — ")
         : undefined,
     },
     {
       id: "majeur",
-      label: `Candidat${e} majeur${e} (18 ans ou plus)`,
+      label: `Candidat${e} majeur${e}`,
       ok: age == null ? null : age >= 18,
       detail: age != null ? `${age} an${age > 1 ? "s" : ""}` : undefined,
     },
@@ -1185,6 +1195,7 @@ function EligibilityScreen({
       ok: form.Niveau_de_langue == null
         ? null
         : (niveauEligibilite.get(form.Niveau_de_langue) ?? "").toLowerCase() === "oui",
+      detail: niveauLabel || undefined,
     },
     {
       id: "logement",
@@ -1270,13 +1281,22 @@ function EligibilityScreen({
                 {age} an{age > 1 ? "s" : ""}
               </span>
             )}
-            {deptLabel && (
+            {form.Genre && (
               <span style={{
                 background: "rgba(255,255,255,0.18)", borderRadius: 99,
                 padding: "0.1rem 0.55rem", fontSize: "0.72rem", fontWeight: 600,
               }}>
-                <i className="fa-solid fa-location-dot" style={{ marginRight: "0.3rem", fontSize: "0.65rem" }} />
-                {deptNum ? `(${deptNum}) ` : ""}{deptLabel}
+                <i className="fa-solid fa-venus-mars" style={{ marginRight: "0.3rem", fontSize: "0.65rem" }} />
+                {form.Genre}
+              </span>
+            )}
+            {nationaliteLabel && (
+              <span style={{
+                background: "rgba(255,255,255,0.18)", borderRadius: 99,
+                padding: "0.1rem 0.55rem", fontSize: "0.72rem", fontWeight: 600,
+              }}>
+                <i className="fa-solid fa-passport" style={{ marginRight: "0.3rem", fontSize: "0.65rem" }} />
+                {nationaliteLabel}
               </span>
             )}
           </div>
@@ -1734,7 +1754,9 @@ export default function InscriptionPage() {
             form={form}
             dptsOptions={dptsOptions}
             dptsIsDepart={dptsIsDepart}
+            niveauOptions={niveauOptions}
             niveauEligibilite={niveauEligibilite}
+            paysOptions={paysOptions}
             id2={submittedId2}
             onNew={() => { setForm(INITIAL); setDone(false); setStep(1); setValidError(""); setSubmitError(""); setSubmittedId2(null); }}
           />
