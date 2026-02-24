@@ -15,23 +15,15 @@ const TABLE_ID = "ETABLISSEMENTS";
 
 /* ─── Types ──────────────────────────────────────────────────── */
 type FormData = {
-  Nom:         string;
-  Type:        string;
-  Adresse:     string;
-  Ville:       string;
-  Code_postal: string;
-  Email:       string;
-  Tel:         string;
+  Dispositif:             string;
+  Departement:            number | null;   // Ref:DPTS_REGIONS → rowId
+  Organisme_gestionnaire: string;
 };
 
 const INITIAL: FormData = {
-  Nom:         "",
-  Type:        "",
-  Adresse:     "",
-  Ville:       "",
-  Code_postal: "",
-  Email:       "",
-  Tel:         "",
+  Dispositif:             "",
+  Departement:            null,
+  Organisme_gestionnaire: "",
 };
 
 /* ─── Helpers ────────────────────────────────────────────────── */
@@ -39,17 +31,29 @@ function choicesToOptions(choices: string[]): Option[] {
   return choices.map((label, i) => ({ id: i + 1, label, q: label.toLowerCase() }));
 }
 
+/* 2A → 20.1, 2B → 20.2  (Corse entre 19 et 21) */
+function deptSortKey(numero: string | undefined): number {
+  if (!numero) return 9999;
+  const n = numero.toUpperCase();
+  if (n === "2A") return 20.1;
+  if (n === "2B") return 20.2;
+  const p = parseFloat(n);
+  return isNaN(p) ? 9999 : p;
+}
+
 /* ─── Page principale ────────────────────────────────────────── */
 export default function EtablissementPage() {
-  const [docApi, setDocApi]       = useState<GristDocAPI | null>(null);
-  const [form, setForm]           = useState<FormData>(INITIAL);
-  const [done, setDone]           = useState(false);
+  const [docApi, setDocApi]         = useState<GristDocAPI | null>(null);
+  const [form, setForm]             = useState<FormData>(INITIAL);
+  const [done, setDone]             = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError]         = useState<string | null>(null);
+  const [error, setError]           = useState<string | null>(null);
 
   /* Options */
-  const [typeOptions, setTypeOptions] = useState<Option[]>([]);
-  const [dataLoading, setDataLoading] = useState(true);
+  const [dispositifOptions, setDispositifOptions]             = useState<Option[]>([]);
+  const [deptOptions,        setDeptOptions]                  = useState<Option[]>([]);
+  const [organismeOptions,   setOrganismeOptions]             = useState<Option[]>([]);
+  const [dataLoading,        setDataLoading]                  = useState(true);
 
   /* ── Init Grist ─────────────────────────────────────────────── */
   useEffect(() => {
@@ -58,18 +62,46 @@ export default function EtablissementPage() {
     });
   }, []);
 
-  /* ── Chargement des métadonnées ─────────────────────────────── */
+  /* ── Chargement des données ─────────────────────────────────── */
   useEffect(() => {
     if (!docApi) return;
 
     async function load() {
       try {
+        /* Colonnes Choice de la table ETABLISSEMENTS */
         const cols = await loadColumnsMetaFor(docApi!, TABLE_ID);
-        const typeCol = cols.find((c) => c.colId === "Type");
-        if (typeCol) {
-          const choices = normalizeChoices(typeCol.widgetOptionsParsed?.choices);
-          setTypeOptions(choicesToOptions(choices));
+
+        const dispCol  = cols.find((c) => c.colId === "Dispositif");
+        const orgaCol  = cols.find((c) => c.colId === "Organisme_gestionnaire");
+
+        if (dispCol) {
+          const choices = normalizeChoices(dispCol.widgetOptionsParsed?.choices);
+          setDispositifOptions(choicesToOptions(choices));
         }
+        if (orgaCol) {
+          const choices = normalizeChoices(orgaCol.widgetOptionsParsed?.choices);
+          setOrganismeOptions(choicesToOptions(choices));
+        }
+
+        /* Table DPTS_REGIONS → dropdown département */
+        const dpts = await docApi!.fetchTable("DPTS_REGIONS");
+        const opts: Option[] = [];
+        for (let i = 0; i < dpts.id.length; i++) {
+          const id     = dpts.id[i];
+          const nom    = String(dpts.Nom?.[i]    ?? "");
+          const numero = String(dpts.Numero?.[i] ?? "");
+          const region = String(dpts.Region?.[i] ?? "");
+          if (!nom) continue;
+          opts.push({
+            id,
+            label:   nom,
+            tagLeft: numero,
+            tag:     region,
+            q:       `${numero} ${nom} ${region}`.toLowerCase(),
+          });
+        }
+        opts.sort((a, b) => deptSortKey(a.tagLeft) - deptSortKey(b.tagLeft));
+        setDeptOptions(opts);
       } catch (err) {
         console.error("[EtablissementPage] Erreur chargement:", err);
       } finally {
@@ -87,9 +119,8 @@ export default function EtablissementPage() {
 
   /* ── Validation ─────────────────────────────────────────────── */
   function validate(): string | null {
-    if (!form.Nom.trim()) return "Le nom de l'établissement est requis.";
-    if (form.Email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.Email.trim()))
-      return "L'adresse email n'est pas valide.";
+    if (!form.Dispositif)  return "Le dispositif est requis.";
+    if (!form.Departement) return "Le département est requis.";
     return null;
   }
 
@@ -100,22 +131,15 @@ export default function EtablissementPage() {
     if (err) { setError(err); return; }
     setError(null);
 
-    if (!docApi) {
-      setDone(true);
-      return;
-    }
+    if (!docApi) { setDone(true); return; }
 
     setSubmitting(true);
     try {
       await docApi.applyUserActions([
         ["AddRecord", TABLE_ID, null, {
-          Nom:         form.Nom.trim(),
-          Type:        form.Type,
-          Adresse:     form.Adresse.trim(),
-          Ville:       form.Ville.trim(),
-          Code_postal: form.Code_postal.trim(),
-          Email:       form.Email.trim(),
-          Tel:         form.Tel.trim(),
+          Dispositif:             form.Dispositif,
+          Departement:            form.Departement,
+          Organisme_gestionnaire: form.Organisme_gestionnaire,
         }],
       ]);
       setDone(true);
@@ -133,6 +157,9 @@ export default function EtablissementPage() {
     setDone(false);
   }
 
+  /* ── Libellés pour l'écran done ─────────────────────────────── */
+  const deptOpt = deptOptions.find((o) => o.id === form.Departement);
+
   /* ── Écran de confirmation ──────────────────────────────────── */
   if (done) {
     return (
@@ -145,22 +172,22 @@ export default function EtablissementPage() {
         <main className="ae-body ae-body--center">
           <div className="ae-done">
             <i className="fa-solid fa-circle-check" style={{ fontSize: "2.5rem", color: "#18753c" }} />
-            <h1 className="ae-done__title">Établissement ajouté&nbsp;!</h1>
+            <h1 className="ae-done__title">Enregistrement réussi&nbsp;!</h1>
             <p className="ae-done__subtitle">
-              L&apos;établissement suivant a bien été enregistré dans EMILE&nbsp;:
+              L&apos;entrée suivante a bien été ajoutée dans EMILE&nbsp;:
             </p>
             <div className="ae-done__name">
-              <i className="fa-solid fa-school" style={{ marginRight: "0.5rem" }} />
-              {form.Nom}
+              {form.Dispositif}
+              {deptOpt && (
+                <span style={{ fontWeight: 400, marginLeft: "0.5rem", opacity: 0.8 }}>
+                  — {deptOpt.tagLeft} {deptOpt.label}
+                </span>
+              )}
             </div>
             <div className="ae-done__actions">
-              <button
-                type="button"
-                className="ae-btn ae-btn--secondary"
-                onClick={handleReset}
-              >
+              <button type="button" className="ae-btn ae-btn--secondary" onClick={handleReset}>
                 <i className="fa-solid fa-plus" />
-                Ajouter un autre établissement
+                Ajouter un autre
               </button>
             </div>
           </div>
@@ -179,125 +206,52 @@ export default function EtablissementPage() {
       </header>
       <main className="ae-body">
 
-        {/* Formulaire */}
         <form className="ae-form" onSubmit={handleSubmit}>
 
-          {/* ── Identification ────────────────────────────────── */}
-          <p className="ae-section-title">Identification</p>
-
+          {/* Dispositif */}
           <div className="ae-field">
             <label className="ae-label">
-              Nom de l&apos;établissement <span className="ae-required">*</span>
+              Dispositif <span className="ae-required">*</span>
             </label>
-            <input
-              className="ae-input"
-              type="text"
-              value={form.Nom}
-              onChange={(e) => set("Nom", e.target.value)}
-              placeholder="Ex : Collège Jean Moulin"
+            <SearchDropdown
+              options={dispositifOptions}
+              valueId={dispositifOptions.find((o) => o.label === form.Dispositif)?.id ?? null}
+              onChange={(id) => {
+                const found = dispositifOptions.find((o) => o.id === id);
+                set("Dispositif", found?.label ?? "");
+              }}
+              placeholder={dataLoading && dispositifOptions.length === 0 ? "Chargement…" : "Sélectionner le dispositif"}
+              disabled={dataLoading && dispositifOptions.length === 0}
             />
           </div>
 
+          {/* Département */}
           <div className="ae-field">
-            <label className="ae-label">Type d&apos;établissement</label>
-            {typeOptions.length > 0 ? (
-              <SearchDropdown
-                options={typeOptions}
-                valueId={typeOptions.find((o) => o.label === form.Type)?.id ?? null}
-                onChange={(id) => {
-                  const found = typeOptions.find((o) => o.id === id);
-                  set("Type", found?.label ?? "");
-                }}
-                placeholder="Sélectionner le type"
-                searchable={typeOptions.length > 6}
-              />
-            ) : (
-              <input
-                className="ae-input"
-                type="text"
-                value={form.Type}
-                onChange={(e) => set("Type", e.target.value)}
-                placeholder={dataLoading ? "Chargement…" : "Ex : Collège, Lycée, CFA…"}
-                disabled={dataLoading}
-              />
-            )}
-          </div>
-
-          {/* ── Adresse ───────────────────────────────────────── */}
-          <p className="ae-section-title">Adresse</p>
-
-          <div className="ae-field">
-            <label className="ae-label">Adresse</label>
-            <input
-              className="ae-input"
-              type="text"
-              value={form.Adresse}
-              onChange={(e) => set("Adresse", e.target.value)}
-              placeholder="N° et nom de la voie"
-              autoComplete="street-address"
+            <label className="ae-label">
+              Département <span className="ae-required">*</span>
+            </label>
+            <SearchDropdown
+              options={deptOptions}
+              valueId={form.Departement}
+              onChange={(id) => set("Departement", id)}
+              placeholder={dataLoading && deptOptions.length === 0 ? "Chargement…" : "Rechercher un département"}
+              disabled={dataLoading && deptOptions.length === 0}
             />
           </div>
 
-          <div className="ae-row">
-            <div className="ae-field">
-              <label className="ae-label">Ville</label>
-              <input
-                className="ae-input"
-                type="text"
-                value={form.Ville}
-                onChange={(e) => set("Ville", e.target.value)}
-                placeholder="Ville"
-                autoComplete="address-level2"
-              />
-            </div>
-            <div className="ae-field">
-              <label className="ae-label">Code postal</label>
-              <input
-                className="ae-input"
-                type="text"
-                value={form.Code_postal}
-                onChange={(e) => set("Code_postal", e.target.value)}
-                placeholder="Ex : 31000"
-                autoComplete="postal-code"
-                maxLength={10}
-              />
-            </div>
-          </div>
-
-          {/* ── Contact ───────────────────────────────────────── */}
-          <p className="ae-section-title">Contact</p>
-
-          <div className="ae-row">
-            <div className="ae-field">
-              <label className="ae-label">Email</label>
-              <input
-                className="ae-input"
-                type="email"
-                value={form.Email}
-                onChange={(e) => set("Email", e.target.value)}
-                placeholder="contact@etablissement.fr"
-                autoComplete="email"
-              />
-            </div>
-            <div className="ae-field">
-              <label className="ae-label">Téléphone</label>
-              <input
-                className="ae-input"
-                type="tel"
-                value={form.Tel}
-                onChange={(e) => set("Tel", e.target.value)}
-                placeholder="05 xx xx xx xx"
-                autoComplete="tel"
-              />
-            </div>
-          </div>
-
-          <div className="ae-infobox">
-            <i className="fa-solid fa-circle-info ae-infobox__icon" />
-            <span>
-              Une fois ajouté, cet établissement sera disponible dans les formulaires
-              d&apos;inscription des orienteur·ices.
-            </span>
+          {/* Organisme gestionnaire */}
+          <div className="ae-field">
+            <label className="ae-label">Organisme gestionnaire</label>
+            <SearchDropdown
+              options={organismeOptions}
+              valueId={organismeOptions.find((o) => o.label === form.Organisme_gestionnaire)?.id ?? null}
+              onChange={(id) => {
+                const found = organismeOptions.find((o) => o.id === id);
+                set("Organisme_gestionnaire", found?.label ?? "");
+              }}
+              placeholder={dataLoading && organismeOptions.length === 0 ? "Chargement…" : "Sélectionner l'organisme"}
+              disabled={dataLoading && organismeOptions.length === 0}
+            />
           </div>
 
           {/* Erreur de validation */}
@@ -308,19 +262,15 @@ export default function EtablissementPage() {
             </div>
           )}
 
-          {/* Navigation */}
+          {/* Bouton */}
           <div className="ae-nav-row">
-            <button
-              type="submit"
-              className="ae-btn ae-btn--primary"
-              disabled={submitting}
-            >
+            <button type="submit" className="ae-btn ae-btn--primary" disabled={submitting}>
               {submitting ? (
                 "Enregistrement…"
               ) : (
                 <>
                   <i className="fa-solid fa-floppy-disk" />
-                  Enregistrer l&apos;établissement
+                  Enregistrer
                 </>
               )}
             </button>
