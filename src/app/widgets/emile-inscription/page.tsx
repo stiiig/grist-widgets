@@ -777,7 +777,23 @@ function DateNaissanceField({
   const daysInMonth = selY && selM
     ? new Date(parseInt(selY), parseInt(selM), 0).getDate()
     : 31;
-  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+
+  const dayOptions = useMemo(
+    () => Array.from({ length: daysInMonth }, (_, i) => ({ id: i + 1, label: String(i + 1) })),
+    [daysInMonth],
+  );
+  const monthOptions = useMemo(
+    () => MONTHS_FR.map((name, i) => ({ id: i + 1, label: name })),
+    [],
+  );
+  const yearOptions = useMemo(
+    () => BIRTH_YEARS.map((y) => ({ id: y, label: String(y) })),
+    [],
+  );
+
+  const dayId   = selD ? parseInt(selD, 10)  : null;
+  const monthId = selM ? parseInt(selM, 10)  : null;
+  const yearId  = selY ? parseInt(selY, 10)  : null;
 
   const age = computeAge(value);
 
@@ -787,36 +803,48 @@ function DateNaissanceField({
         Date de naissance{required && <span className="ins-required"> *</span>}
       </label>
       <div className="ins-date-row">
-        <select
-          className="ins-select ins-date-select ins-date-select--day"
-          value={selD}
-          onChange={(e) => { setSelD(e.target.value); commit(selY, selM, e.target.value); }}
-        >
-          <option value="">Jour</option>
-          {days.map((d) => (
-            <option key={d} value={String(d).padStart(2, "0")}>{d}</option>
-          ))}
-        </select>
-        <select
-          className="ins-select ins-date-select"
-          value={selM}
-          onChange={(e) => { setSelM(e.target.value); commit(selY, e.target.value, selD); }}
-        >
-          <option value="">Mois</option>
-          {MONTHS_FR.map((name, i) => (
-            <option key={i + 1} value={String(i + 1).padStart(2, "0")}>{name}</option>
-          ))}
-        </select>
-        <select
-          className="ins-select ins-date-select ins-date-select--year"
-          value={selY}
-          onChange={(e) => { setSelY(e.target.value); commit(e.target.value, selM, selD); }}
-        >
-          <option value="">Année</option>
-          {BIRTH_YEARS.map((y) => (
-            <option key={y} value={String(y)}>{y}</option>
-          ))}
-        </select>
+        {/* Jour */}
+        <div style={{ flex: "0 0 4.5rem" }}>
+          <SearchDropdown
+            options={dayOptions}
+            valueId={dayId}
+            onChange={(id) => {
+              if (!id) return;
+              const d = String(id).padStart(2, "0");
+              setSelD(d); commit(selY, selM, d);
+            }}
+            placeholder="Jour"
+            searchable={false}
+          />
+        </div>
+        {/* Mois */}
+        <div style={{ flex: 1 }}>
+          <SearchDropdown
+            options={monthOptions}
+            valueId={monthId}
+            onChange={(id) => {
+              if (!id) return;
+              const m = String(id).padStart(2, "0");
+              setSelM(m); commit(selY, m, selD);
+            }}
+            placeholder="Mois"
+            searchable={false}
+          />
+        </div>
+        {/* Année */}
+        <div style={{ flex: "0 0 5.5rem" }}>
+          <SearchDropdown
+            options={yearOptions}
+            valueId={yearId}
+            onChange={(id) => {
+              if (!id) return;
+              const y = String(id);
+              setSelY(y); commit(y, selM, selD);
+            }}
+            placeholder="Année"
+            searchable={true}
+          />
+        </div>
       </div>
       {age !== null && (
         <div className="ins-age-badge-row">
@@ -1020,14 +1048,13 @@ export default function InscriptionPage() {
     docApi.fetchTable("NIVEAU_LANGUE")
       .then((table: any) => {
         const ids = table.id as number[];
-        // Prend la première colonne non-système comme label
-        const labelCol = Object.keys(table).find((c) => c !== "id" && c !== "manualSort") ?? "";
         const opts: Option[] = [];
         for (let i = 0; i < ids.length; i++) {
           const id = ids[i];
-          const label = String(table[labelCol]?.[i] ?? "").trim();
+          const label = String(table["Niveau_de_langue"]?.[i] ?? "").trim();
           if (!label) continue;
-          opts.push({ id, label, q: label.toLowerCase() });
+          const code = String(table["Code_langue"]?.[i] ?? "").trim() || undefined;
+          opts.push({ id, label, q: `${code ?? ""} ${label}`.toLowerCase(), tagLeft: code });
         }
         setNiveauOptions(opts);
       })
