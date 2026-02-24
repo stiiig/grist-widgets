@@ -57,24 +57,21 @@ export default function EtablissementPage() {
   const [organismeOptions,   setOrganismeOptions]             = useState<Option[]>([]);
   const [dataLoading,        setDataLoading]                  = useState(true);
 
-  /* ── Init Grist ─────────────────────────────────────────────── */
+  /* ── Init Grist + chargement ────────────────────────────────── */
   useEffect(() => {
-    initGristOrMock({ requiredAccess: "full" }).then(({ docApi: api }) => {
+    async function init() {
+      const { docApi: api } = await initGristOrMock({ requiredAccess: "full" });
       setDocApi(api);
-    });
-  }, []);
 
-  /* ── Chargement des données ─────────────────────────────────── */
-  useEffect(() => {
-    if (!docApi) return;
+      /* Pas de contexte Grist : on déverrouille juste les dropdowns */
+      if (!api) { setDataLoading(false); return; }
 
-    async function load() {
       try {
         /* Colonnes Choice de la table ETABLISSEMENTS */
-        const cols = await loadColumnsMetaFor(docApi!, TABLE_ID);
+        const cols = await loadColumnsMetaFor(api, TABLE_ID);
 
-        const dispCol  = cols.find((c) => c.colId === "Dispositif");
-        const orgaCol  = cols.find((c) => c.colId === "Organisme_gestionnaire");
+        const dispCol = cols.find((c) => c.colId === "Dispositif");
+        const orgaCol = cols.find((c) => c.colId === "Organisme_gestionnaire");
 
         if (dispCol) {
           const choices = normalizeChoices(dispCol.widgetOptionsParsed?.choices);
@@ -86,7 +83,7 @@ export default function EtablissementPage() {
         }
 
         /* Table DPTS_REGIONS → dropdown département */
-        const dpts = await docApi!.fetchTable("DPTS_REGIONS");
+        const dpts = await api.fetchTable("DPTS_REGIONS");
         const opts: Option[] = [];
         for (let i = 0; i < dpts.id.length; i++) {
           const id     = dpts.id[i];
@@ -111,8 +108,8 @@ export default function EtablissementPage() {
       }
     }
 
-    load();
-  }, [docApi]);
+    init();
+  }, []);
 
   /* ── Mise à jour du formulaire ──────────────────────────────── */
   function set<K extends keyof FormData>(key: K, value: FormData[K]) {

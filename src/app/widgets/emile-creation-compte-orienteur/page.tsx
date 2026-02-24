@@ -51,21 +51,18 @@ export default function OrienteurPage() {
   const [fonctionOptions, setFonctionOptions] = useState<Option[]>([]);
   const [dataLoading,     setDataLoading]     = useState(true);
 
-  /* ── Init Grist ─────────────────────────────────────────────── */
+  /* ── Init Grist + chargement ────────────────────────────────── */
   useEffect(() => {
-    initGristOrMock({ requiredAccess: "full" }).then(({ docApi: api }) => {
+    async function init() {
+      const { docApi: api } = await initGristOrMock({ requiredAccess: "full" });
       setDocApi(api);
-    });
-  }, []);
 
-  /* ── Chargement des données ─────────────────────────────────── */
-  useEffect(() => {
-    if (!docApi) return;
+      /* Pas de contexte Grist : on déverrouille juste les dropdowns */
+      if (!api) { setDataLoading(false); return; }
 
-    async function load() {
       try {
         /* Table ETABLISSEMENTS → dropdown */
-        const etablTable = await docApi!.fetchTable("ETABLISSEMENTS");
+        const etablTable = await api.fetchTable("ETABLISSEMENTS");
         const opts: Option[] = [];
         for (let i = 0; i < etablTable.id.length; i++) {
           const id  = etablTable.id[i];
@@ -76,7 +73,7 @@ export default function OrienteurPage() {
         setEtablOptions(opts);
 
         /* Colonne Fonction → choices */
-        const cols = await loadColumnsMetaFor(docApi!, TABLE_ID);
+        const cols = await loadColumnsMetaFor(api, TABLE_ID);
         const fonctionCol = cols.find((c) => c.colId === "Fonction");
         if (fonctionCol) {
           const choices = normalizeChoices(fonctionCol.widgetOptionsParsed?.choices);
@@ -89,8 +86,8 @@ export default function OrienteurPage() {
       }
     }
 
-    load();
-  }, [docApi]);
+    init();
+  }, []);
 
   /* ── Mise à jour du formulaire ──────────────────────────────── */
   function set<K extends keyof FormData>(key: K, value: FormData[K]) {
