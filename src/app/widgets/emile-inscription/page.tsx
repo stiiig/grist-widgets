@@ -1403,7 +1403,7 @@ export default function InscriptionPage() {
                 />
 
                 <MultiChoiceField
-                  label="Candidat prêt à se former à l'un ou plusieurs de ces secteurs d'activité ?"
+                  label="Candidat·e prêt·e à se former à l'un ou plusieurs de ces secteurs d'activité ?"
                   choices={ch("Pret_a_se_former")}
                   value={form.Pret_a_se_former}
                   onChange={(v) => set("Pret_a_se_former", v)}
