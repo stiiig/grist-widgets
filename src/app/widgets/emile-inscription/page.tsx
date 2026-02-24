@@ -247,6 +247,48 @@ const OUINON_ACTIVE: React.CSSProperties = {
   background: "#000091", borderColor: "#000091", color: "#fff",
 };
 
+/* ─── InfoPopover ────────────────────────────────────────────── */
+function InfoPopover({ children }: { children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLSpanElement | null>(null);
+
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
+
+  return (
+    <span ref={rootRef} style={{ position: "relative", display: "inline-flex", verticalAlign: "middle", marginLeft: "0.35rem" }}>
+      <button
+        type="button"
+        onClick={(e) => { e.preventDefault(); setOpen((v) => !v); }}
+        style={{
+          background: "none", border: "none", cursor: "pointer",
+          color: "#000091", fontSize: "0.9rem", padding: "0 0.1rem",
+          display: "inline-flex", alignItems: "center", lineHeight: 1,
+        }}
+      >
+        <i className="fa-solid fa-circle-info" aria-hidden="true" />
+      </button>
+      {open && (
+        <div style={{
+          position: "absolute", zIndex: 600, top: "calc(100% + 4px)", left: 0,
+          width: "22rem", maxWidth: "calc(100vw - 2rem)",
+          background: "#fff", border: "1px solid #c8c8e8", borderRadius: 6,
+          boxShadow: "0 6px 20px rgba(0,0,145,.12)",
+          padding: "0.75rem 1rem",
+          fontSize: "0.82rem", lineHeight: 1.55, color: "#1e1e1e", fontWeight: 400,
+        }}>
+          {children}
+        </div>
+      )}
+    </span>
+  );
+}
+
 /* ─── Composants UI génériques ───────────────────────────────── */
 
 function StepHeader({ step, title, subtitle }: { step: number; title: string; subtitle?: string }) {
@@ -273,11 +315,12 @@ function InfoBox({ children }: { children: React.ReactNode }) {
   );
 }
 
-function FieldWrap({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+function FieldWrap({ label, required, info, children }: { label: string; required?: boolean; info?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="ins-field">
       <label className="ins-label">
         {label}{required && <span className="ins-required"> *</span>}
+        {info && <InfoPopover>{info}</InfoPopover>}
       </label>
       {children}
     </div>
@@ -286,15 +329,15 @@ function FieldWrap({ label, required, children }: { label: string; required?: bo
 
 /* Choice → SearchDropdown (valeur string) */
 function ChoiceField({
-  label, choices, value, onChange, required = false,
+  label, choices, value, onChange, required = false, info,
 }: {
   label: string; choices: string[]; value: string;
-  onChange: (v: string) => void; required?: boolean;
+  onChange: (v: string) => void; required?: boolean; info?: React.ReactNode;
 }) {
   const options = useMemo(() => choicesToOptions(choices), [choices]);
   const valueId = value ? (options.find((o) => o.label === value)?.id ?? null) : null;
   return (
-    <FieldWrap label={label} required={required}>
+    <FieldWrap label={label} required={required} info={info}>
       <SearchDropdown
         options={options}
         valueId={valueId}
@@ -329,10 +372,10 @@ function RefField({
 
 /* ChoiceList → SearchMultiDropdown (valeur string[]) */
 function MultiChoiceField({
-  label, choices, value, onChange, required = false,
+  label, choices, value, onChange, required = false, info,
 }: {
   label: string; choices: string[]; value: string[];
-  onChange: (v: string[]) => void; required?: boolean;
+  onChange: (v: string[]) => void; required?: boolean; info?: React.ReactNode;
 }) {
   const options  = useMemo(() => choicesToOptions(choices), [choices]);
   const valueIds = useMemo(
@@ -340,7 +383,7 @@ function MultiChoiceField({
     [value, options],
   );
   return (
-    <FieldWrap label={label} required={required}>
+    <FieldWrap label={label} required={required} info={info}>
       <SearchMultiDropdown
         options={options}
         valueIds={valueIds}
@@ -956,7 +999,8 @@ export default function InscriptionPage() {
           const id = ids[i];
           const label = String(table["Numero_et_nom"]?.[i] ?? "").trim();
           if (!label) continue;
-          opts.push({ id, label, q: label.toLowerCase() });
+          const region = String(table["Nom_region"]?.[i] ?? "").trim() || undefined;
+          opts.push({ id, label, q: label.toLowerCase(), tag: region });
         }
         opts.sort((a, b) => a.label.localeCompare(b.label, "fr"));
         setDptsOptions(opts);
@@ -1259,12 +1303,18 @@ export default function InscriptionPage() {
                   />
                 </FieldWrap>
                 <TextField label="Adresse de domiciliation" value={form.Adresse} onChange={(v) => set("Adresse", v)} required />
-                <ChoiceField label="Situation de précarité du logement" choices={ch("Precarite_de_logement")} value={form.Precarite_de_logement} onChange={(v) => set("Precarite_de_logement", v)} required />
-                <InfoBox>
-                  <strong>À NOTER :</strong>
-                  <br />- Pour bien comprendre les différentes situations de précarité du logement, cf. FAQ &gt; "Inscrire un·e candidat·e"
-                  <br />- Une pièce justificative pourra vous être demandée, cf. page FAQ "Les étapes du programme EMILE" &gt; "Justificatifs de la situation d'hébergement"
-                </InfoBox>
+                <ChoiceField
+                  label="Situation de précarité du logement"
+                  choices={ch("Precarite_de_logement")}
+                  value={form.Precarite_de_logement}
+                  onChange={(v) => set("Precarite_de_logement", v)}
+                  required
+                  info={<>
+                    <strong>À NOTER :</strong><br />
+                    — Pour bien comprendre les différentes situations de précarité du logement, cf. FAQ &gt; «&nbsp;Inscrire un·e candidat·e&nbsp;»<br />
+                    — Une pièce justificative pourra vous être demandée, cf. FAQ «&nbsp;Les étapes du programme EMILE&nbsp;» &gt; «&nbsp;Justificatifs de la situation d'hébergement&nbsp;»
+                  </>}
+                />
 
                 <div className="ins-consent-frame">
                   <ToggleOuiNon
@@ -1313,10 +1363,8 @@ export default function InscriptionPage() {
                   choices={ch("Pret_a_se_former")}
                   value={form.Pret_a_se_former}
                   onChange={(v) => set("Pret_a_se_former", v)}
+                  info="Si le / la candidat·e est intéressé·e par un autre secteur d'activité, vous pourrez renseigner les informations dans son dossier après l'inscription."
                 />
-                <InfoBox>
-                  Si le / la candidat·e est intéressé·e par un autre secteur d'activité, vous pourrez renseigner les informations dans son dossier après l'inscription.
-                </InfoBox>
               </>
             )}
 
