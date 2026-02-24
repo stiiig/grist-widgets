@@ -79,27 +79,26 @@ export default function OrienteurPage() {
         /* Pas de contexte Grist → on déverrouille les dropdowns */
         if (!api) { setDataLoading(false); return; }
 
-        /* 3. Charger les données en parallèle */
-        const [etablTable, cols] = await Promise.all([
-          api.fetchTable("ETABLISSEMENTS"),
-          loadColumnsMetaFor(api, TABLE_ID),
-        ]);
+        /* 3a. ETABLISSEMENTS → dropdown (indépendant) */
+        try {
+          const etablTable = await api.fetchTable("ETABLISSEMENTS");
+          const opts: Option[] = [];
+          for (let i = 0; i < etablTable.id.length; i++) {
+            const id  = etablTable.id[i];
+            const nom = etablTable.Nom?.[i] ?? `Établissement ${id}`;
+            if (nom) opts.push({ id, label: String(nom), q: String(nom).toLowerCase() });
+          }
+          opts.sort((a, b) => a.label.localeCompare(b.label, "fr", { sensitivity: "base" }));
+          setEtablOptions(opts);
+        } catch { /* ignore */ }
 
-        /* ETABLISSEMENTS → dropdown */
-        const opts: Option[] = [];
-        for (let i = 0; i < etablTable.id.length; i++) {
-          const id  = etablTable.id[i];
-          const nom = etablTable.Nom?.[i] ?? `Établissement ${id}`;
-          if (nom) opts.push({ id, label: String(nom), q: String(nom).toLowerCase() });
-        }
-        opts.sort((a, b) => a.label.localeCompare(b.label, "fr", { sensitivity: "base" }));
-        setEtablOptions(opts);
+        /* 3b. Choice Fonction (indépendant) */
+        try {
+          const cols = await loadColumnsMetaFor(api, TABLE_ID);
+          const fonctionCol = cols.find((c) => c.colId === "Fonction");
+          if (fonctionCol) setFonctionOptions(choicesToOptions(normalizeChoices(fonctionCol.widgetOptionsParsed?.choices)));
+        } catch { /* ignore */ }
 
-        /* Choice Fonction */
-        const fonctionCol = cols.find((c) => c.colId === "Fonction");
-        if (fonctionCol) {
-          setFonctionOptions(choicesToOptions(normalizeChoices(fonctionCol.widgetOptionsParsed?.choices)));
-        }
       } catch {
         setMode("none");
       } finally {

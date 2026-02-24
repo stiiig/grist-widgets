@@ -85,42 +85,37 @@ export default function EtablissementPage() {
         /* Pas de contexte Grist → on déverrouille les dropdowns */
         if (!api) { setDataLoading(false); return; }
 
-        /* 3. Charger les données en parallèle */
-        const [dpts, cols] = await Promise.all([
-          api.fetchTable("DPTS_REGIONS"),
-          loadColumnsMetaFor(api, TABLE_ID),
-        ]);
+        /* 3a. DPTS_REGIONS → dropdown département (indépendant) */
+        try {
+          const dpts = await api.fetchTable("DPTS_REGIONS");
+          const opts: Option[] = [];
+          for (let i = 0; i < dpts.id.length; i++) {
+            const id     = dpts.id[i];
+            const nom    = String(dpts.Nom?.[i]    ?? "").trim();
+            const numero = String(dpts.Numero?.[i] ?? "").trim();
+            const region = String(dpts.Region?.[i] ?? "").trim();
+            if (!nom) continue;
+            opts.push({
+              id,
+              label:   nom,
+              tagLeft: numero,
+              tag:     region,
+              q:       `${numero} ${nom} ${region}`.toLowerCase(),
+            });
+          }
+          opts.sort((a, b) => deptSortKey(a.tagLeft) - deptSortKey(b.tagLeft));
+          setDeptOptions(opts);
+        } catch { /* ignore */ }
 
-        /* DPTS_REGIONS → dropdown département */
-        const opts: Option[] = [];
-        for (let i = 0; i < dpts.id.length; i++) {
-          const id     = dpts.id[i];
-          const nom    = String(dpts.Nom?.[i]    ?? "").trim();
-          const numero = String(dpts.Numero?.[i] ?? "").trim();
-          const region = String(dpts.Region?.[i] ?? "").trim();
-          if (!nom) continue;
-          opts.push({
-            id,
-            label:   nom,
-            tagLeft: numero,
-            tag:     region,
-            q:       `${numero} ${nom} ${region}`.toLowerCase(),
-          });
-        }
-        opts.sort((a, b) => deptSortKey(a.tagLeft) - deptSortKey(b.tagLeft));
-        setDeptOptions(opts);
+        /* 3b. Colonnes Choice (indépendant) */
+        try {
+          const cols = await loadColumnsMetaFor(api, TABLE_ID);
+          const dispCol = cols.find((c) => c.colId === "Dispositif");
+          if (dispCol) setDispositifOptions(choicesToOptions(normalizeChoices(dispCol.widgetOptionsParsed?.choices)));
+          const orgaCol = cols.find((c) => c.colId === "Organisme_gestionnaire");
+          if (orgaCol) setOrganismeOptions(choicesToOptions(normalizeChoices(orgaCol.widgetOptionsParsed?.choices)));
+        } catch { /* ignore */ }
 
-        /* Choice Dispositif */
-        const dispCol = cols.find((c) => c.colId === "Dispositif");
-        if (dispCol) {
-          setDispositifOptions(choicesToOptions(normalizeChoices(dispCol.widgetOptionsParsed?.choices)));
-        }
-
-        /* Choice Organisme_gestionnaire */
-        const orgaCol = cols.find((c) => c.colId === "Organisme_gestionnaire");
-        if (orgaCol) {
-          setOrganismeOptions(choicesToOptions(normalizeChoices(orgaCol.widgetOptionsParsed?.choices)));
-        }
       } catch {
         setMode("none");
       } finally {
