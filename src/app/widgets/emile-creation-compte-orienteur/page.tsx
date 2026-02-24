@@ -37,6 +37,19 @@ function choicesToOptions(choices: string[]): Option[] {
   return choices.map((label, i) => ({ id: i + 1, label, q: label.toLowerCase() }));
 }
 
+/* ─── Fallback choices (accès anonyme, _grist_Tables non accessible) ── */
+const FALLBACK_FONCTION_OPTIONS: Option[] = choicesToOptions([
+  "Conseiller en insertion professionnelle",
+  "Directeur·ice",
+  "Professionnel·le de l'accompagnement EMILE",
+  "Responsable de service",
+  "Travailleur social",
+  "Autre",
+  "Responsable projets et partenariats",
+  "Responsable sourcing",
+  "Assistant·e sourcing",
+]);
+
 /* ─── Page principale ────────────────────────────────────────── */
 export default function OrienteurPage() {
   const [mode, setMode]             = useState<string>("boot");
@@ -109,7 +122,7 @@ export default function OrienteurPage() {
         const fonctionCol = cols.find((c) => c.colId === "Fonction");
         if (fonctionCol) setFonctionOptions(choicesToOptions(normalizeChoices(fonctionCol.widgetOptionsParsed?.choices)));
       })
-      .catch(() => {})
+      .catch(() => { setFonctionOptions(FALLBACK_FONCTION_OPTIONS); })
       .finally(() => setColsLoading(false));
   }, [docApi]); // eslint-disable-line react-hooks/exhaustive-deps
 
