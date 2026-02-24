@@ -1135,12 +1135,14 @@ function EligibilityScreen({
   dptsOptions,
   dptsIsDepart,
   niveauEligibilite,
+  id2,
   onNew,
 }: {
   form: FormData;
   dptsOptions: Option[];
   dptsIsDepart: Map<number, boolean>;
   niveauEligibilite: Map<number, string>;
+  id2?: string | null;
   onNew: () => void;
 }) {
   const age      = computeAge(form.Date_de_naissance);
@@ -1279,6 +1281,20 @@ function EligibilityScreen({
             )}
           </div>
         </div>
+        {id2 && (
+          <div style={{ flexShrink: 0, textAlign: "right" }}>
+            <div style={{ fontSize: "0.6rem", opacity: 0.6, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "0.2rem" }}>
+              Référence
+            </div>
+            <div style={{
+              fontSize: "0.78rem", fontWeight: 700, letterSpacing: "0.04em",
+              background: "rgba(255,255,255,0.18)", borderRadius: 4,
+              padding: "0.2rem 0.55rem",
+            }}>
+              {id2}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Critères ── */}
@@ -1447,6 +1463,7 @@ export default function InscriptionPage() {
   const [showFaq, setShowFaq]         = useState(false);
   const [dptsIsDepart, setDptsIsDepart]           = useState<Map<number, boolean>>(new Map());
   const [niveauEligibilite, setNiveauEligibilite] = useState<Map<number, string>>(new Map());
+  const [submittedId2, setSubmittedId2]           = useState<string | null>(null);
 
   /* ── Choix dynamiques depuis métadonnées Grist ── */
   const choicesMap = useMemo(() => {
@@ -1677,7 +1694,16 @@ export default function InscriptionPage() {
         fields.Pret_a_se_former = encodeListCell(form.Pret_a_se_former);
       }
 
-      await docApi.applyUserActions([["AddRecord", TABLE_ID, null, fields]]);
+      const result = await docApi.applyUserActions([["AddRecord", TABLE_ID, null, fields]]);
+      const newRowId = result?.retValues?.[0] as number | undefined;
+      if (newRowId) {
+        try {
+          const table = await docApi.fetchTable(TABLE_ID);
+          const ids = table.id as number[];
+          const idx = ids.indexOf(newRowId);
+          if (idx >= 0) setSubmittedId2(String(table["ID2"]?.[idx] ?? "").trim() || null);
+        } catch { /* non bloquant */ }
+      }
       setDone(true);
     } catch (e: any) {
       setSubmitError(e?.message ?? "Une erreur est survenue.");
@@ -1709,7 +1735,8 @@ export default function InscriptionPage() {
             dptsOptions={dptsOptions}
             dptsIsDepart={dptsIsDepart}
             niveauEligibilite={niveauEligibilite}
-            onNew={() => { setForm(INITIAL); setDone(false); setStep(1); setValidError(""); setSubmitError(""); }}
+            id2={submittedId2}
+            onNew={() => { setForm(INITIAL); setDone(false); setStep(1); setValidError(""); setSubmitError(""); setSubmittedId2(null); }}
           />
         </div>
       </div>
