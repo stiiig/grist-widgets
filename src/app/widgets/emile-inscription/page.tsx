@@ -1194,19 +1194,24 @@ export default function InscriptionPage() {
     docApi.fetchTable("DPTS_REGIONS")
       .then((table: any) => {
         const ids = table.id as number[];
-        const opts: Option[] = [];
+        const optsDepart: Option[] = [];
+        const optsAutres: Option[] = [];
         for (let i = 0; i < ids.length; i++) {
           const id = ids[i];
           const label = String(table["Nom_departement"]?.[i] ?? "").trim();
           if (!label) continue;
-          // Filtre : seulement les départements du territoire EMILE
-          if (table["Territoire_depart"]?.[i] !== "Oui") continue;
-          const numero  = String(table["Numero"]?.[i] ?? "").trim() || undefined;
-          const region  = String(table["Nom_region"]?.[i] ?? "").trim() || undefined;
-          opts.push({ id, label, q: `${numero ?? ""} ${label}`.toLowerCase(), tagLeft: numero, tag: region });
+          const numero   = String(table["Numero"]?.[i] ?? "").trim() || undefined;
+          const region   = String(table["Nom_region"]?.[i] ?? "").trim() || undefined;
+          const isDepart = table["Territoire_depart"]?.[i] === "Oui";
+          const opt: Option = { id, label, q: `${numero ?? ""} ${label}`.toLowerCase(), tagLeft: numero, tag: region };
+          if (isDepart) optsDepart.push(opt);
+          else optsAutres.push(opt);
         }
-        opts.sort((a, b) => (a.tagLeft ?? "").localeCompare(b.tagLeft ?? "", "fr", { numeric: true }));
-        setDptsOptions(opts);
+        const sortFn = (a: Option, b: Option) =>
+          (a.tagLeft ?? "").localeCompare(b.tagLeft ?? "", "fr", { numeric: true });
+        optsDepart.sort(sortFn);
+        optsAutres.sort(sortFn);
+        setDptsOptions([...optsDepart, ...optsAutres]);
       })
       .catch(() => {})
       .finally(() => setDptsLoading(false));
