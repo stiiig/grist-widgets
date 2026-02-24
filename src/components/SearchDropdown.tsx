@@ -109,8 +109,8 @@ export function SearchDropdown(props: {
 
   const filtered = useMemo(() => {
     const qq = q.trim().toLowerCase();
-    if (!qq) return options.slice(0, 80);
-    return options.filter((o) => (o.q ?? o.label).toLowerCase().includes(qq)).slice(0, 80);
+    if (!qq) return options.slice(0, 200);
+    return options.filter((o) => (o.q ?? o.label).toLowerCase().includes(qq)).slice(0, 200);
   }, [q, options]);
 
   useEffect(() => {
