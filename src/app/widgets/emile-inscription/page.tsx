@@ -710,24 +710,36 @@ function TelField({
 
 function TextField({
   label, value, onChange, type = "text", required = false,
-  placeholder = "", readOnly = false, wide = false,
+  placeholder = "", readOnly = false, wide = false, rows = 1,
 }: {
   label: string; value: string; onChange?: (v: string) => void;
-  type?: string; required?: boolean; placeholder?: string; readOnly?: boolean; wide?: boolean;
+  type?: string; required?: boolean; placeholder?: string; readOnly?: boolean; wide?: boolean; rows?: number;
 }) {
   return (
     <div className={wide ? "ins-field ins-field--wide" : "ins-field"}>
       <label className="ins-label">
         {label}{required && <span className="ins-required"> *</span>}
       </label>
-      <input
-        type={type}
-        className={`ins-input${readOnly ? " ins-input--readonly" : ""}`}
-        value={value}
-        onChange={readOnly ? undefined : (e) => onChange?.(e.target.value)}
-        placeholder={placeholder}
-        readOnly={readOnly}
-      />
+      {rows > 1 ? (
+        <textarea
+          className={`ins-input${readOnly ? " ins-input--readonly" : ""}`}
+          rows={rows}
+          value={value}
+          onChange={readOnly ? undefined : (e) => onChange?.(e.target.value)}
+          placeholder={placeholder}
+          readOnly={readOnly}
+          style={{ height: "auto", resize: "vertical", paddingTop: "0.4rem", paddingBottom: "0.4rem" }}
+        />
+      ) : (
+        <input
+          type={type}
+          className={`ins-input${readOnly ? " ins-input--readonly" : ""}`}
+          value={value}
+          onChange={readOnly ? undefined : (e) => onChange?.(e.target.value)}
+          placeholder={placeholder}
+          readOnly={readOnly}
+        />
+      )}
     </div>
   );
 }
@@ -1031,7 +1043,7 @@ export default function InscriptionPage() {
           const label = String(table["Nom_departement"]?.[i] ?? "").trim();
           if (!label) continue;
           // Filtre : seulement les départements du territoire EMILE
-          if (!table["Territoire_depart"]?.[i]) continue;
+          if (table["Territoire_depart"]?.[i] !== "Oui") continue;
           const numero  = String(table["Numero"]?.[i] ?? "").trim() || undefined;
           const region  = String(table["Nom_region"]?.[i] ?? "").trim() || undefined;
           opts.push({ id, label, q: `${numero ?? ""} ${label}`.toLowerCase(), tagLeft: numero, tag: region });
@@ -1335,7 +1347,7 @@ export default function InscriptionPage() {
                     searchable
                   />
                 </FieldWrap>
-                <TextField label="Adresse de domiciliation" value={form.Adresse} onChange={(v) => set("Adresse", v)} required />
+                <TextField label="Adresse de domiciliation" value={form.Adresse} onChange={(v) => set("Adresse", v)} required rows={3} />
                 <ChoiceField
                   label="Situation de précarité du logement"
                   choices={ch("Precarite_de_logement")}
@@ -1385,13 +1397,13 @@ export default function InscriptionPage() {
                   onChange={(v) => set("Primo_arrivant", v)}
                 />
                 <ToggleOuiNon
-                  label="Bénéficiaire de la Protection Internationale (BPI)"
+                  label="Bénéficiaire de la Protection Internationale"
                   value={form.Bpi}
                   onChange={(v) => set("Bpi", v)}
                 />
 
                 <MultiChoiceField
-                  label="La personne serait-elle prête à se former sur l'un de ces secteurs d'activité ?"
+                  label="Candidat prêt à se former à l'un ou plusieurs de ces secteurs d'activité ?"
                   choices={ch("Pret_a_se_former")}
                   value={form.Pret_a_se_former}
                   onChange={(v) => set("Pret_a_se_former", v)}
