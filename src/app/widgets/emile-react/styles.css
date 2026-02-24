@@ -479,10 +479,10 @@ body {
   gap: 0.35rem;
   padding: 0 0.75rem;
   height: 2rem;
-  border: 1px solid rgba(255,255,255,.35);
+  border: 1px solid rgba(255,255,255,.35) !important;
   border-radius: 3px;
-  background: rgba(255,255,255,.12);
-  color: #fff;
+  background: rgba(255,255,255,.12) !important;
+  color: #fff !important;
   font-size: 0.75rem;
   font-weight: 700;
   cursor: pointer;
@@ -492,5 +492,6 @@ body {
   transition: background 0.15s;
 }
 .emile-faq-btn:hover {
-  background: rgba(255,255,255,.22);
+  background: rgba(255,255,255,.25) !important;
+  color: #fff !important;
 }
