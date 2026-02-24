@@ -92,6 +92,56 @@ function choicesToOptions(choices: string[]): Option[] {
   return choices.map((label, i) => ({ id: i + 1, label, q: label.toLowerCase() }));
 }
 
+/* ─── Fallback choices (pour accès anonyme, _grist_Tables non accessible) ── */
+const FALLBACK_COLS: ColMeta[] = [
+  {
+    colId: "Precarite_de_logement",
+    label: "Precarite_de_logement",
+    type: "Choice",
+    widgetOptions: "",
+    widgetOptionsParsed: {
+      choices: [
+        "Non propriétaire d'un logement",
+        "Non titulaire d'un bail (incluant personne sans domicile)",
+        "Doit quitter son logement (raison : avis d'expulsion)",
+        "Doit quitter son logement (raison : situation d'insalubrité)",
+        "Doit quitter son logement (raison : suroccupation importante)",
+        "Doit quitter son logement (raison : violence intrafamiliale)",
+        "Aucun des choix ne correspond à la situation",
+      ],
+    },
+    isFormula: false,
+  },
+  {
+    colId: "Foyer",
+    label: "Foyer",
+    type: "Choice",
+    widgetOptions: "",
+    widgetOptionsParsed: {
+      choices: [
+        "Couple avec enfant(s)",
+        "Couple sans enfant",
+        "Famille monoparentale",
+      ],
+    },
+    isFormula: false,
+  },
+  {
+    colId: "Pret_a_se_former",
+    label: "Pret_a_se_former",
+    type: "ChoiceList",
+    widgetOptions: "",
+    widgetOptionsParsed: {
+      choices: [
+        "BTP",
+        "Hôtellerie-Restauration",
+        "Service à la personne",
+      ],
+    },
+    isFormula: false,
+  },
+];
+
 /* ─── Pays ───────────────────────────────────────────────────── */
 type PaysOption = Option & { typeNationalite: string };
 
@@ -1588,7 +1638,7 @@ export default function InscriptionPage() {
     if (!docApi) return;
     loadColumnsMetaFor(docApi, TABLE_ID)
       .then((meta) => setCols(meta))
-      .catch(() => {});
+      .catch(() => { setCols(FALLBACK_COLS); });
   }, [docApi]);
 
   /* ── Chargement pays depuis table PAYS ── */
