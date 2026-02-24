@@ -1191,7 +1191,7 @@ function EligibilityScreen({
     },
     {
       id: "langue",
-      label: "Niveau de langue éligible",
+      label: "Niveau de langue",
       ok: form.Niveau_de_langue == null
         ? null
         : (niveauEligibilite.get(form.Niveau_de_langue) ?? "").toLowerCase() === "oui",
@@ -1233,24 +1233,6 @@ function EligibilityScreen({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "0.9rem" }}>
-
-      {/* ── Notice succès ── */}
-      <div style={{
-        ...W,
-        display: "flex", alignItems: "flex-start", gap: "0.7rem",
-        background: "#f0fdf4", border: "1px solid #bbf7d0",
-        borderRadius: "0.5rem", padding: "0.75rem 1rem",
-      }}>
-        <i className="fa-solid fa-circle-check" style={{ color: "#16a34a", fontSize: "1.1rem", flexShrink: 0, marginTop: "0.05rem" }} />
-        <div>
-          <div style={{ fontWeight: 700, fontSize: "0.85rem", color: "#15803d" }}>
-            Inscription enregistrée avec succès
-          </div>
-          <div style={{ fontSize: "0.78rem", color: "#555", marginTop: "0.15rem", lineHeight: 1.4 }}>
-            D&apos;ici quelques instants, un email sera envoyé avec le statut du dossier et les instructions pour la suite.
-          </div>
-        </div>
-      </div>
 
       {/* ── Carte candidat·e ── */}
       <div style={{
@@ -1410,14 +1392,29 @@ function EligibilityScreen({
           </div>
           <div style={{ fontSize: "0.78rem", color: "#555", marginTop: "0.25rem", lineHeight: 1.4 }}>
             {eligible
-              ? "Tous les critères sont remplis. Le dossier peut être traité."
+              ? `Nous avons le plaisir de vous confirmer que l'inscription au programme EMILE pour ${[form.Prenom, form.Nom_de_famille.toUpperCase()].filter(Boolean).join(" ")}${id2 ? ` (référence ${id2})` : ""} a été validée comme éligible.`
               : failingCount > 0
-              ? `${failingCount} critère${failingCount > 1 ? "s" : ""} non rempli${failingCount > 1 ? "s" : ""}. L'inscription au programme EMILE pour ${[form.Prenom, form.Nom_de_famille.toUpperCase()].filter(Boolean).join(" ")}${id2 ? ` (dossier ${id2})` : ""} n'a malheureusement pas été validée et reste inéligible en l'état.`
+              ? `${failingCount} critère${failingCount > 1 ? "s" : ""} non rempli${failingCount > 1 ? "s" : ""}. L'inscription au programme EMILE pour ${[form.Prenom, form.Nom_de_famille.toUpperCase()].filter(Boolean).join(" ")}${id2 ? ` (référence ${id2})` : ""} n'a malheureusement pas été validée et reste inéligible en l'état.`
               : "Certains critères n'ont pas pu être vérifiés automatiquement."
             }
           </div>
         </div>
       </div>
+
+      {/* ── Message si éligible ── */}
+      {eligible && (
+        <div style={{
+          ...W,
+          display: "flex", alignItems: "flex-start", gap: "0.65rem",
+          background: "#eff6ff", border: "1px solid #bfdbfe",
+          borderRadius: "0.5rem", padding: "0.75rem 1rem",
+        }}>
+          <i className="fa-solid fa-envelope" style={{ color: "#2563eb", fontSize: "1rem", flexShrink: 0, marginTop: "0.05rem" }} />
+          <div style={{ fontSize: "0.82rem", color: "#1e3a5f", lineHeight: 1.5 }}>
+            Vous allez recevoir d&apos;ici quelques instants un email avec les instructions pour la suite.
+          </div>
+        </div>
+      )}
 
       {/* ── Message si non éligible ── */}
       {failingCount > 0 && (
