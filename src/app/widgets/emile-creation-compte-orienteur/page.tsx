@@ -211,9 +211,6 @@ export default function OrienteurPage() {
                 <strong>{form.Email}</strong>
               </li>
               <li>
-                Vos identifiants de connexion vous seront communiqués d&apos;ici quelques minutes
-              </li>
-              <li>
                 En cas de problème, contactez votre équipe via l&apos;adresse indiquée dans l&apos;email
               </li>
             </ul>
@@ -354,7 +351,6 @@ export default function OrienteurPage() {
                     type="text"
                     value={form.Prenom}
                     onChange={(e) => set("Prenom", e.target.value)}
-                    placeholder="Prénom"
                     autoComplete="given-name"
                   />
                 </div>
@@ -367,7 +363,6 @@ export default function OrienteurPage() {
                     type="text"
                     value={form.Nom}
                     onChange={(e) => set("Nom", e.target.value)}
-                    placeholder="Nom de famille"
                     autoComplete="family-name"
                   />
                 </div>
@@ -390,7 +385,6 @@ export default function OrienteurPage() {
                     type="tel"
                     value={form.Tel}
                     onChange={(e) => set("Tel", e.target.value)}
-                    placeholder="6 xx xx xx xx"
                     autoComplete="tel"
                     style={{ flex: 1 }}
                   />
@@ -407,7 +401,6 @@ export default function OrienteurPage() {
                   type="email"
                   value={form.Email}
                   onChange={(e) => set("Email", e.target.value)}
-                  placeholder="prenom.nom@education.gouv.fr"
                   autoComplete="email"
                 />
               </div>
