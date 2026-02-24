@@ -1386,7 +1386,7 @@ function EligibilityScreen({
             {eligible
               ? `Candidat${e} éligible au programme EMILE`
               : failingCount > 0
-              ? `Candidat${e} non éligible`
+              ? `Candidat${e} non éligible au programme EMILE`
               : "Éligibilité incomplète"
             }
           </div>
