@@ -1247,7 +1247,7 @@ function EligibilityScreen({
           display: "flex", alignItems: "center", justifyContent: "center",
           flexShrink: 0, fontSize: "1.2rem",
         }}>
-          <i className="fa-solid fa-user-tie" />
+          <i className={`fa-solid ${isFemme ? "fa-person-dress" : "fa-user-tie"}`} />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontWeight: 700, fontSize: "1rem", marginBottom: "0.3rem", letterSpacing: "0.03em" }}>
@@ -1638,7 +1638,7 @@ export default function InscriptionPage() {
       if (form.Departement_domicile_inscription === null) return "Le département est requis.";
       if (!form.Adresse.trim())                   return "L'adresse est requise.";
       if (!form.Precarite_de_logement)            return "La situation de précarité est requise.";
-      if (form.Consentement_volontaire === null)   return "Le consentement EMILE est requis.";
+      if (form.Consentement_volontaire === null)   return "Le consentement au programme EMILE est requis.";
       if (form.Niveau_de_langue === null)          return "Le niveau de langue est requis.";
       if (!form.Foyer)                            return "La composition du foyer est requise.";
       if (!form.Regularite_situation)             return "La situation régulière est requise.";
