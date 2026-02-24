@@ -471,3 +471,26 @@ body {
 .emile-ouinon-btn:not(:disabled):hover { border-color: #000091; color: #000091; }
 .emile-ouinon-btn--active,
 .emile-ouinon-btn--active:hover { background: #000091; border-color: #000091; color: #fff; }
+
+/* ── Bouton FAQ dans le header ──────────────────────────── */
+.emile-faq-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0 0.75rem;
+  height: 2rem;
+  border: 1px solid rgba(255,255,255,.35);
+  border-radius: 3px;
+  background: rgba(255,255,255,.12);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: Marianne, arial, sans-serif;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+.emile-faq-btn:hover {
+  background: rgba(255,255,255,.22);
+}
