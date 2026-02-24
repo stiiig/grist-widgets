@@ -1412,7 +1412,7 @@ function EligibilityScreen({
             {eligible
               ? "Tous les critères sont remplis. Le dossier peut être traité."
               : failingCount > 0
-              ? `${failingCount} critère${failingCount > 1 ? "s" : ""} non rempli${failingCount > 1 ? "s" : ""}. Le dossier ne peut pas être traité en l'état.`
+              ? `${failingCount} critère${failingCount > 1 ? "s" : ""} non rempli${failingCount > 1 ? "s" : ""}. L'inscription au programme EMILE pour ${[form.Prenom, form.Nom_de_famille.toUpperCase()].filter(Boolean).join(" ")}${id2 ? ` (dossier ${id2})` : ""} n'a malheureusement pas été validée et reste inéligible en l'état.`
               : "Certains critères n'ont pas pu être vérifiés automatiquement."
             }
           </div>
