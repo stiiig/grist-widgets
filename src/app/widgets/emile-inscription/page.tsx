@@ -1289,8 +1289,8 @@ export default function InscriptionPage() {
 
                 <SectionTitle title="Informations administratives" />
 
-                <TextField label="Prénom" value={form.Prenom} onChange={(v) => set("Prenom", v)} required />
-                <TextField label="Nom" value={form.Nom_de_famille} onChange={(v) => set("Nom_de_famille", v)} required />
+                <TextField label="Prénom" value={form.Prenom} onChange={(v) => set("Prenom", v)} required placeholder="Prénom du candidat" />
+                <TextField label="Nom de famille" value={form.Nom_de_famille} onChange={(v) => set("Nom_de_famille", v)} required placeholder="Nom de famille du candidat" />
                 <GenreField value={form.Genre} onChange={(v) => set("Genre", v)} required />
                 <NationaliteDropdown
                   options={paysOptions}
