@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import "./styles.css";
 import logoEmile from "../emile-inscription/logo-emile-white.png";
 import { initGristOrMock } from "@/lib/grist/init";
@@ -39,30 +39,53 @@ function choicesToOptions(choices: string[]): Option[] {
 
 /* ─── Page principale ────────────────────────────────────────── */
 export default function OrienteurPage() {
-  const [docApi, setDocApi] = useState<GristDocAPI | null>(null);
-  const [step, setStep]     = useState(1);
-  const [form, setForm]     = useState<FormData>(INITIAL);
-  const [done, setDone]     = useState(false);
+  const [mode, setMode]             = useState<string>("boot");
+  const [docApi, setDocApi]         = useState<GristDocAPI | null>(null);
+  const [step, setStep]             = useState(1);
+  const [form, setForm]             = useState<FormData>(INITIAL);
+  const [done, setDone]             = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError]   = useState<string | null>(null);
+  const [error, setError]           = useState<string | null>(null);
 
   /* Options chargées depuis Grist */
   const [etablOptions,    setEtablOptions]    = useState<Option[]>([]);
   const [fonctionOptions, setFonctionOptions] = useState<Option[]>([]);
-  const [dataLoading,     setDataLoading]     = useState(true);
+  const [etablLoading,    setEtablLoading]    = useState(true);
+  const [colsLoading,     setColsLoading]     = useState(true);
 
-  /* ── Init Grist + chargement ────────────────────────────────── */
+  /* ── Init Grist (même pattern que emile-inscription) ──────── */
   useEffect(() => {
-    async function init() {
-      const { docApi: api } = await initGristOrMock({ requiredAccess: "full" });
-      setDocApi(api);
-
-      /* Pas de contexte Grist : on déverrouille juste les dropdowns */
-      if (!api) { setDataLoading(false); return; }
-
+    (async () => {
       try {
-        /* Table ETABLISSEMENTS → dropdown */
-        const etablTable = await api.fetchTable("ETABLISSEMENTS");
+        if (typeof window !== "undefined" && !(window as any).grist) {
+          await new Promise<void>((resolve, reject) => {
+            const existing = document.querySelector('script[data-grist-plugin-api="1"]') as HTMLScriptElement | null;
+            if (existing) return resolve();
+            const s = document.createElement("script");
+            s.src = "https://docs.getgrist.com/grist-plugin-api.js";
+            s.async = true;
+            s.setAttribute("data-grist-plugin-api", "1");
+            s.onload  = () => resolve();
+            s.onerror = () => reject(new Error("Impossible de charger grist-plugin-api.js"));
+            document.head.appendChild(s);
+          });
+        }
+        const result = await initGristOrMock({ requiredAccess: "full" });
+        setMode(result.mode);
+        setDocApi(result.docApi);
+      } catch (e: any) {
+        setError(`Erreur init: ${e?.message ?? String(e)}`);
+        setMode("none");
+      }
+    })();
+  }, []);
+
+  /* ── Chargement établissements depuis table ETABLISSEMENTS ──── */
+  useEffect(() => {
+    if (!docApi) return;
+    setEtablLoading(true);
+    docApi.fetchTable("ETABLISSEMENTS")
+      .then((etablTable: any) => {
         const opts: Option[] = [];
         for (let i = 0; i < etablTable.id.length; i++) {
           const id  = etablTable.id[i];
@@ -71,23 +94,26 @@ export default function OrienteurPage() {
         }
         opts.sort((a, b) => a.label.localeCompare(b.label, "fr", { sensitivity: "base" }));
         setEtablOptions(opts);
+      })
+      .catch(() => {})
+      .finally(() => setEtablLoading(false));
+  }, [docApi]);
 
-        /* Colonne Fonction → choices */
-        const cols = await loadColumnsMetaFor(api, TABLE_ID);
+  /* ── Chargement colonne Fonction (Choice) ────────────────────── */
+  useEffect(() => {
+    if (!docApi) return;
+    setColsLoading(true);
+    loadColumnsMetaFor(docApi, TABLE_ID)
+      .then((cols) => {
         const fonctionCol = cols.find((c) => c.colId === "Fonction");
         if (fonctionCol) {
           const choices = normalizeChoices(fonctionCol.widgetOptionsParsed?.choices);
           setFonctionOptions(choicesToOptions(choices));
         }
-      } catch (err) {
-        console.error("[OrienteurPage] Erreur chargement:", err);
-      } finally {
-        setDataLoading(false);
-      }
-    }
-
-    init();
-  }, []);
+      })
+      .catch(() => {})
+      .finally(() => setColsLoading(false));
+  }, [docApi]);
 
   /* ── Mise à jour du formulaire ──────────────────────────────── */
   function set<K extends keyof FormData>(key: K, value: FormData[K]) {
@@ -150,6 +176,22 @@ export default function OrienteurPage() {
     }
   }
 
+  /* ── Spinner boot ───────────────────────────────────────────── */
+  if (mode === "boot") {
+    return (
+      <div className="occ-shell">
+        <header className="occ-header">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={logoEmile.src} alt="EMILE" style={{ height: "2rem", width: "auto" }} />
+          <span className="occ-header__appname">Création compte orienteur·ice</span>
+        </header>
+        <main className="occ-body occ-body--center">
+          <div style={{ color: "#bbb", fontSize: "1.5rem" }}><i className="fa-solid fa-spinner fa-spin" /></div>
+        </main>
+      </div>
+    );
+  }
+
   /* ── Écran de confirmation ──────────────────────────────────── */
   if (done) {
     return (
@@ -172,7 +214,7 @@ export default function OrienteurPage() {
                 Vos identifiants de connexion vous seront communiqués d&apos;ici quelques minutes
               </li>
               <li>
-                En cas de problème, contactez notre équipe via l&apos;adresse indiquée dans l&apos;email
+                En cas de problème, contactez votre équipe via l&apos;adresse indiquée dans l&apos;email
               </li>
             </ul>
             <div className="occ-done__warning">
@@ -182,10 +224,6 @@ export default function OrienteurPage() {
               </span>
             </div>
             <p className="occ-done__thanks">🙏 Merci de rejoindre le réseau EMILE</p>
-            <button type="button" className="occ-btn occ-btn--primary" style={{ marginLeft: 0 }}>
-              <i className="fa-solid fa-right-to-bracket" />
-              Connexion
-            </button>
           </div>
         </main>
       </div>
@@ -247,8 +285,8 @@ export default function OrienteurPage() {
                   options={etablOptions}
                   valueId={form.Etablissement}
                   onChange={(id) => set("Etablissement", id)}
-                  placeholder={dataLoading && etablOptions.length === 0 ? "Chargement…" : "Rechercher un établissement…"}
-                  disabled={dataLoading && etablOptions.length === 0}
+                  placeholder={etablLoading ? "Chargement…" : "Rechercher un établissement…"}
+                  disabled={etablLoading}
                 />
               </div>
 

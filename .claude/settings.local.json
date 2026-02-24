@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc:*)",
+      "Bash(npm run build:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nui\\(emile-react\\): align design with DDT31 widgets \\(header, palette, FontAwesome\\)\n\n- Header bleu #000091 avec logo DDT31, titre EMILE et candidat courant\n- Onglets L1 intégrés dans le header \\(style app-tab, underline blanc sur actif\\)\n- Subheader blanc : subtabs L2 en pills, recherche candidat et bouton save\n- Icônes FontAwesome 6.5.1 \\(remplacent les SVG inline\\)\n- DSFR mis à jour 1.12 → 1.14\n- Palette cohérente : fond #f0f0f0, cards blanches, inputs #f5f5fe / border #000091\n- Font Marianne explicite sur tous les éléments custom\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "WebFetch(domain:support.getgrist.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:community.getgrist.com)",
+      "WebFetch(domain:pygrister.readthedocs.io)",
+      "Bash(curl:*)",
+      "WebFetch(domain:docs.getgrist.com)",
+      "Bash(git show:*)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(xargs:*)",
+      "Bash(ls:*)",
+      "Bash(convert:*)",
+      "Bash(python3:*)",
+      "Bash(pip3 install:*)",
+      "Bash(brew install:*)",
+      "Bash(magick:*)",
+      "Bash(git -C /Users/benjamin/grist-widgets add src/app/widgets/emile-inscription/logo-emile-white.png)",
+      "Bash(git -C:*)",
+      "Bash(git -C /Users/benjamin/grist-widgets push)"
+    ]
+  }
+}

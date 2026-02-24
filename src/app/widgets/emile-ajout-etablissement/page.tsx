@@ -45,6 +45,7 @@ function deptSortKey(numero: string | undefined): number {
 
 /* ─── Page principale ────────────────────────────────────────── */
 export default function EtablissementPage() {
+  const [mode, setMode]             = useState<string>("boot");
   const [docApi, setDocApi]         = useState<GristDocAPI | null>(null);
   const [form, setForm]             = useState<FormData>(INITIAL);
   const [done, setDone]             = useState(false);
@@ -52,41 +53,45 @@ export default function EtablissementPage() {
   const [error, setError]           = useState<string | null>(null);
 
   /* Options */
-  const [dispositifOptions, setDispositifOptions]             = useState<Option[]>([]);
-  const [deptOptions,        setDeptOptions]                  = useState<Option[]>([]);
-  const [organismeOptions,   setOrganismeOptions]             = useState<Option[]>([]);
-  const [dataLoading,        setDataLoading]                  = useState(true);
-  const [initError,          setInitError]                    = useState<string | null>(null);
+  const [dispositifOptions, setDispositifOptions] = useState<Option[]>([]);
+  const [deptOptions,        setDeptOptions]      = useState<Option[]>([]);
+  const [organismeOptions,   setOrganismeOptions] = useState<Option[]>([]);
+  const [dptsLoading,        setDptsLoading]      = useState(true);
+  const [colsLoading,        setColsLoading]      = useState(true);
 
-  /* ── Init Grist + chargement ────────────────────────────────── */
+  /* ── Init Grist (même pattern que emile-inscription) ──────── */
   useEffect(() => {
-    async function init() {
-      const { docApi: api } = await initGristOrMock({ requiredAccess: "full" });
-      setDocApi(api);
-
-      /* Pas de contexte Grist : on déverrouille juste les dropdowns */
-      if (!api) { setDataLoading(false); return; }
-
+    (async () => {
       try {
-        /* Colonnes Choice de la table ETABLISSEMENTS */
-        const cols = await loadColumnsMetaFor(api, TABLE_ID);
-        console.log("[EtablissementPage] colonnes trouvées:", cols.map((c) => `${c.colId} (${c.type})`));
-
-        const dispCol = cols.find((c) => c.colId === "Dispositif");
-        const orgaCol = cols.find((c) => c.colId === "Organisme_gestionnaire");
-        console.log("[EtablissementPage] dispCol:", dispCol?.colId, "orgaCol:", orgaCol?.colId);
-
-        if (dispCol) {
-          const choices = normalizeChoices(dispCol.widgetOptionsParsed?.choices);
-          setDispositifOptions(choicesToOptions(choices));
+        if (typeof window !== "undefined" && !(window as any).grist) {
+          await new Promise<void>((resolve, reject) => {
+            const existing = document.querySelector('script[data-grist-plugin-api="1"]') as HTMLScriptElement | null;
+            if (existing) return resolve();
+            const s = document.createElement("script");
+            s.src = "https://docs.getgrist.com/grist-plugin-api.js";
+            s.async = true;
+            s.setAttribute("data-grist-plugin-api", "1");
+            s.onload  = () => resolve();
+            s.onerror = () => reject(new Error("Impossible de charger grist-plugin-api.js"));
+            document.head.appendChild(s);
+          });
         }
-        if (orgaCol) {
-          const choices = normalizeChoices(orgaCol.widgetOptionsParsed?.choices);
-          setOrganismeOptions(choicesToOptions(choices));
-        }
+        const result = await initGristOrMock({ requiredAccess: "full" });
+        setMode(result.mode);
+        setDocApi(result.docApi);
+      } catch (e: any) {
+        setError(`Erreur init: ${e?.message ?? String(e)}`);
+        setMode("none");
+      }
+    })();
+  }, []);
 
-        /* Table DPTS_REGIONS → dropdown département */
-        const dpts = await api.fetchTable("DPTS_REGIONS");
+  /* ── Chargement départements depuis table DPTS_REGIONS ──────── */
+  useEffect(() => {
+    if (!docApi) return;
+    setDptsLoading(true);
+    docApi.fetchTable("DPTS_REGIONS")
+      .then((dpts: any) => {
         const opts: Option[] = [];
         for (let i = 0; i < dpts.id.length; i++) {
           const id     = dpts.id[i];
@@ -104,16 +109,31 @@ export default function EtablissementPage() {
         }
         opts.sort((a, b) => deptSortKey(a.tagLeft) - deptSortKey(b.tagLeft));
         setDeptOptions(opts);
-      } catch (err: any) {
-        console.error("[EtablissementPage] Erreur chargement:", err);
-        setInitError(err?.message ?? String(err));
-      } finally {
-        setDataLoading(false);
-      }
-    }
+      })
+      .catch(() => {})
+      .finally(() => setDptsLoading(false));
+  }, [docApi]);
 
-    init();
-  }, []);
+  /* ── Chargement colonnes Choice (Dispositif + Organisme) ────── */
+  useEffect(() => {
+    if (!docApi) return;
+    setColsLoading(true);
+    loadColumnsMetaFor(docApi, TABLE_ID)
+      .then((cols) => {
+        const dispCol = cols.find((c) => c.colId === "Dispositif");
+        const orgaCol = cols.find((c) => c.colId === "Organisme_gestionnaire");
+        if (dispCol) {
+          const choices = normalizeChoices(dispCol.widgetOptionsParsed?.choices);
+          setDispositifOptions(choicesToOptions(choices));
+        }
+        if (orgaCol) {
+          const choices = normalizeChoices(orgaCol.widgetOptionsParsed?.choices);
+          setOrganismeOptions(choicesToOptions(choices));
+        }
+      })
+      .catch(() => {})
+      .finally(() => setColsLoading(false));
+  }, [docApi]);
 
   /* ── Mise à jour du formulaire ──────────────────────────────── */
   function set<K extends keyof FormData>(key: K, value: FormData[K]) {
@@ -166,6 +186,22 @@ export default function EtablissementPage() {
   /* ── Libellés pour l'écran done ─────────────────────────────── */
   const deptOpt = deptOptions.find((o) => o.id === form.Departement);
 
+  /* ── Spinner boot ───────────────────────────────────────────── */
+  if (mode === "boot") {
+    return (
+      <div className="ae-shell">
+        <header className="ae-header">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={logoEmile.src} alt="EMILE" style={{ height: "2rem", width: "auto" }} />
+          <span className="ae-header__appname">Ajout d&apos;un établissement</span>
+        </header>
+        <main className="ae-body ae-body--center">
+          <div style={{ color: "#bbb", fontSize: "1.5rem" }}><i className="fa-solid fa-spinner fa-spin" /></div>
+        </main>
+      </div>
+    );
+  }
+
   /* ── Écran de confirmation ──────────────────────────────────── */
   if (done) {
     return (
@@ -203,6 +239,8 @@ export default function EtablissementPage() {
     );
   }
 
+  const dataLoading = dptsLoading || colsLoading;
+
   /* ── Rendu principal ────────────────────────────────────────── */
   return (
     <div className="ae-shell">
@@ -238,8 +276,8 @@ export default function EtablissementPage() {
               options={deptOptions}
               valueId={form.Departement}
               onChange={(id) => set("Departement", id)}
-              placeholder={dataLoading && deptOptions.length === 0 ? "Chargement…" : "Rechercher un département"}
-              disabled={dataLoading && deptOptions.length === 0}
+              placeholder={dptsLoading ? "Chargement…" : "Rechercher un département"}
+              disabled={dptsLoading}
             />
           </div>
 
@@ -255,8 +293,8 @@ export default function EtablissementPage() {
                 const found = dispositifOptions.find((o) => o.id === id);
                 set("Dispositif", found?.label ?? "");
               }}
-              placeholder={dataLoading && dispositifOptions.length === 0 ? "Chargement…" : "Sélectionner le dispositif"}
-              disabled={dataLoading && dispositifOptions.length === 0}
+              placeholder={colsLoading ? "Chargement…" : "Sélectionner le dispositif"}
+              disabled={colsLoading}
             />
           </div>
 
@@ -272,18 +310,10 @@ export default function EtablissementPage() {
                 const found = organismeOptions.find((o) => o.id === id);
                 set("Organisme_gestionnaire", found?.label ?? "");
               }}
-              placeholder={dataLoading && organismeOptions.length === 0 ? "Chargement…" : "Sélectionner l'organisme"}
-              disabled={dataLoading && organismeOptions.length === 0}
+              placeholder={colsLoading ? "Chargement…" : "Sélectionner l'organisme"}
+              disabled={colsLoading}
             />
           </div>
-
-          {/* Erreur init Grist (debug) */}
-          {initError && (
-            <div className="ae-validation-error">
-              <i className="fa-solid fa-circle-exclamation" />
-              <span><strong>Erreur chargement :</strong> {initError}</span>
-            </div>
-          )}
 
           {/* Erreur de validation */}
           {error && (
@@ -295,7 +325,7 @@ export default function EtablissementPage() {
 
           {/* Bouton */}
           <div className="ae-nav-row">
-            <button type="submit" className="ae-btn ae-btn--primary" disabled={submitting}>
+            <button type="submit" className="ae-btn ae-btn--primary" disabled={submitting || dataLoading}>
               {submitting ? (
                 "Enregistrement…"
               ) : (
