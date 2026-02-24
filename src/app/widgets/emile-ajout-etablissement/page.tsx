@@ -217,19 +217,21 @@ export default function EtablissementPage() {
               L&apos;établissement suivant a bien été ajouté au programme EMILE&nbsp;:
             </p>
             <div className="ae-done__name">
-              <i className="fa-solid fa-school" style={{ marginRight: "0.5rem" }} />
-              {form.Nom_etablissement}
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem", marginTop: "0.5rem", fontSize: "0.9rem", color: "#555" }}>
-              {deptOpt && (
-                <span><strong>Département&nbsp;:</strong> {deptOpt.label}</span>
-              )}
-              {form.Organisme_gestionnaire && (
-                <span><strong>Organisme gestionnaire&nbsp;:</strong> {form.Organisme_gestionnaire}</span>
-              )}
-              {form.Dispositif && (
-                <span><strong>Dispositif&nbsp;:</strong> {form.Dispositif}</span>
-              )}
+              <div style={{ fontWeight: 700, marginBottom: "0.4rem" }}>
+                <i className="fa-solid fa-school" style={{ marginRight: "0.5rem" }} />
+                {form.Nom_etablissement}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.2rem", fontSize: "0.85rem", fontWeight: 400, color: "#333" }}>
+                {deptOpt && (
+                  <span><strong>Département&nbsp;:</strong> {deptOpt.label}</span>
+                )}
+                {form.Organisme_gestionnaire && (
+                  <span><strong>Organisme gestionnaire&nbsp;:</strong> {form.Organisme_gestionnaire}</span>
+                )}
+                {form.Dispositif && (
+                  <span><strong>Dispositif&nbsp;:</strong> {form.Dispositif}</span>
+                )}
+              </div>
             </div>
             <div className="ae-done__actions">
               <button type="button" className="ae-btn ae-btn--secondary" onClick={handleReset}>
