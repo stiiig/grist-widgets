@@ -804,7 +804,7 @@ function DateNaissanceField({
       </label>
       <div className="ins-date-row">
         {/* Jour */}
-        <div style={{ flex: "0 0 4.5rem" }}>
+        <div style={{ flex: "1 1 0%" }}>
           <SearchDropdown
             options={dayOptions}
             valueId={dayId}
@@ -818,7 +818,7 @@ function DateNaissanceField({
           />
         </div>
         {/* Mois */}
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: "1 1 0%" }}>
           <SearchDropdown
             options={monthOptions}
             valueId={monthId}
@@ -832,7 +832,7 @@ function DateNaissanceField({
           />
         </div>
         {/* Année */}
-        <div style={{ flex: "0 0 5.5rem" }}>
+        <div style={{ flex: "1 1 0%" }}>
           <SearchDropdown
             options={yearOptions}
             valueId={yearId}
