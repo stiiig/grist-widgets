@@ -165,8 +165,8 @@ export default function EtablissementPage() {
         }],
       ]);
       setDone(true);
-    } catch (e: any) {
-      setError(e?.message ?? "Une erreur est survenue lors de l'enregistrement. Veuillez réessayer.");
+    } catch {
+      setError("Une erreur est survenue lors de l'enregistrement. Veuillez réessayer.");
     } finally {
       setSubmitting(false);
     }

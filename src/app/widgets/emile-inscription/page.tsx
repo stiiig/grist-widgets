@@ -1566,8 +1566,7 @@ export default function InscriptionPage() {
         const result = await initGristOrMock({ requiredAccess: "full" });
         setMode(result.mode);
         setDocApi(result.docApi);
-      } catch (e: any) {
-        setSubmitError(`Erreur init: ${e?.message ?? String(e)}`);
+      } catch {
         setMode("none");
       }
     })();
@@ -1772,8 +1771,8 @@ export default function InscriptionPage() {
         } catch { /* non bloquant */ }
       }
       setDone(true);
-    } catch (e: any) {
-      setSubmitError(e?.message ?? "Une erreur est survenue.");
+    } catch {
+      setSubmitError("Une erreur est survenue lors de l'enregistrement. Veuillez réessayer.");
     } finally {
       setSubmitting(false);
     }
