@@ -1,0 +1,368 @@
+/* ================================================================
+   EMILE — Création compte orienteur·ice
+   ================================================================ */
+
+@import url("https://unpkg.com/@gouvfr/dsfr@1.14.0/dist/dsfr/dsfr.min.css");
+@import url("https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css");
+
+/* ── Shell ─────────────────────────────────────────────────── */
+.occ-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: #f5f5f5;
+  font-family: "Marianne", "Helvetica Neue", Arial, sans-serif;
+  font-size: 0.875rem;
+  color: #1e1e1e;
+}
+
+/* ── Body ───────────────────────────────────────────────────── */
+.occ-body {
+  flex: 1;
+  padding: 1.5rem 1rem;
+  max-width: 640px;
+  width: 100%;
+  margin: 0 auto;
+}
+.occ-body--center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+}
+
+/* ── Page header ────────────────────────────────────────────── */
+.occ-page-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+.occ-logo {
+  height: 2.25rem;
+  width: auto;
+}
+.occ-page-header__title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1e1e1e;
+  margin: 0;
+}
+
+/* ── Barre de progression ───────────────────────────────────── */
+.occ-progress {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1.25rem;
+  padding: 0 0.5rem;
+}
+.occ-progress__bar {
+  position: absolute;
+  top: 0.9rem;
+  left: 1.5rem;
+  right: 1.5rem;
+  height: 2px;
+  background: #ddd;
+  z-index: 0;
+}
+.occ-progress__fill {
+  height: 100%;
+  background: #000091;
+  transition: width 0.3s ease;
+}
+.occ-progress__step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  z-index: 1;
+}
+.occ-progress__dot {
+  width: 1.8rem;
+  height: 1.8rem;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #ddd;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #999;
+  transition: all 0.2s;
+}
+.occ-progress__step.active .occ-progress__dot {
+  background: #000091;
+  border-color: #000091;
+  color: #fff;
+}
+.occ-progress__step.done .occ-progress__dot {
+  background: #18753c;
+  border-color: #18753c;
+  color: #fff;
+}
+.occ-progress__label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #999;
+}
+.occ-progress__step.active .occ-progress__label,
+.occ-progress__step.done .occ-progress__label {
+  color: #1e1e1e;
+}
+
+/* ── Formulaire ─────────────────────────────────────────────── */
+.occ-form {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  overflow: visible;
+}
+
+/* ── En-tête d'étape ────────────────────────────────────────── */
+.occ-step-header {
+  margin-bottom: 0.25rem;
+}
+.occ-step-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #1e1e1e;
+  margin: 0 0 0.2rem;
+}
+.occ-step-badge {
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: #666;
+}
+
+/* ── Champ ──────────────────────────────────────────────────── */
+.occ-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.occ-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+@media (max-width: 480px) {
+  .occ-row { grid-template-columns: 1fr; }
+}
+
+/* ── Label ──────────────────────────────────────────────────── */
+.occ-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #333;
+}
+.occ-required {
+  color: #ce0500;
+}
+.occ-field-desc {
+  font-size: 0.78rem;
+  color: #666;
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* ── Input / Select ─────────────────────────────────────────── */
+.occ-input,
+.occ-select {
+  height: 2.25rem;
+  border: 1px solid #c1c1c1;
+  border-radius: 4px;
+  background: #f8f8f8;
+  padding: 0 0.625rem;
+  font-size: 0.85rem;
+  color: #1e1e1e;
+  width: 100%;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+  box-sizing: border-box;
+}
+.occ-input:focus,
+.occ-select:focus {
+  border-color: #000091;
+  background: #fff;
+  box-shadow: 0 0 0 2px rgba(0, 0, 145, 0.15);
+}
+.occ-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23666'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-color: #f8f8f8;
+  padding-right: 2rem;
+  cursor: pointer;
+}
+
+/* ── Infobox ────────────────────────────────────────────────── */
+.occ-infobox {
+  display: flex;
+  gap: 0.6rem;
+  background: #f0f0fb;
+  border-left: 3px solid #000091;
+  border-radius: 0 4px 4px 0;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.78rem;
+  color: #333;
+  line-height: 1.5;
+}
+.occ-infobox__icon {
+  color: #000091;
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+}
+
+/* ── Récap établissement ────────────────────────────────────── */
+.occ-recap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #f0f0fb;
+  border: 1px solid #d0d0f0;
+  border-radius: 4px;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.82rem;
+  color: #000091;
+  font-weight: 600;
+}
+
+/* ── Erreur ─────────────────────────────────────────────────── */
+.occ-validation-error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: #fef2f2;
+  border: 1px solid #fca5a5;
+  border-radius: 4px;
+  color: #b91c1c;
+  font-size: 0.82rem;
+}
+
+/* ── Navigation ─────────────────────────────────────────────── */
+.occ-nav-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e8e8e8;
+}
+
+/* ── Boutons ────────────────────────────────────────────────── */
+.occ-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 1.25rem;
+  height: 2.5rem;
+  border-radius: 4px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  transition: background 0.15s, opacity 0.15s;
+  text-decoration: none;
+}
+.occ-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.occ-btn--primary {
+  background: #000091;
+  color: #fff !important;
+  margin-left: auto;
+}
+.occ-btn--primary:hover:not(:disabled) {
+  background: #1212ff;
+  color: #fff !important;
+}
+.occ-btn--secondary {
+  background: #f0f0f0;
+  color: #1e1e1e;
+  border: 1px solid #d0d0d0;
+}
+.occ-btn--secondary:hover:not(:disabled) { background: #e0e0e0; }
+
+/* ── Écran de confirmation ──────────────────────────────────── */
+.occ-done {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 2rem;
+  max-width: 520px;
+  width: 100%;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0,0,0,.08);
+}
+.occ-done__title {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin: 0;
+  color: #1e1e1e;
+  text-align: center;
+}
+.occ-done__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  width: 100%;
+}
+.occ-done__list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  font-size: 0.87rem;
+  color: #333;
+  line-height: 1.5;
+}
+.occ-done__list li::before {
+  content: "✓";
+  color: #18753c;
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+.occ-done__warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+  border-radius: 4px;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.82rem;
+  color: #92400e;
+  line-height: 1.5;
+  width: 100%;
+  box-sizing: border-box;
+}
+.occ-done__warning i {
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+}
+.occ-done__thanks {
+  font-size: 0.9rem;
+  color: #555;
+  margin: 0;
+  text-align: center;
+}
