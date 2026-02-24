@@ -56,13 +56,13 @@ export default function EtablissementPage() {
   const [dispositifOptions, setDispositifOptions] = useState<Option[]>([]);
   const [deptOptions,        setDeptOptions]      = useState<Option[]>([]);
   const [organismeOptions,   setOrganismeOptions] = useState<Option[]>([]);
-  const [dptsLoading,        setDptsLoading]      = useState(true);
-  const [colsLoading,        setColsLoading]      = useState(true);
+  const [dataLoading,        setDataLoading]      = useState(true);
 
-  /* ── Init Grist (même pattern que emile-inscription) ──────── */
+  /* ── Init + chargement (effet unique) ───────────────────────── */
   useEffect(() => {
     (async () => {
       try {
+        /* 1. Charger grist-plugin-api.js si besoin */
         if (typeof window !== "undefined" && !(window as any).grist) {
           await new Promise<void>((resolve, reject) => {
             const existing = document.querySelector('script[data-grist-plugin-api="1"]') as HTMLScriptElement | null;
@@ -76,28 +76,28 @@ export default function EtablissementPage() {
             document.head.appendChild(s);
           });
         }
-        const result = await initGristOrMock({ requiredAccess: "full" });
-        setMode(result.mode);
-        setDocApi(result.docApi);
-      } catch (e: any) {
-        setError(`Erreur init: ${e?.message ?? String(e)}`);
-        setMode("none");
-      }
-    })();
-  }, []);
 
-  /* ── Chargement départements depuis table DPTS_REGIONS ──────── */
-  useEffect(() => {
-    if (!docApi) return;
-    setDptsLoading(true);
-    docApi.fetchTable("DPTS_REGIONS")
-      .then((dpts: any) => {
+        /* 2. Initialiser Grist */
+        const { docApi: api, mode: m } = await initGristOrMock({ requiredAccess: "full" });
+        setMode(m);
+        setDocApi(api);
+
+        /* Pas de contexte Grist → on déverrouille les dropdowns */
+        if (!api) { setDataLoading(false); return; }
+
+        /* 3. Charger les données en parallèle */
+        const [dpts, cols] = await Promise.all([
+          api.fetchTable("DPTS_REGIONS"),
+          loadColumnsMetaFor(api, TABLE_ID),
+        ]);
+
+        /* DPTS_REGIONS → dropdown département */
         const opts: Option[] = [];
         for (let i = 0; i < dpts.id.length; i++) {
           const id     = dpts.id[i];
-          const nom    = String(dpts.Nom?.[i]    ?? "");
-          const numero = String(dpts.Numero?.[i] ?? "");
-          const region = String(dpts.Region?.[i] ?? "");
+          const nom    = String(dpts.Nom?.[i]    ?? "").trim();
+          const numero = String(dpts.Numero?.[i] ?? "").trim();
+          const region = String(dpts.Region?.[i] ?? "").trim();
           if (!nom) continue;
           opts.push({
             id,
@@ -109,31 +109,25 @@ export default function EtablissementPage() {
         }
         opts.sort((a, b) => deptSortKey(a.tagLeft) - deptSortKey(b.tagLeft));
         setDeptOptions(opts);
-      })
-      .catch(() => {})
-      .finally(() => setDptsLoading(false));
-  }, [docApi]);
 
-  /* ── Chargement colonnes Choice (Dispositif + Organisme) ────── */
-  useEffect(() => {
-    if (!docApi) return;
-    setColsLoading(true);
-    loadColumnsMetaFor(docApi, TABLE_ID)
-      .then((cols) => {
+        /* Choice Dispositif */
         const dispCol = cols.find((c) => c.colId === "Dispositif");
-        const orgaCol = cols.find((c) => c.colId === "Organisme_gestionnaire");
         if (dispCol) {
-          const choices = normalizeChoices(dispCol.widgetOptionsParsed?.choices);
-          setDispositifOptions(choicesToOptions(choices));
+          setDispositifOptions(choicesToOptions(normalizeChoices(dispCol.widgetOptionsParsed?.choices)));
         }
+
+        /* Choice Organisme_gestionnaire */
+        const orgaCol = cols.find((c) => c.colId === "Organisme_gestionnaire");
         if (orgaCol) {
-          const choices = normalizeChoices(orgaCol.widgetOptionsParsed?.choices);
-          setOrganismeOptions(choicesToOptions(choices));
+          setOrganismeOptions(choicesToOptions(normalizeChoices(orgaCol.widgetOptionsParsed?.choices)));
         }
-      })
-      .catch(() => {})
-      .finally(() => setColsLoading(false));
-  }, [docApi]);
+      } catch {
+        setMode("none");
+      } finally {
+        setDataLoading(false);
+      }
+    })();
+  }, []);
 
   /* ── Mise à jour du formulaire ──────────────────────────────── */
   function set<K extends keyof FormData>(key: K, value: FormData[K]) {
@@ -241,8 +235,6 @@ export default function EtablissementPage() {
     );
   }
 
-  const dataLoading = dptsLoading || colsLoading;
-
   /* ── Rendu principal ────────────────────────────────────────── */
   return (
     <div className="ae-shell">
@@ -278,8 +270,8 @@ export default function EtablissementPage() {
               options={deptOptions}
               valueId={form.Departement}
               onChange={(id) => set("Departement", id)}
-              placeholder={dptsLoading ? "Chargement…" : "Rechercher un département"}
-              disabled={dptsLoading}
+              placeholder={dataLoading ? "Chargement…" : "Rechercher un département"}
+              disabled={dataLoading}
             />
           </div>
 
@@ -295,8 +287,8 @@ export default function EtablissementPage() {
                 const found = dispositifOptions.find((o) => o.id === id);
                 set("Dispositif", found?.label ?? "");
               }}
-              placeholder={colsLoading ? "Chargement…" : "Sélectionner le dispositif"}
-              disabled={colsLoading}
+              placeholder={dataLoading ? "Chargement…" : "Sélectionner le dispositif"}
+              disabled={dataLoading}
             />
           </div>
 
@@ -312,8 +304,8 @@ export default function EtablissementPage() {
                 const found = organismeOptions.find((o) => o.id === id);
                 set("Organisme_gestionnaire", found?.label ?? "");
               }}
-              placeholder={colsLoading ? "Chargement…" : "Sélectionner l'organisme"}
-              disabled={colsLoading}
+              placeholder={dataLoading ? "Chargement…" : "Sélectionner l'organisme"}
+              disabled={dataLoading}
             />
           </div>
 

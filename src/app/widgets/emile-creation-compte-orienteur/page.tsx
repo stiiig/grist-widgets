@@ -50,13 +50,13 @@ export default function OrienteurPage() {
   /* Options chargées depuis Grist */
   const [etablOptions,    setEtablOptions]    = useState<Option[]>([]);
   const [fonctionOptions, setFonctionOptions] = useState<Option[]>([]);
-  const [etablLoading,    setEtablLoading]    = useState(true);
-  const [colsLoading,     setColsLoading]     = useState(true);
+  const [dataLoading,     setDataLoading]     = useState(true);
 
-  /* ── Init Grist (même pattern que emile-inscription) ──────── */
+  /* ── Init + chargement (effet unique) ───────────────────────── */
   useEffect(() => {
     (async () => {
       try {
+        /* 1. Charger grist-plugin-api.js si besoin */
         if (typeof window !== "undefined" && !(window as any).grist) {
           await new Promise<void>((resolve, reject) => {
             const existing = document.querySelector('script[data-grist-plugin-api="1"]') as HTMLScriptElement | null;
@@ -70,22 +70,22 @@ export default function OrienteurPage() {
             document.head.appendChild(s);
           });
         }
-        const result = await initGristOrMock({ requiredAccess: "full" });
-        setMode(result.mode);
-        setDocApi(result.docApi);
-      } catch (e: any) {
-        setError(`Erreur init: ${e?.message ?? String(e)}`);
-        setMode("none");
-      }
-    })();
-  }, []);
 
-  /* ── Chargement établissements depuis table ETABLISSEMENTS ──── */
-  useEffect(() => {
-    if (!docApi) return;
-    setEtablLoading(true);
-    docApi.fetchTable("ETABLISSEMENTS")
-      .then((etablTable: any) => {
+        /* 2. Initialiser Grist */
+        const { docApi: api, mode: m } = await initGristOrMock({ requiredAccess: "full" });
+        setMode(m);
+        setDocApi(api);
+
+        /* Pas de contexte Grist → on déverrouille les dropdowns */
+        if (!api) { setDataLoading(false); return; }
+
+        /* 3. Charger les données en parallèle */
+        const [etablTable, cols] = await Promise.all([
+          api.fetchTable("ETABLISSEMENTS"),
+          loadColumnsMetaFor(api, TABLE_ID),
+        ]);
+
+        /* ETABLISSEMENTS → dropdown */
         const opts: Option[] = [];
         for (let i = 0; i < etablTable.id.length; i++) {
           const id  = etablTable.id[i];
@@ -94,26 +94,19 @@ export default function OrienteurPage() {
         }
         opts.sort((a, b) => a.label.localeCompare(b.label, "fr", { sensitivity: "base" }));
         setEtablOptions(opts);
-      })
-      .catch(() => {})
-      .finally(() => setEtablLoading(false));
-  }, [docApi]);
 
-  /* ── Chargement colonne Fonction (Choice) ────────────────────── */
-  useEffect(() => {
-    if (!docApi) return;
-    setColsLoading(true);
-    loadColumnsMetaFor(docApi, TABLE_ID)
-      .then((cols) => {
+        /* Choice Fonction */
         const fonctionCol = cols.find((c) => c.colId === "Fonction");
         if (fonctionCol) {
-          const choices = normalizeChoices(fonctionCol.widgetOptionsParsed?.choices);
-          setFonctionOptions(choicesToOptions(choices));
+          setFonctionOptions(choicesToOptions(normalizeChoices(fonctionCol.widgetOptionsParsed?.choices)));
         }
-      })
-      .catch(() => {})
-      .finally(() => setColsLoading(false));
-  }, [docApi]);
+      } catch {
+        setMode("none");
+      } finally {
+        setDataLoading(false);
+      }
+    })();
+  }, []);
 
   /* ── Mise à jour du formulaire ──────────────────────────────── */
   function set<K extends keyof FormData>(key: K, value: FormData[K]) {
@@ -285,8 +278,8 @@ export default function OrienteurPage() {
                   options={etablOptions}
                   valueId={form.Etablissement}
                   onChange={(id) => set("Etablissement", id)}
-                  placeholder={etablLoading ? "Chargement…" : "Rechercher un établissement…"}
-                  disabled={etablLoading}
+                  placeholder={dataLoading ? "Chargement…" : "Rechercher un établissement…"}
+                  disabled={dataLoading}
                 />
               </div>
 
