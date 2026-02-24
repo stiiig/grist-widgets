@@ -814,7 +814,7 @@ function DateNaissanceField({
               setSelD(d); commit(selY, selM, d);
             }}
             placeholder="Jour"
-            searchable={false}
+            searchable={true}
           />
         </div>
         {/* Mois */}
@@ -828,7 +828,7 @@ function DateNaissanceField({
               setSelM(m); commit(selY, m, selD);
             }}
             placeholder="Mois"
-            searchable={false}
+            searchable={true}
           />
         </div>
         {/* Année */}
@@ -1030,6 +1030,8 @@ export default function InscriptionPage() {
           const id = ids[i];
           const label = String(table["Nom_departement"]?.[i] ?? "").trim();
           if (!label) continue;
+          // Filtre : seulement les départements du territoire EMILE
+          if (!table["Territoire_depart"]?.[i]) continue;
           const numero  = String(table["Numero"]?.[i] ?? "").trim() || undefined;
           const region  = String(table["Nom_region"]?.[i] ?? "").trim() || undefined;
           opts.push({ id, label, q: `${numero ?? ""} ${label}`.toLowerCase(), tagLeft: numero, tag: region });
