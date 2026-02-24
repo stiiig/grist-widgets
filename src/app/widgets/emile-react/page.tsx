@@ -47,6 +47,16 @@ function computeAge(dateIso: string): number | null {
   return age >= 0 ? age : null;
 }
 
+/* 2A → 20.1, 2B → 20.2  (Corse entre 19 et 21) */
+function deptSortKey(numero: string | undefined): number {
+  if (!numero) return 9999;
+  const n = numero.toUpperCase();
+  if (n === "2A") return 20.1;
+  if (n === "2B") return 20.2;
+  const p = parseFloat(n);
+  return isNaN(p) ? 9999 : p;
+}
+
 function StatusAlert({ status }: { status: string }) {
   if (!status) return null;
   const isError = status.toLowerCase().includes("erreur") || status.toLowerCase().includes("error");
@@ -311,7 +321,7 @@ function DeptSpecialField({ value, onChange, disabled, docApi, col }: {
         const region = String(table["Nom_region"]?.[i] ?? "").trim() || undefined;
         opts.push({ id, label, q: `${numero ?? ""} ${label}`.toLowerCase(), tagLeft: numero, tag: region });
       }
-      opts.sort((a, b) => (a.tagLeft ?? "").localeCompare(b.tagLeft ?? "", "fr", { numeric: true }));
+      opts.sort((a, b) => deptSortKey(a.tagLeft) - deptSortKey(b.tagLeft));
       setOptions(opts);
     }).catch(() => {}).finally(() => setLoading(false));
   }, [docApi]);
