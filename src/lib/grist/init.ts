@@ -21,7 +21,11 @@ export async function initGristOrMock(
   const grist =
     typeof window !== "undefined" ? (window as any).grist ?? null : null;
 
-  if (grist?.ready) {
+  // Grist embeds widgets dans un iframe → on vérifie qu'on y est bien.
+  // Sinon (page standalone / magic link), on skip et on tombe en mode REST.
+  const isInFrame = typeof window !== "undefined" && window.self !== window.top;
+
+  if (grist?.ready && isInFrame) {
     try {
       grist.ready({ requiredAccess });
     } catch {

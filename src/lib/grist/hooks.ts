@@ -19,7 +19,11 @@ export function useGristInit(opts?: { requiredAccess?: "read table" | "full" }) 
   useEffect(() => {
     (async () => {
       try {
-        if (typeof window !== "undefined" && !(window as any).grist) {
+        // Charger le Plugin API uniquement si on est dans un iframe Grist.
+        // En standalone (magic link), window.self === window.top → on skip
+        // et on tombera directement en mode REST.
+        const isInFrame = typeof window !== "undefined" && window.self !== window.top;
+        if (isInFrame && !(window as any).grist) {
           await new Promise<void>((resolve, reject) => {
             const existing = document.querySelector('script[data-grist-plugin-api="1"]');
             if (existing) return resolve();
