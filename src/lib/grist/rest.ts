@@ -16,7 +16,23 @@ function apiKey(): string {
   return process.env.NEXT_PUBLIC_GRIST_API_KEY ?? "";
 }
 
-function authHeaders(): Record<string, string> {
+// ── Helpers auth ──────────────────────────────────────────────────────────────
+//
+// GET  → on passe la clef en ?auth=KEY (query param) pour éviter le CORS
+//         preflight : sans header custom, c'est une "simple request" et le
+//         navigateur n'envoie pas d'OPTIONS. Grist accepte ?auth=KEY.
+//
+// POST/PATCH → body JSON obligatoire → préflight de toutes façons → on garde
+//         Authorization: Bearer, Grist l'autorise dans ses CORS headers.
+
+/** URL GET avec la clef en query param (?auth=KEY) — pas de preflight CORS. */
+function getUrl(path: string, extraParams?: Record<string, string>): string {
+  const params = new URLSearchParams({ auth: apiKey(), ...extraParams });
+  return `${server()}${path}?${params.toString()}`;
+}
+
+/** Headers pour POST / PATCH (body JSON + Bearer token). */
+function writeHeaders(): Record<string, string> {
   return {
     Authorization: `Bearer ${apiKey()}`,
     "Content-Type": "application/json",
@@ -39,8 +55,8 @@ function toColumnar(records: RestRecord[]): Record<string, any[]> {
 }
 
 async function fetchTableRest(tableId: string): Promise<Record<string, any[]>> {
-  const url = `${server()}/api/docs/${docId()}/tables/${encodeURIComponent(tableId)}/records`;
-  const res = await fetch(url, { headers: authHeaders() });
+  const url = getUrl(`/api/docs/${docId()}/tables/${encodeURIComponent(tableId)}/records`);
+  const res = await fetch(url);
   if (!res.ok) throw new Error(`REST fetchTable(${tableId}): ${res.status} ${res.statusText}`);
   const { records } = (await res.json()) as { records: RestRecord[] };
   return toColumnar(records);
@@ -54,9 +70,11 @@ export async function fetchSingleRowRest(
   tableId: string,
   rowId: number
 ): Promise<{ id: number; [k: string]: any } | null> {
-  const filter = encodeURIComponent(JSON.stringify({ id: [rowId] }));
-  const url = `${server()}/api/docs/${docId()}/tables/${encodeURIComponent(tableId)}/records?filter=${filter}`;
-  const res = await fetch(url, { headers: authHeaders() });
+  const url = getUrl(
+    `/api/docs/${docId()}/tables/${encodeURIComponent(tableId)}/records`,
+    { filter: JSON.stringify({ id: [rowId] }) }
+  );
+  const res = await fetch(url);
   if (!res.ok) throw new Error(`REST fetchRecord(${tableId}, ${rowId}): ${res.status} ${res.statusText}`);
   const { records } = (await res.json()) as { records: RestRecord[] };
   const rec = records.find((r) => r.id === rowId) ?? null;
@@ -77,14 +95,14 @@ async function applyUserActionsRest(actions: any[]): Promise<any> {
     if (type === "UpdateRecord") {
       const res = await fetch(url, {
         method: "PATCH",
-        headers: authHeaders(),
+        headers: writeHeaders(),
         body: JSON.stringify({ records: [{ id: rowId, fields }] }),
       });
       if (!res.ok) throw new Error(`REST UpdateRecord(${tableId}, ${rowId}): ${res.status} ${res.statusText}`);
     } else if (type === "AddRecord") {
       const res = await fetch(url, {
         method: "POST",
-        headers: authHeaders(),
+        headers: writeHeaders(),
         body: JSON.stringify({ records: [{ fields }] }),
       });
       if (!res.ok) throw new Error(`REST AddRecord(${tableId}): ${res.status} ${res.statusText}`);
