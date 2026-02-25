@@ -1046,7 +1046,7 @@ export default function Page() {
         if (row) setSelected(row);
         else setStatus("Dossier introuvable (rowId=" + rowIdFromUrl + ").");
       } catch (e: any) {
-        setStatus("Erreur lors du chargement du dossier.");
+        setStatus("Erreur: " + (e?.message ?? String(e)));
       }
     })();
   }, [docApi, mode, rowIdFromUrl]);
