@@ -1,7 +1,7 @@
 // src/lib/grist/init.ts
 
 export type InitResult = {
-  mode: "grist" | "mock" | "none";
+  mode: "grist" | "mock" | "rest" | "none";
   grist: any | null;
   docApi: any | null;
 };
@@ -96,7 +96,19 @@ export async function initGristOrMock(
   }
 
   // --------------------------------------------------
-  // 3️⃣ Aucun contexte Grist
+  // 3️⃣ Mode REST (NEXT_PUBLIC_GRIST_API_KEY défini au build)
+  // --------------------------------------------------
+  if (process.env.NEXT_PUBLIC_GRIST_API_KEY) {
+    const { createRestDocApi } = await import("./rest");
+    return {
+      mode: "rest",
+      grist: null,
+      docApi: createRestDocApi(),
+    };
+  }
+
+  // --------------------------------------------------
+  // 4️⃣ Aucun contexte Grist
   // --------------------------------------------------
   return {
     mode: "none",

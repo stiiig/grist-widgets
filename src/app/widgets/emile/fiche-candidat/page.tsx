@@ -5,7 +5,8 @@ import "./styles.css";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import logoEmile from "../assets/logo-emile-white.png";
-import { initGristOrMock } from "@/lib/grist/init";
+import { useGristInit } from "@/lib/grist/hooks";
+import { fetchSingleRowRest } from "@/lib/grist/rest";
 import {
   loadColumnsMetaFor,
   buildColRowIdMap,
@@ -967,8 +968,16 @@ function DateNaissanceSpecialField({ value, onChange, disabled, col, genreValue 
    ===================================================== */
 
 export default function Page() {
-  const [mode, setMode] = useState<string>("boot");
-  const [docApi, setDocApi] = useState<GristDocAPI | null>(null);
+  const { mode, docApi } = useGristInit({ requiredAccess: "full" });
+
+  // ── Magic link : rowId lu dans l'URL (?rowId=123) ──
+  const [rowIdFromUrl, setRowIdFromUrl] = useState<number | null>(null);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const p = new URLSearchParams(window.location.search);
+    const v = p.get("rowId");
+    if (v) setRowIdFromUrl(parseInt(v, 10));
+  }, []);
 
   const [cols, setCols] = useState<ColMeta[]>([]);
   const colById = useMemo(() => new Map(cols.map((c) => [c.colId, c])), [cols]);
@@ -997,31 +1006,10 @@ export default function Page() {
   const [rowIdByCandidateId, setRowIdByCandidateId] = useState<Map<number, number>>(new Map());
   const [candidateValueId, setCandidateValueId] = useState<number | null>(null);
 
+  // mode "none" → message d'aide
   useEffect(() => {
-    (async () => {
-      try {
-        if (typeof window !== "undefined" && !(window as any).grist) {
-          await new Promise<void>((resolve, reject) => {
-            const existing = document.querySelector('script[data-grist-plugin-api="1"]') as HTMLScriptElement | null;
-            if (existing) return resolve();
-            const s = document.createElement("script");
-            s.src = "https://docs.getgrist.com/grist-plugin-api.js";
-            s.async = true;
-            s.setAttribute("data-grist-plugin-api", "1");
-            s.onload = () => resolve();
-            s.onerror = () => reject(new Error("Impossible de charger grist-plugin-api.js"));
-            document.head.appendChild(s);
-          });
-        }
-        const { mode, docApi } = await initGristOrMock({ requiredAccess: "full" });
-        setMode(mode);
-        setDocApi(docApi);
-        if (mode === "none") setStatus("Ouvre ce widget dans Grist (ou /dev/harness).");
-      } catch (e: any) {
-        setStatus(`Erreur: ${e?.message ?? String(e)}`);
-      }
-    })();
-  }, []);
+    if (mode === "none") setStatus("Ouvre ce widget dans Grist (ou /dev/harness).");
+  }, [mode]);
 
   useEffect(() => {
     if (!docApi) return;
@@ -1036,8 +1024,9 @@ export default function Page() {
     })();
   }, [docApi]);
 
+  // ── Mode Grist (iframe) : onRecord ────────────────────
   useEffect(() => {
-    if (!docApi) return;
+    if (!docApi || mode !== "grist") return;
     if (typeof window === "undefined") return;
     const grist = (window as any).grist;
     if (!grist) return;
@@ -1046,7 +1035,21 @@ export default function Page() {
       setSelected(record);
     });
     grist.ready({ requiredAccess: "full" });
-  }, [docApi]);
+  }, [docApi, mode]);
+
+  // ── Mode REST (standalone magic link) : fetch par rowId ─
+  useEffect(() => {
+    if (!docApi || mode !== "rest" || !rowIdFromUrl) return;
+    (async () => {
+      try {
+        const row = await fetchSingleRowRest(TABLE_ID, rowIdFromUrl);
+        if (row) setSelected(row);
+        else setStatus("Dossier introuvable (rowId=" + rowIdFromUrl + ").");
+      } catch (e: any) {
+        setStatus("Erreur lors du chargement du dossier.");
+      }
+    })();
+  }, [docApi, mode, rowIdFromUrl]);
 
   useEffect(() => {
     if (!selected) { setDraft({}); return; }
@@ -1056,7 +1059,8 @@ export default function Page() {
   }, [selected, cols]);
 
   useEffect(() => {
-    if (!docApi) return;
+    // En mode REST (magic link), pas besoin de la liste complète des candidats
+    if (!docApi || mode === "rest") return;
     (async () => {
       try {
         const t = await docApi.fetchTable(TABLE_ID);
@@ -1132,38 +1136,43 @@ export default function Page() {
         <div className="emile-header__spacer" />
 
         <div className="emile-header__search">
-          <span className="emile-header__search-label">
-            <i className="fa-solid fa-magnifying-glass" aria-hidden="true" />
-          </span>
-          <div className="emile-header__search-wrap">
-            <SearchDropdown
-              options={candidateOptions}
-              valueId={candidateValueId}
-              onChange={(candidateId) => {
-                if (!candidateId) return;
-                setCandidateValueId(candidateId);
-                const rowId = rowIdByCandidateId.get(candidateId);
-                const grist = (window as any).grist;
-                if (rowId && grist?.setCursorPos) {
-                  grist.setCursorPos({ rowId });
-                } else {
-                  setStatus("Info: sélection candidat active uniquement dans Grist.");
-                }
-              }}
-              placeholder="Candidat…"
-              disabled={candidateOptions.length === 0}
-              searchable={true}
-              variant="header"
-            />
-          </div>
-          <button
-            type="button"
-            className="emile-faq-btn"
-            onClick={() => setShowFaq(true)}
-          >
-            <i className="fa-solid fa-circle-question" aria-hidden="true" />
-            FAQ
-          </button>
+          {/* Recherche candidat + FAQ : uniquement en mode Grist (iframe) */}
+          {mode !== "rest" && (
+            <>
+              <span className="emile-header__search-label">
+                <i className="fa-solid fa-magnifying-glass" aria-hidden="true" />
+              </span>
+              <div className="emile-header__search-wrap">
+                <SearchDropdown
+                  options={candidateOptions}
+                  valueId={candidateValueId}
+                  onChange={(candidateId) => {
+                    if (!candidateId) return;
+                    setCandidateValueId(candidateId);
+                    const rowId = rowIdByCandidateId.get(candidateId);
+                    const grist = (window as any).grist;
+                    if (rowId && grist?.setCursorPos) {
+                      grist.setCursorPos({ rowId });
+                    } else {
+                      setStatus("Info: sélection candidat active uniquement dans Grist.");
+                    }
+                  }}
+                  placeholder="Candidat…"
+                  disabled={candidateOptions.length === 0}
+                  searchable={true}
+                  variant="header"
+                />
+              </div>
+              <button
+                type="button"
+                className="emile-faq-btn"
+                onClick={() => setShowFaq(true)}
+              >
+                <i className="fa-solid fa-circle-question" aria-hidden="true" />
+                FAQ
+              </button>
+            </>
+          )}
           <button
             type="button"
             className="emile-save-btn"
@@ -1217,7 +1226,10 @@ export default function Page() {
         ) : !selected || !docApi ? (
           <div className="fr-alert fr-alert--info">
             <p className="fr-alert__title">En attente</p>
-            <p>Sélectionne un candidat dans Grist pour afficher son dossier.</p>
+            <p>{mode === "rest"
+              ? "Aucun dossier chargé. Vérifie que le lien contient un paramètre ?rowId=."
+              : "Sélectionne un candidat dans Grist pour afficher son dossier."
+            }</p>
           </div>
         ) : !isTabMapped ? (
           <div className="fr-alert fr-alert--info">

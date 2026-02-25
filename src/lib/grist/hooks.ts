@@ -13,7 +13,7 @@ import { deptSortKey } from "@/lib/emile/utils";
    Remplace le boilerplate répété dans chaque widget.
 ───────────────────────────────────────────────────────────────── */
 export function useGristInit(opts?: { requiredAccess?: "read table" | "full" }) {
-  const [mode, setMode]     = useState<"boot" | "grist" | "mock" | "none">("boot");
+  const [mode, setMode]     = useState<"boot" | "grist" | "mock" | "rest" | "none">("boot");
   const [docApi, setDocApi] = useState<GristDocAPI | null>(null);
 
   useEffect(() => {
