@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import "./styles.css";
-import logoEmile from "../inscription-candidat/logo-emile-white.png";
+import logoEmile from "../assets/logo-emile-white.png";
 import {
   loadColumnsMetaFor,
   normalizeChoices,

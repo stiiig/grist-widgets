@@ -4,7 +4,7 @@ import "./styles.css";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import logoEmile from "./logo-emile-white.png";
+import logoEmile from "../assets/logo-emile-white.png";
 import { initGristOrMock } from "@/lib/grist/init";
 import {
   loadColumnsMetaFor,

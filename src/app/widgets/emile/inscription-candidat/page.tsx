@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import "./styles.css";
-import logoEmile from "./logo-emile-white.png";
+import logoEmile from "../assets/logo-emile-white.png";
 import {
   loadColumnsMetaFor,
   encodeListCell,
