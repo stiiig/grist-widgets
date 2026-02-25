@@ -2,14 +2,14 @@
 
 import { useEffect, useState } from "react";
 import "./styles.css";
-import logoEmile from "../emile-inscription/logo-emile-white.png";
-import { initGristOrMock } from "@/lib/grist/init";
+import logoEmile from "../inscription-candidat/logo-emile-white.png";
 import {
   loadColumnsMetaFor,
   normalizeChoices,
-  GristDocAPI,
 } from "@/lib/grist/meta";
 import { SearchDropdown, Option } from "@/components/SearchDropdown";
+import { useGristInit, useDepartementOptions } from "@/lib/grist/hooks";
+import { choicesToOptions } from "@/lib/emile/utils";
 
 const TABLE_ID = "ETABLISSEMENTS";
 
@@ -28,25 +28,10 @@ const INITIAL: FormData = {
   Organisme_gestionnaire: "",
 };
 
-/* ─── Helpers ────────────────────────────────────────────────── */
-function choicesToOptions(choices: string[]): Option[] {
-  return choices.map((label, i) => ({ id: i + 1, label, q: label.toLowerCase() }));
-}
-
-/* 2A → 20.1, 2B → 20.2  (Corse entre 19 et 21) */
-function deptSortKey(numero: string | undefined): number {
-  if (!numero) return 9999;
-  const n = numero.toUpperCase();
-  if (n === "2A") return 20.1;
-  if (n === "2B") return 20.2;
-  const p = parseFloat(n);
-  return isNaN(p) ? 9999 : p;
-}
-
 /* ─── Page principale ────────────────────────────────────────── */
 export default function EtablissementPage() {
-  const [mode, setMode]             = useState<string>("boot");
-  const [docApi, setDocApi]         = useState<GristDocAPI | null>(null);
+  const { mode, docApi }            = useGristInit();
+  const { deptOptions, dptsLoading } = useDepartementOptions(docApi);
   const [form, setForm]             = useState<FormData>(INITIAL);
   const [done, setDone]             = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -54,67 +39,10 @@ export default function EtablissementPage() {
 
   /* Options */
   const [dispositifOptions, setDispositifOptions] = useState<Option[]>([]);
-  const [deptOptions,        setDeptOptions]      = useState<Option[]>([]);
   const [organismeOptions,   setOrganismeOptions] = useState<Option[]>([]);
-  const [dptsLoading,        setDptsLoading]      = useState(true);
   const [colsLoading,        setColsLoading]      = useState(true);
 
-  /* ── Effet 1 : init Grist (identique à emile-inscription) ───── */
-  useEffect(() => {
-    (async () => {
-      try {
-        if (typeof window !== "undefined" && !(window as any).grist) {
-          await new Promise<void>((resolve, reject) => {
-            const existing = document.querySelector('script[data-grist-plugin-api="1"]') as HTMLScriptElement | null;
-            if (existing) return resolve();
-            const s = document.createElement("script");
-            s.src = "https://docs.getgrist.com/grist-plugin-api.js";
-            s.async = true;
-            s.setAttribute("data-grist-plugin-api", "1");
-            s.onload  = () => resolve();
-            s.onerror = () => reject(new Error("Impossible de charger grist-plugin-api.js"));
-            document.head.appendChild(s);
-          });
-        }
-        const result = await initGristOrMock({ requiredAccess: "full" });
-        setMode(result.mode);
-        setDocApi(result.docApi);
-      } catch (e: any) {
-        setMode("none");
-      }
-    })();
-  }, []);
-
-  /* ── Effet 2 : DPTS_REGIONS (identique à emile-inscription) ─── */
-  useEffect(() => {
-    if (!docApi) return;
-    setDptsLoading(true);
-    docApi.fetchTable("DPTS_REGIONS")
-      .then((table: any) => {
-        const ids = table.id as number[];
-        const opts: Option[] = [];
-        for (let i = 0; i < ids.length; i++) {
-          const id     = ids[i];
-          const nom    = String(table.Nom_departement?.[i] ?? "").trim();
-          const numero = String(table.Numero?.[i]          ?? "").trim();
-          const region = String(table.Nom_region?.[i]      ?? "").trim();
-          if (!nom) continue;
-          opts.push({
-            id,
-            label:   nom,
-            tagLeft: numero,
-            tag:     region,
-            q:       `${numero} ${nom} ${region}`.toLowerCase(),
-          });
-        }
-        opts.sort((a, b) => deptSortKey(a.tagLeft) - deptSortKey(b.tagLeft));
-        setDeptOptions(opts);
-      })
-      .catch(() => {})
-      .finally(() => setDptsLoading(false));
-  }, [docApi]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  /* ── Effet 3 : colonnes Choice ───────────────────────────────── */
+  /* ── Effet : colonnes Choice ───────────────────────────────── */
   useEffect(() => {
     if (!docApi) return;
     setColsLoading(true);

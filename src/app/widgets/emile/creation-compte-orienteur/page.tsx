@@ -2,14 +2,16 @@
 
 import { useEffect, useState } from "react";
 import "./styles.css";
-import logoEmile from "../emile-inscription/logo-emile-white.png";
-import { initGristOrMock } from "@/lib/grist/init";
+import logoEmile from "../inscription-candidat/logo-emile-white.png";
 import {
   loadColumnsMetaFor,
   normalizeChoices,
-  GristDocAPI,
 } from "@/lib/grist/meta";
 import { SearchDropdown, Option } from "@/components/SearchDropdown";
+import { useGristInit } from "@/lib/grist/hooks";
+import { choicesToOptions } from "@/lib/emile/utils";
+import { FALLBACK_FONCTION_OPTIONS } from "@/lib/emile/constants";
+import { EMAIL_REGEX, validatePhone } from "@/lib/emile/validators";
 
 const TABLE_ID = "ACCOMPAGNANTS";
 
@@ -32,28 +34,9 @@ const INITIAL: FormData = {
   Email: "",
 };
 
-/* ─── Helpers ────────────────────────────────────────────────── */
-function choicesToOptions(choices: string[]): Option[] {
-  return choices.map((label, i) => ({ id: i + 1, label, q: label.toLowerCase() }));
-}
-
-/* ─── Fallback choices (accès anonyme, _grist_Tables non accessible) ── */
-const FALLBACK_FONCTION_OPTIONS: Option[] = choicesToOptions([
-  "Conseiller en insertion professionnelle",
-  "Directeur·ice",
-  "Professionnel·le de l'accompagnement EMILE",
-  "Responsable de service",
-  "Travailleur social",
-  "Autre",
-  "Responsable projets et partenariats",
-  "Responsable sourcing",
-  "Assistant·e sourcing",
-]);
-
 /* ─── Page principale ────────────────────────────────────────── */
 export default function OrienteurPage() {
-  const [mode, setMode]             = useState<string>("boot");
-  const [docApi, setDocApi]         = useState<GristDocAPI | null>(null);
+  const { mode, docApi } = useGristInit();
   const [step, setStep]             = useState(1);
   const [form, setForm]             = useState<FormData>(INITIAL);
   const [done, setDone]             = useState(false);
@@ -66,33 +49,7 @@ export default function OrienteurPage() {
   const [etablLoading,    setEtablLoading]    = useState(true);
   const [colsLoading,     setColsLoading]     = useState(true);
 
-  /* ── Effet 1 : init Grist (identique à emile-inscription) ───── */
-  useEffect(() => {
-    (async () => {
-      try {
-        if (typeof window !== "undefined" && !(window as any).grist) {
-          await new Promise<void>((resolve, reject) => {
-            const existing = document.querySelector('script[data-grist-plugin-api="1"]') as HTMLScriptElement | null;
-            if (existing) return resolve();
-            const s = document.createElement("script");
-            s.src = "https://docs.getgrist.com/grist-plugin-api.js";
-            s.async = true;
-            s.setAttribute("data-grist-plugin-api", "1");
-            s.onload  = () => resolve();
-            s.onerror = () => reject(new Error("Impossible de charger grist-plugin-api.js"));
-            document.head.appendChild(s);
-          });
-        }
-        const result = await initGristOrMock({ requiredAccess: "full" });
-        setMode(result.mode);
-        setDocApi(result.docApi);
-      } catch {
-        setMode("none");
-      }
-    })();
-  }, []);
-
-  /* ── Effet 2 : ETABLISSEMENTS → colonne Nom_etablissement ────── */
+  /* ── Effet : ETABLISSEMENTS → colonne Nom_etablissement ────── */
   useEffect(() => {
     if (!docApi) return;
     setEtablLoading(true);
@@ -142,10 +99,10 @@ export default function OrienteurPage() {
     if (!form.Prenom.trim())   return "Le prénom est requis.";
     if (!form.Nom.trim())      return "Le nom de famille est requis.";
     if (!form.Email.trim())    return "L'adresse email est requise.";
-    if (!/^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/.test(form.Email.trim()))
+    if (!EMAIL_REGEX.test(form.Email.trim()))
                                return "L'adresse email n'est pas valide.";
-    if (form.Tel.trim() && form.Tel.replace(/\D/g, "").length < 6)
-                               return "Le téléphone doit contenir au moins 6 chiffres.";
+    const telErr = validatePhone(form.Tel);
+    if (telErr) return telErr;
     return null;
   }
 

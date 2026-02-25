@@ -24,7 +24,12 @@
       "Bash(magick:*)",
       "Bash(git -C /Users/benjamin/grist-widgets add src/app/widgets/emile-inscription/logo-emile-white.png)",
       "Bash(git -C:*)",
-      "Bash(git -C /Users/benjamin/grist-widgets push)"
+      "Bash(git -C /Users/benjamin/grist-widgets push)",
+      "Bash(wc:*)",
+      "Bash(gh run list:*)",
+      "Bash(brew list:*)",
+      "Bash(grep:*)",
+      "Bash(git mv:*)"
     ]
   }
 }
