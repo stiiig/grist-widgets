@@ -88,8 +88,15 @@ export async function loadColumnsMetaFor(docApi: GristDocAPI, tableId: string) {
 
   // ── Mode plugin Grist : via tables internes ────────────────────────────
   const tables = await docApi.fetchTable("_grist_Tables");
-  const idx = tables.tableId.findIndex((t: string) => t === tableId);
-  if (idx < 0) throw new Error(`Table introuvable: ${tableId}`);
+  // Diagnostic : logue les clés et tableIds reçus pour aider au débogage REST
+  const receivedKeys = Object.keys(tables).join(", ");
+  const receivedTableIds: string[] = tables.tableId ?? [];
+  const idx = receivedTableIds.findIndex((t: string) => t === tableId);
+  if (idx < 0) throw new Error(
+    `Table introuvable: ${tableId}. ` +
+    `Clés reçues: [${receivedKeys}]. ` +
+    `tableIds: [${receivedTableIds.slice(0, 10).join(", ")}]`
+  );
   const parentId = tables.id[idx];
 
   const cols = await docApi.fetchTable("_grist_Tables_column");
