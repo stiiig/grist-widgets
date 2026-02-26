@@ -198,8 +198,19 @@ export function AttachmentField({
       try {
         const newIds = await doUpload(files);
         onChange(encodeAttachmentCell([...ids, ...newIds]));
-        const map = await fetchAttachmentsMeta(docApi);
-        setMetaMap(map);
+
+        // Mise à jour optimiste : on connaît le nom/type localement, sans attendre
+        // que _grist_Attachments soit mis à jour côté serveur (race condition sinon).
+        const optimisticMap = new Map(metaMap);
+        Array.from(files).forEach((file, i) => {
+          if (i < newIds.length) {
+            optimisticMap.set(newIds[i], {
+              fileName: file.name,
+              fileType: file.type || "",
+            });
+          }
+        });
+        setMetaMap(optimisticMap);
       } catch (e: any) {
         setError(e?.message ?? "Erreur upload.");
       } finally {
