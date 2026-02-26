@@ -990,6 +990,7 @@ export default function Page() {
   const [draft, setDraft] = useState<Record<string, any>>({});
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState("");
+  const [loadingRest, setLoadingRest] = useState(false);
   const [showFaq, setShowFaq] = useState(false);
 
   const [activeTab, setActiveTab] = useState<L1TabKey>(EMILE_TABS[0].key);
@@ -1040,6 +1041,7 @@ export default function Page() {
   // ── Mode REST (standalone magic link) : fetch par rowId ─
   useEffect(() => {
     if (!docApi || mode !== "rest" || !rowIdFromUrl) return;
+    setLoadingRest(true);
     (async () => {
       try {
         const row = await fetchSingleRowRest(TABLE_ID, rowIdFromUrl);
@@ -1047,6 +1049,8 @@ export default function Page() {
         else setStatus("Dossier introuvable (rowId=" + rowIdFromUrl + ").");
       } catch (e: any) {
         setStatus("Erreur: " + (e?.message ?? String(e)));
+      } finally {
+        setLoadingRest(false);
       }
     })();
   }, [docApi, mode, rowIdFromUrl]);
@@ -1220,6 +1224,10 @@ export default function Page() {
       {/* ===== CORPS ===== */}
       <div className="emile-body">
         {mode === "boot" ? (
+          <div style={{ padding: "3rem", textAlign: "center", color: "#bbb" }}>
+            <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: "1.5rem" }} />
+          </div>
+        ) : loadingRest ? (
           <div style={{ padding: "3rem", textAlign: "center", color: "#bbb" }}>
             <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: "1.5rem" }} />
           </div>
