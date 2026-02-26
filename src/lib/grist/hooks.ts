@@ -59,6 +59,7 @@ export type DeptOption = Option & { tagLeft: string; tag: string };
 export function useDepartementOptions(docApi: GristDocAPI | null) {
   const [deptOptions, setDeptOptions] = useState<DeptOption[]>([]);
   const [dptsLoading, setDptsLoading] = useState(true);
+  const [dptsError, setDptsError]     = useState<string | null>(null);
 
   useEffect(() => {
     if (!docApi) return;
@@ -81,9 +82,9 @@ export function useDepartementOptions(docApi: GristDocAPI | null) {
         opts.sort((a, b) => deptSortKey(a.tagLeft) - deptSortKey(b.tagLeft));
         setDeptOptions(opts);
       })
-      .catch(() => {})
+      .catch((e: any) => setDptsError(`[DPTS_REGIONS] ${e?.message ?? String(e)}`))
       .finally(() => setDptsLoading(false));
   }, [docApi]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return { deptOptions, dptsLoading };
+  return { deptOptions, dptsLoading, dptsError };
 }

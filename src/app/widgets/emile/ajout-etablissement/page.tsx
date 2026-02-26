@@ -31,7 +31,7 @@ const INITIAL: FormData = {
 /* ─── Page principale ────────────────────────────────────────── */
 export default function EtablissementPage() {
   const { mode, docApi }            = useGristInit();
-  const { deptOptions, dptsLoading } = useDepartementOptions(docApi);
+  const { deptOptions, dptsLoading, dptsError } = useDepartementOptions(docApi);
   const [form, setForm]             = useState<FormData>(INITIAL);
   const [done, setDone]             = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -41,6 +41,11 @@ export default function EtablissementPage() {
   const [dispositifOptions, setDispositifOptions] = useState<Option[]>([]);
   const [organismeOptions,   setOrganismeOptions] = useState<Option[]>([]);
   const [colsLoading,        setColsLoading]      = useState(true);
+
+  /* ── Effet : répercute l'erreur département ─────────────────── */
+  useEffect(() => {
+    if (dptsError) setError(dptsError);
+  }, [dptsError]);
 
   /* ── Effet : colonnes Choice ───────────────────────────────── */
   useEffect(() => {
@@ -53,7 +58,7 @@ export default function EtablissementPage() {
         const orgaCol = cols.find((c) => c.colId === "Organisme_gestionnaire");
         if (orgaCol) setOrganismeOptions(choicesToOptions(normalizeChoices(orgaCol.widgetOptionsParsed?.choices)));
       })
-      .catch(() => {})
+      .catch((e: any) => setError(`[colonnes] ${e?.message ?? String(e)}`))
       .finally(() => setColsLoading(false));
   }, [docApi]); // eslint-disable-line react-hooks/exhaustive-deps
 

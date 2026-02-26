@@ -66,7 +66,7 @@ export default function OrienteurPage() {
         opts.sort((a, b) => a.label.localeCompare(b.label, "fr", { sensitivity: "base" }));
         setEtablOptions(opts);
       })
-      .catch(() => {})
+      .catch((e: any) => setError(`[ETABLISSEMENTS] ${e?.message ?? String(e)}`))
       .finally(() => setEtablLoading(false));
   }, [docApi]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -79,7 +79,7 @@ export default function OrienteurPage() {
         const fonctionCol = cols.find((c) => c.colId === "Fonction");
         if (fonctionCol) setFonctionOptions(choicesToOptions(normalizeChoices(fonctionCol.widgetOptionsParsed?.choices)));
       })
-      .catch(() => { setFonctionOptions(FALLBACK_FONCTION_OPTIONS); })
+      .catch((e: any) => setError(`[colonnes] ${e?.message ?? String(e)}`))
       .finally(() => setColsLoading(false));
   }, [docApi]); // eslint-disable-line react-hooks/exhaustive-deps
 
