@@ -143,9 +143,7 @@ export function AttachmentField({
     }).catch(() => setError("Token indisponible."));
   }, [docApi]);
 
-  // En mode REST, ne pas afficher le champ (pas de token disponible)
-  if (restMode) return null;
-
+  // ⚠️ useCallback doit être appelé AVANT tout return conditionnel (Rules of Hooks)
   const handleFiles = useCallback(
     async (files: FileList | null) => {
       if (!files || files.length === 0 || !tokenInfo) return;
@@ -183,6 +181,10 @@ export function AttachmentField({
     },
     [tokenInfo, ids, onChange, docApi]
   );
+
+  // En mode REST, ne pas afficher le champ (pas de token disponible).
+  // Ce return doit être APRÈS tous les hooks (Rules of Hooks).
+  if (restMode) return null;
 
   // Le bouton + est toujours visible (même si tokenInfo pas encore chargé),
   // mais l'input reste disabled jusqu'au token
