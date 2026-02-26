@@ -196,22 +196,10 @@ export function AttachmentField({
       setUploading(true);
       setError("");
       try {
-        // Snapshot des IDs connus avant upload
-        const beforeMap = await fetchAttachmentsMeta(docApi);
-        const beforeIds = new Set(beforeMap.keys());
-        const uploadedNames = new Set(Array.from(files).map((f) => f.name));
-
-        await doUpload(files);
-
-        // Détecte les nouveaux IDs : nouveau + nom de fichier correspond à ce qu'on vient d'uploader
-        // (résistant aux uploads simultanés de fichiers avec des noms différents)
-        const afterMap = await fetchAttachmentsMeta(docApi);
-        const newIds = [...afterMap.entries()]
-          .filter(([id, meta]) => !beforeIds.has(id) && uploadedNames.has(meta.fileName))
-          .map(([id]) => id);
-
+        const newIds = await doUpload(files);
         onChange(encodeAttachmentCell([...ids, ...newIds]));
-        setMetaMap(afterMap);
+        const map = await fetchAttachmentsMeta(docApi);
+        setMetaMap(map);
       } catch (e: any) {
         setError(e?.message ?? "Erreur upload.");
       } finally {

@@ -132,13 +132,12 @@ async function uploadAttachmentsRest(files: FileList): Promise<number[]> {
       throw new Error(`Upload ${res.status}: ${detail}`);
     }
     const body = await res.json();
-    // n8n peut renvoyer [42], 42, ou {"0":42} selon la version — on normalise
-    const ids: number[] = Array.isArray(body)
-      ? body.filter((v: any) => typeof v === "number")
-      : typeof body === "number"
-        ? [body]
-        : Object.values(body as object).filter((v): v is number => typeof v === "number");
-    newIds.push(...ids);
+    // n8n Code node renvoie { ids: [42] } — on normalise aussi les autres formats au cas où
+    const raw: any[] = Array.isArray(body?.ids) ? body.ids
+      : Array.isArray(body)                     ? body
+      : typeof body === "number"                ? [body]
+      : Object.values(body as object).filter((v) => typeof v === "number");
+    newIds.push(...(raw as number[]).filter((v) => typeof v === "number"));
   }
   return newIds;
 }
