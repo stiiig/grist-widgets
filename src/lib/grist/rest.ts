@@ -64,6 +64,12 @@ export async function fetchSingleRowRest(
   return { id: rec.id, ...rec.fields };
 }
 
+/**
+ * Applique des actions Grist via le proxy n8n (PATCH / POST).
+ * ⚠️  Nécessite que le webhook n8n gère aussi le preflight CORS OPTIONS
+ *     pour les requêtes avec Content-Type: application/json.
+ * Actions supportées : UpdateRecord, AddRecord.
+ */
 async function applyUserActionsRest(actions: any[]): Promise<any> {
   for (const action of actions) {
     const [type, tableId, rowId, fields] = action as [
