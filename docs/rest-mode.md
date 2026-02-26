@@ -106,34 +106,44 @@ https://n8n.incubateur.dnum.din.developpement-durable.gouv.fr/webhook/grist
 | Path | `grist` |
 | Response Mode | Using Respond to Webhook Node |
 
-### Nœud 2 — HTTP Request (appel Grist)
+### Nœud 2 — IF (branchement records / attachment)
+
+Ajouter un nœud **IF** entre le Webhook et le HTTP Request :
+
+| Paramètre | Valeur |
+|-----------|--------|
+| Condition | `{{ $json.query.attachId }}` **is not empty** |
+| True → | branche téléchargement pièce jointe |
+| False → | branche records (comportement existant) |
+
+---
+
+### Branche **records** (False du IF)
+
+#### Nœud 3a — HTTP Request (appel Grist — records)
 
 | Paramètre | Valeur |
 |-----------|--------|
 | Method | GET |
 | Authentication | Generic Credential Type → Bearer Auth → **Bearer Auth Grist** |
-| Query Parameters | **Vide** — ne rien mettre dans "Using Fields Below" |
+| Query Parameters | **Vide** |
 
-**URL** (coller dans le champ URL, **sans** activer le toggle `fx`) :
+**URL** (sans activer `fx`) :
 ```
 https://grist.incubateur.dnum.din.developpement-durable.gouv.fr/api/docs/75GHATRaKvHSmx3FRqCi4f/tables/{{ $json.query.table }}/records{{ $json.query.filter ? '?filter=' + $json.query.filter : '' }}
 ```
 
-> ⚠️ **Ne jamais ajouter de param `filter` dans "Using Fields Below".**
-> Le filtre est géré exclusivement par l'expression `{{ ... }}` dans l'URL.
-> Si le filtre est présent aux deux endroits, n8n l'envoie en double → Grist retourne une erreur JSON parse.
->
-> ℹ️ La syntaxe `{{ }}` (sans `=`) est requise ici. Le mode expression `={{ }}` ne fonctionne pas dans ce champ sur cette instance n8n.
+> ⚠️ Ne jamais ajouter de param `filter` dans "Using Fields Below" — cf. section précédente.
 
-Cas couverts par l'URL :
+Cas couverts :
 
 | Requête entrante | URL envoyée à Grist |
 |-----------------|---------------------|
 | `?table=ETABLISSEMENTS` | `.../tables/ETABLISSEMENTS/records` |
-| `?table=CANDIDATS&filter={"id":[42]}` | `.../tables/CANDIDATS/records?filter=%7B%22id%22%3A%5B42%5D%7D` |
+| `?table=CANDIDATS&filter={"id":[42]}` | `.../tables/CANDIDATS/records?filter=...` |
 | `?table=_grist_Tables` | `.../tables/_grist_Tables/records` |
 
-### Nœud 3 — Respond to Webhook
+#### Nœud 4a — Respond to Webhook (JSON)
 
 | Paramètre | Valeur |
 |-----------|--------|
@@ -141,6 +151,45 @@ Cas couverts par l'URL :
 | Response Code | 200 |
 | Response Body | `={{ $json }}` |
 | Response Headers | `Access-Control-Allow-Origin: *` |
+
+---
+
+### Branche **attachment** (True du IF)
+
+#### Nœud 3b — HTTP Request (appel Grist — fichier binaire)
+
+| Paramètre | Valeur |
+|-----------|--------|
+| Method | GET |
+| URL | `https://grist.incubateur.dnum.din.developpement-durable.gouv.fr/api/docs/75GHATRaKvHSmx3FRqCi4f/attachments/{{ $json.query.attachId }}/download` |
+| Authentication | Generic Credential Type → Bearer Auth → **Bearer Auth Grist** |
+| Response Format | **File** |
+
+#### Nœud 4b — Respond to Webhook (binaire)
+
+| Paramètre | Valeur |
+|-----------|--------|
+| Respond With | **Binary Data** |
+| Response Data Property Name | `data` |
+| Response Code | 200 |
+| Response Headers | `Access-Control-Allow-Origin: *` |
+
+> ℹ️ Quand n8n répond avec Binary Data, il forward automatiquement les headers `Content-Type` et `Content-Disposition` de la réponse Grist, ce qui déclenche le téléchargement du fichier dans le navigateur.
+
+---
+
+### Schéma du workflow complet
+
+```
+Webhook (GET /webhook/grist)
+    │
+    ▼
+IF ($json.query.attachId is not empty)
+    │
+    ├─ False ──► HTTP Request (records JSON)  ──► Respond to Webhook (JSON)
+    │
+    └─ True  ──► HTTP Request (attachment File) ──► Respond to Webhook (Binary)
+```
 
 ---
 
@@ -192,9 +241,13 @@ Pour ajouter le support POST/PATCH dans n8n :
 - Ajouter une branche conditionnelle sur `$json.method` pour router vers `/records` en POST ou PATCH selon le cas
 - Configurer les headers CORS pour les preflights OPTIONS
 
-### Pièces jointes (AttachmentField)
+### Pièces jointes (AttachmentField) — téléchargement
 
-`AttachmentField` requiert `getAccessToken()`, une méthode disponible uniquement dans le plugin Grist. En mode REST, l'onglet contenant les pièces jointes n'est pas affiché (retourne `null` silencieusement).
+En mode REST, les pièces jointes s'affichent en lecture seule (nom + icône). Le téléchargement nécessite la branche n8n `?attachId=X` décrite ci-dessus.
+
+- Upload : non supporté (nécessite `getAccessToken`, plugin Grist uniquement)
+- Affichage des noms : ✅ via `_grist_Attachments` proxifié
+- Téléchargement : ✅ une fois la branche n8n configurée
 
 ### Fiche candidat — onglets non mappés
 

@@ -188,6 +188,7 @@ export function AttachmentField({
   // Ce return doit être APRÈS tous les hooks (Rules of Hooks).
   // On affiche toujours le champ (même vide) pour rester cohérent avec le mode plugin.
   if (restMode) {
+    const getDownloadUrl = docApi?.getAttachmentDownloadUrl;
     return (
       <div className="emile-field emile-field--wide att-field">
         <div className="emile-field__label">{label}</div>
@@ -196,10 +197,22 @@ export function AttachmentField({
             <span className="att-empty">Aucun document joint</span>
           ) : (
             ids.map((id) => {
-              const meta = metaMap.get(id);
-              const name = meta?.fileName || `fichier_${id}`;
-              const mime = meta?.fileType || "";
-              return (
+              const meta  = metaMap.get(id);
+              const name  = meta?.fileName || `fichier_${id}`;
+              const mime  = meta?.fileType || "";
+              const dlUrl = getDownloadUrl?.(id);
+              return dlUrl ? (
+                <button
+                  key={id}
+                  type="button"
+                  className="att-item att-item__link"
+                  title={`Télécharger ${name}`}
+                  onClick={() => window.open(dlUrl, "_blank", "noopener,noreferrer")}
+                >
+                  <i className={`${fileIcon(mime, name)} att-item__icon`} aria-hidden="true" />
+                  <span className="att-item__name">{name}</span>
+                </button>
+              ) : (
                 <div key={id} className="att-item att-item--readonly"
                      title="Téléchargement disponible uniquement dans Grist">
                   <i className={`${fileIcon(mime, name)} att-item__icon`} aria-hidden="true" />

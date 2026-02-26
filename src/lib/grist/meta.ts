@@ -2,6 +2,8 @@
 export type GristDocAPI = {
   fetchTable: (tableId: string) => Promise<any>;
   applyUserActions: (actions: any[]) => Promise<any>;
+  /** Mode REST uniquement : retourne l'URL de téléchargement d'une pièce jointe via le proxy n8n. */
+  getAttachmentDownloadUrl?: (attachId: number) => string;
 };
 
 export type ColMeta = {

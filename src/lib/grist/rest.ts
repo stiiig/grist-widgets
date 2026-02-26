@@ -112,7 +112,9 @@ async function applyUserActionsRest(actions: any[]): Promise<any> {
 /** Crée un objet GristDocAPI utilisant le proxy n8n. */
 export function createRestDocApi(): GristDocAPI {
   return {
-    fetchTable:       fetchTableRest,
-    applyUserActions: applyUserActionsRest,
+    fetchTable:               fetchTableRest,
+    applyUserActions:         applyUserActionsRest,
+    getAttachmentDownloadUrl: (attachId: number) =>
+      `${proxyUrl()}?attachId=${attachId}`,
   };
 }
