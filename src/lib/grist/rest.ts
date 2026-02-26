@@ -133,6 +133,7 @@ async function uploadAttachmentsRest(files: FileList): Promise<number[]> {
     }
     const body = await res.json();
     // n8n peut renvoyer plusieurs formats selon sa version et sa config :
+    //   26                     ← nombre brut (n8n unwrappe [26] → 26 selon config)
     //   { ids: [26] }          ← Code node qui extrait .json
     //   { data: "[26]" }       ← HTTP Request sans Code node (réponse brute en string)
     //   [26]                   ← tableau direct
