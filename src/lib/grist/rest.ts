@@ -131,7 +131,13 @@ async function uploadAttachmentsRest(files: FileList): Promise<number[]> {
       try { const b = await res.json(); if (b?.error) detail = b.error; } catch { /* ignore */ }
       throw new Error(`Upload ${res.status}: ${detail}`);
     }
-    const ids: number[] = await res.json();
+    const body = await res.json();
+    // n8n peut renvoyer [42], 42, ou {"0":42} selon la version — on normalise
+    const ids: number[] = Array.isArray(body)
+      ? body.filter((v: any) => typeof v === "number")
+      : typeof body === "number"
+        ? [body]
+        : Object.values(body as object).filter((v): v is number => typeof v === "number");
     newIds.push(...ids);
   }
   return newIds;
