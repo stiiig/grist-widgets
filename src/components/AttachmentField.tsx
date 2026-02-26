@@ -129,8 +129,10 @@ export function AttachmentField({
   // Token + métadonnées au montage
   useEffect(() => {
     if (!docApi) return;
-    // getAccessToken n'existe qu'en mode plugin Grist (pas en mode REST standalone)
+    // getAccessToken n'existe qu'en mode plugin Grist (pas en mode REST standalone).
+    // En REST, on charge quand même _grist_Attachments pour afficher les noms de fichiers.
     if (typeof docApi.getAccessToken !== "function") {
+      fetchAttachmentsMeta(docApi).then(setMetaMap).catch(() => {});
       setRestMode(true);
       return;
     }
@@ -182,9 +184,30 @@ export function AttachmentField({
     [tokenInfo, ids, onChange, docApi]
   );
 
-  // En mode REST, ne pas afficher le champ (pas de token disponible).
+  // En mode REST : affichage lecture seule (pas d'upload ni de téléchargement).
   // Ce return doit être APRÈS tous les hooks (Rules of Hooks).
-  if (restMode) return null;
+  if (restMode) {
+    if (ids.length === 0) return null;
+    return (
+      <div className="emile-field emile-field--wide att-field">
+        <div className="emile-field__label">{label}</div>
+        <div className="att-list">
+          {ids.map((id) => {
+            const meta = metaMap.get(id);
+            const name = meta?.fileName || `fichier_${id}`;
+            const mime = meta?.fileType || "";
+            return (
+              <div key={id} className="att-item att-item--readonly"
+                   title="Téléchargement disponible uniquement dans Grist">
+                <i className={`${fileIcon(mime, name)} att-item__icon`} aria-hidden="true" />
+                <span className="att-item__name">{name}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
 
   // Le bouton + est toujours visible (même si tokenInfo pas encore chargé),
   // mais l'input reste disabled jusqu'au token
