@@ -2,16 +2,17 @@
 // Client REST Grist — implémente la même interface que grist.docApi (Plugin API)
 // Utilisé en mode standalone (hors iframe Grist) via le proxy n8n (NEXT_PUBLIC_GRIST_PROXY_URL).
 
-import type { GristDocAPI, ColMeta } from "./meta";
-import { parseWidgetOptions } from "./meta";
+import type { GristDocAPI } from "./meta";
 
 function proxyUrl(): string {
   return (process.env.NEXT_PUBLIC_GRIST_PROXY_URL ?? "").replace(/\/$/, "");
 }
 
+/**
+ * Construit l'URL du proxy n8n.
+ * GET /webhook/grist?table=TABLE[&filter=JSON]
+ */
 function tableUrl(tableId: string, params?: Record<string, string>): string {
-  // Passe par le proxy n8n (GET /webhook/grist?table=X&filter=Y)
-  // → n8n appelle Grist server-side avec le Bearer token (pas de CORS côté navigateur)
   const allParams = new URLSearchParams({ table: tableId, ...params });
   return `${proxyUrl()}?${allParams.toString()}`;
 }
@@ -19,8 +20,8 @@ function tableUrl(tableId: string, params?: Record<string, string>): string {
 type RestRecord = { id: number; fields: Record<string, any> };
 
 /**
- * Convertit [{id, fields: {col: val}}] → format columnar {id:[], col:[]}
- * (même format que le Plugin API grist.docApi.fetchTable)
+ * Convertit le format REST Grist [{id, fields: {col: val}}]
+ * → format columnar {id:[], col:[]} (même format que grist.docApi.fetchTable).
  */
 function toColumnar(records: RestRecord[]): Record<string, any[]> {
   const result: Record<string, any[]> = { id: records.map((r) => r.id) };
@@ -44,6 +45,10 @@ async function gristFetch(url: string, init: RequestInit): Promise<any> {
   return res.json();
 }
 
+/**
+ * Récupère tous les enregistrements d'une table (format columnar).
+ * Utilisé pour DPTS_REGIONS, ETABLISSEMENTS, _grist_Tables, _grist_Tables_column…
+ */
 async function fetchTableRest(tableId: string): Promise<Record<string, any[]>> {
   const url = tableUrl(tableId);
   const { records } = (await gristFetch(url, {})) as { records: RestRecord[] };
@@ -58,7 +63,8 @@ export async function fetchSingleRowRest(
   tableId: string,
   rowId: number
 ): Promise<{ id: number; [k: string]: any } | null> {
-  const url = tableUrl(tableId, { filter: JSON.stringify({ id: [rowId] }) });
+  const filter = JSON.stringify({ id: [rowId] });
+  const url = tableUrl(tableId, { filter });
   const { records } = (await gristFetch(url, {})) as { records: RestRecord[] };
   const rec = records.find((r) => r.id === rowId) ?? null;
   if (!rec) return null;
@@ -66,10 +72,14 @@ export async function fetchSingleRowRest(
 }
 
 /**
- * Applique des actions Grist via le proxy n8n (PATCH / POST).
- * ⚠️  Nécessite que le webhook n8n gère aussi le preflight CORS OPTIONS
- *     pour les requêtes avec Content-Type: application/json.
- * Actions supportées : UpdateRecord, AddRecord.
+ * Applique des actions Grist via le proxy n8n (POST / PATCH).
+ *
+ * ⚠️  n8n doit accepter POST et PATCH (pas seulement GET) et gérer
+ *     le preflight CORS OPTIONS pour les requêtes avec Content-Type JSON.
+ *
+ * Actions supportées :
+ *   ["AddRecord",    tableId, null, fields] → POST   /webhook/grist?table=TABLE
+ *   ["UpdateRecord", tableId, rowId, fields] → PATCH /webhook/grist?table=TABLE
  */
 async function applyUserActionsRest(actions: any[]): Promise<any> {
   for (const action of actions) {
@@ -99,41 +109,10 @@ async function applyUserActionsRest(actions: any[]): Promise<any> {
   }
 }
 
-/**
- * Charge les métadonnées des colonnes via l'endpoint REST /columns.
- * Évite de requêter les tables internes _grist_Tables / _grist_Tables_column
- * qui ne sont pas fiablement accessibles via le proxy n8n.
- *
- * n8n doit router ?action=columns vers /tables/{table}/columns
- * au lieu de /tables/{table}/records.
- */
-async function fetchColumnsRest(tableId: string): Promise<ColMeta[]> {
-  const url = tableUrl(tableId, { action: "columns" });
-  // Grist /columns retourne : { columns: [{ id: "colId", fields: { label, type, widgetOptions, ... } }] }
-  const data = await gristFetch(url, {});
-  return (data.columns ?? []).map((col: any): ColMeta => {
-    const rawOpts: string = col.fields?.widgetOptions ?? "";
-    return {
-      colId:              String(col.id ?? ""),
-      label:              String(col.fields?.label ?? col.id ?? ""),
-      type:               String(col.fields?.type ?? "Text"),
-      widgetOptions:      rawOpts,
-      widgetOptionsParsed: parseWidgetOptions(rawOpts),
-      isFormula:          !!(col.fields?.isFormula),
-      description:        String(col.fields?.description ?? ""),
-      visibleColRowId:    (col.fields?.visibleCol as number) || null,
-      displayColRowId:    (col.fields?.displayCol as number) || null,
-    };
-  });
-}
-
-/** Crée un objet GristDocAPI utilisant l'API REST Grist. */
+/** Crée un objet GristDocAPI utilisant le proxy n8n. */
 export function createRestDocApi(): GristDocAPI {
   return {
     fetchTable:       fetchTableRest,
     applyUserActions: applyUserActionsRest,
-    // fetchColumns non utilisé : l'endpoint /columns n'est pas disponible sur cette
-    // instance Grist. loadColumnsMetaFor utilise le chemin _grist_Tables à la place,
-    // ce qui fonctionne maintenant que le filtre conditionnel est corrigé dans n8n.
   };
 }

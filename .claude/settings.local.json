@@ -29,7 +29,9 @@
       "Bash(gh run list:*)",
       "Bash(brew list:*)",
       "Bash(grep:*)",
-      "Bash(git mv:*)"
+      "Bash(git mv:*)",
+      "Bash(cat:*)",
+      "Bash(git rm:*)"
     ]
   }
 }
