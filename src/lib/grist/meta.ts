@@ -4,6 +4,11 @@ export type GristDocAPI = {
   applyUserActions: (actions: any[]) => Promise<any>;
   /** Mode REST uniquement : retourne l'URL de téléchargement d'une pièce jointe via le proxy n8n. */
   getAttachmentDownloadUrl?: (attachId: number) => string;
+  /**
+   * Mode REST uniquement : upload un ou plusieurs fichiers via le proxy n8n.
+   * Retourne les rowIds des nouvelles pièces jointes dans _grist_Attachments.
+   */
+  uploadAttachments?: (files: FileList) => Promise<number[]>;
 };
 
 export type ColMeta = {

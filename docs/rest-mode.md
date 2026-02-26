@@ -102,13 +102,68 @@ https://n8n.incubateur.dnum.din.developpement-durable.gouv.fr/webhook/grist
 
 | Paramètre | Valeur |
 |-----------|--------|
-| HTTP Method | GET |
+| HTTP Method | **Any** (pour accepter GET, POST et OPTIONS) |
 | Path | `grist` |
 | Response Mode | Using Respond to Webhook Node |
 
-### Nœud 2 — IF (branchement records / attachment)
+### Nœud 2 — IF OPTIONS (preflight CORS)
 
-Ajouter un nœud **IF** entre le Webhook et le HTTP Request :
+Les navigateurs envoient une requête `OPTIONS` avant tout `POST`. Sans réponse correcte, l'upload est bloqué.
+
+| Paramètre | Valeur |
+|-----------|--------|
+| Condition | `{{ $json.method }}` **equals** `OPTIONS` |
+| True → | Respond to Webhook (voir ci-dessous) |
+| False → | suite du workflow |
+
+**Nœud True — Respond to Webhook (preflight) :**
+
+| Paramètre | Valeur |
+|-----------|--------|
+| Respond With | No Data |
+| Response Code | 200 |
+| Response Headers | `Access-Control-Allow-Origin: *` |
+| | `Access-Control-Allow-Methods: GET, POST, OPTIONS` |
+| | `Access-Control-Allow-Headers: Content-Type, X-Requested-With` |
+
+### Nœud 3 — IF Upload (POST ?action=upload)
+
+| Paramètre | Valeur |
+|-----------|--------|
+| Condition | `{{ $json.query.action }}` **equals** `upload` |
+| True → | branche upload |
+| False → | branche records / download (comportement existant) |
+
+---
+
+### Branche **upload** (True du IF Upload)
+
+#### Nœud 4a — HTTP Request (upload vers Grist)
+
+| Paramètre | Valeur |
+|-----------|--------|
+| Method | POST |
+| URL | `https://grist.incubateur.dnum.din.developpement-durable.gouv.fr/api/docs/75GHATRaKvHSmx3FRqCi4f/attachments` |
+| Authentication | Generic Credential Type → Bearer Auth → **Bearer Auth Grist** |
+| Body Content Type | **Form-Data** |
+| Body Parameters | Name: `upload` / Type: **n8n Binary File** / Value: `data` |
+
+> ℹ️ "Value: `data`" fait référence au nom de la propriété binaire dans le nœud webhook. Ajuster si n8n nomme autrement la propriété (inspecter l'output du Webhook pour vérifier).
+
+#### Nœud 5a — Respond to Webhook (IDs des pièces jointes)
+
+| Paramètre | Valeur |
+|-----------|--------|
+| Respond With | JSON |
+| Response Body | `={{ $json }}` |
+| Response Code | 200 |
+| Response Headers | `Access-Control-Allow-Origin: *` |
+
+> La réponse Grist est un tableau d'entiers : `[42, 43]` (rowIds des nouvelles pièces jointes).
+
+---
+
+### Nœud 4 — IF Attachment download (branche False du IF Upload)
 
 | Paramètre | Valeur |
 |-----------|--------|
@@ -118,9 +173,9 @@ Ajouter un nœud **IF** entre le Webhook et le HTTP Request :
 
 ---
 
-### Branche **records** (False du IF)
+### Branche **records** (False du IF Attachment)
 
-#### Nœud 3a — HTTP Request (appel Grist — records)
+#### Nœud 5b — HTTP Request (appel Grist — records)
 
 | Paramètre | Valeur |
 |-----------|--------|
@@ -154,9 +209,9 @@ Cas couverts :
 
 ---
 
-### Branche **attachment** (True du IF)
+### Branche **download** (True du IF Attachment)
 
-#### Nœud 3b — HTTP Request (appel Grist — fichier binaire)
+#### Nœud 5c — HTTP Request (appel Grist — fichier binaire)
 
 | Paramètre | Valeur |
 |-----------|--------|
@@ -165,7 +220,7 @@ Cas couverts :
 | Authentication | Generic Credential Type → Bearer Auth → **Bearer Auth Grist** |
 | Response Format | **File** |
 
-#### Nœud 4b — Respond to Webhook (binaire)
+#### Nœud 6c — Respond to Webhook (binaire)
 
 | Paramètre | Valeur |
 |-----------|--------|
@@ -174,21 +229,31 @@ Cas couverts :
 | Response Code | 200 |
 | Response Headers | `Access-Control-Allow-Origin: *` |
 
-> ℹ️ Quand n8n répond avec Binary Data, il forward automatiquement les headers `Content-Type` et `Content-Disposition` de la réponse Grist, ce qui déclenche le téléchargement du fichier dans le navigateur.
+> ℹ️ n8n forward automatiquement les headers `Content-Type` et `Content-Disposition` de la réponse Grist, ce qui déclenche le téléchargement du fichier dans le navigateur.
 
 ---
 
 ### Schéma du workflow complet
 
 ```
-Webhook (GET /webhook/grist)
+Webhook (Any Method — path: grist)
     │
     ▼
-IF ($json.query.attachId is not empty)
+IF method === "OPTIONS"  ──────────────────────────────► Respond 200 + CORS headers
+    │ False
+    ▼
+IF query.action === "upload"  (POST multipart)
     │
-    ├─ False ──► HTTP Request (records JSON)  ──► Respond to Webhook (JSON)
+    ├─ True  ──► HTTP Request POST /attachments (Form-Data) ──► Respond JSON (IDs)
     │
-    └─ True  ──► HTTP Request (attachment File) ──► Respond to Webhook (Binary)
+    └─ False
+           │
+           ▼
+       IF query.attachId is not empty
+           │
+           ├─ True  ──► HTTP Request GET /attachments/{id}/download ──► Respond Binary
+           │
+           └─ False ──► HTTP Request GET /tables/{table}/records ────► Respond JSON
 ```
 
 ---
@@ -241,13 +306,16 @@ Pour ajouter le support POST/PATCH dans n8n :
 - Ajouter une branche conditionnelle sur `$json.method` pour router vers `/records` en POST ou PATCH selon le cas
 - Configurer les headers CORS pour les preflights OPTIONS
 
-### Pièces jointes (AttachmentField) — téléchargement
+### Pièces jointes (AttachmentField)
 
-En mode REST, les pièces jointes s'affichent en lecture seule (nom + icône). Le téléchargement nécessite la branche n8n `?attachId=X` décrite ci-dessus.
+Support en mode REST selon configuration n8n :
 
-- Upload : non supporté (nécessite `getAccessToken`, plugin Grist uniquement)
-- Affichage des noms : ✅ via `_grist_Attachments` proxifié
-- Téléchargement : ✅ une fois la branche n8n configurée
+| Fonctionnalité | Disponible | Condition |
+|----------------|-----------|-----------|
+| Affichage des noms | ✅ | Automatique (`_grist_Attachments` proxifié) |
+| Téléchargement | ✅ | Branche n8n `?attachId=X` configurée |
+| Upload | ✅ | Branche n8n `POST ?action=upload` configurée |
+| Suppression | ✅ | Upload opérationnel (applique l'action sans l'ID supprimé) |
 
 ### Fiche candidat — onglets non mappés
 

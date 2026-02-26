@@ -109,6 +109,33 @@ async function applyUserActionsRest(actions: any[]): Promise<any> {
   }
 }
 
+/**
+ * Upload des fichiers via le proxy n8n.
+ * n8n doit router POST ?action=upload vers POST /attachments de Grist.
+ * Retourne les rowIds des nouvelles pièces jointes.
+ */
+async function uploadAttachmentsRest(files: FileList): Promise<number[]> {
+  const url = `${proxyUrl()}?action=upload`;
+  const newIds: number[] = [];
+  for (const file of Array.from(files)) {
+    const fd = new FormData();
+    fd.append("upload", file, file.name);
+    const res = await fetch(url, {
+      method: "POST",
+      body: fd,
+      headers: { "X-Requested-With": "XMLHttpRequest" },
+    });
+    if (!res.ok) {
+      let detail = res.statusText;
+      try { const b = await res.json(); if (b?.error) detail = b.error; } catch { /* ignore */ }
+      throw new Error(`Upload ${res.status}: ${detail}`);
+    }
+    const ids: number[] = await res.json();
+    newIds.push(...ids);
+  }
+  return newIds;
+}
+
 /** Crée un objet GristDocAPI utilisant le proxy n8n. */
 export function createRestDocApi(): GristDocAPI {
   return {
@@ -116,5 +143,6 @@ export function createRestDocApi(): GristDocAPI {
     applyUserActions:         applyUserActionsRest,
     getAttachmentDownloadUrl: (attachId: number) =>
       `${proxyUrl()}?attachId=${attachId}`,
+    uploadAttachments:        uploadAttachmentsRest,
   };
 }
