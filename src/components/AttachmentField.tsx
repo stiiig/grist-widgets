@@ -197,7 +197,6 @@ export function AttachmentField({
       setError("");
       try {
         const newIds = await doUpload(files);
-        setError(`DEBUG newIds=${JSON.stringify(newIds)} ids=${JSON.stringify(ids)}`);
         onChange(encodeAttachmentCell([...ids, ...newIds]));
         const map = await fetchAttachmentsMeta(docApi);
         setMetaMap(map);
