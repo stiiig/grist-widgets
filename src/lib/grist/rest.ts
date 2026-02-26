@@ -138,7 +138,10 @@ async function uploadAttachmentsRest(files: FileList): Promise<number[]> {
     //   [26]                   ← tableau direct
     //   { "0": { json: 26 } }  ← items n8n sérialisés avec pairedItem
     let extracted: number[] = [];
-    if (Array.isArray(body?.ids) && body.ids.every((v: any) => typeof v === "number")) {
+    if (typeof body === "number") {
+      // n8n renvoie parfois le nombre brut directement (ex: 38)
+      extracted = [body];
+    } else if (Array.isArray(body?.ids) && body.ids.every((v: any) => typeof v === "number")) {
       extracted = body.ids;
     } else if (typeof body?.data === "string") {
       try { extracted = JSON.parse(body.data).filter((v: any) => typeof v === "number"); } catch { /* ignore */ }

@@ -197,7 +197,6 @@ export function AttachmentField({
       setError("");
       try {
         const newIds = await doUpload(files);
-        setError(`DEBUG ids=${JSON.stringify(ids)} newIds=${JSON.stringify(newIds)} files=${Array.from(files).map(f=>f.name)}`);
         onChange(encodeAttachmentCell([...ids, ...newIds]));
 
         // Mise à jour optimiste : on connaît le nom/type localement, sans attendre
