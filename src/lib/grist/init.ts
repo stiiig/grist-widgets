@@ -100,9 +100,9 @@ export async function initGristOrMock(
   }
 
   // --------------------------------------------------
-  // 3️⃣ Mode REST (NEXT_PUBLIC_GRIST_API_KEY défini au build)
+  // 3️⃣ Mode REST (NEXT_PUBLIC_GRIST_PROXY_URL défini au build)
   // --------------------------------------------------
-  if (process.env.NEXT_PUBLIC_GRIST_API_KEY) {
+  if (process.env.NEXT_PUBLIC_GRIST_PROXY_URL) {
     const { createRestDocApi } = await import("./rest");
     return {
       mode: "rest",
