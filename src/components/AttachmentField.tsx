@@ -127,6 +127,11 @@ export function AttachmentField({
   // Token + métadonnées au montage
   useEffect(() => {
     if (!docApi) return;
+    // getAccessToken n'existe qu'en mode plugin Grist (pas en mode REST standalone)
+    if (typeof docApi.getAccessToken !== "function") {
+      setError("Pièces jointes non disponibles en accès direct.");
+      return;
+    }
     Promise.all([
       docApi.getAccessToken({ readOnly: false }),
       fetchAttachmentsMeta(docApi),

@@ -102,11 +102,16 @@ https://n8n.incubateur.dnum.din.developpement-durable.gouv.fr/webhook/grist
 | Paramètre | Valeur |
 |-----------|--------|
 | Method | GET |
-| URL *(mode expression)* | `https://grist.incubateur.dnum.din.developpement-durable.gouv.fr/api/docs/75GHATRaKvHSmx3FRqCi4f/tables/{{ $json.query.table }}/records` |
+| URL *(mode expression `fx`)* | voir expression ci-dessous |
 | Authentication | Generic Credential Type → Bearer Auth → **Bearer Auth Grist** |
-| Query param `filter` *(mode expression)* | `{{ $json.query.filter \|\| undefined }}` |
+| Query Parameters | *(aucun — le filtre est intégré dans l'URL)* |
 
-> ⚠️ Les champs URL et valeur du param filter doivent être en **mode Expression** (icône `fx`).
+**Expression URL** (activer le toggle `fx`, coller telle quelle) :
+```
+={{ 'https://grist.incubateur.dnum.din.developpement-durable.gouv.fr/api/docs/75GHATRaKvHSmx3FRqCi4f/tables/' + $json.query.table + '/records' + ($json.query.filter ? '?filter=' + encodeURIComponent($json.query.filter) : '') }}
+```
+
+> ℹ️ Le filtre est ajouté à l'URL uniquement s'il est présent dans la requête entrante. Sans filtre (ex. chargement d'une table entière pour un dropdown), Grist reçoit `…/records` sans param → retourne tous les enregistrements ✅
 
 ### Nœud 3 — Respond to Webhook
 | Paramètre | Valeur |
@@ -155,8 +160,21 @@ L'`ID_GRIST` correspond au `rowId` de l'enregistrement dans la table `CANDIDATS`
 
 ---
 
+## Widgets accessibles en mode REST (URL directe)
+
+En plus de `fiche-candidat`, les widgets suivants fonctionnent en accès direct (hors iframe Grist) :
+
+| Widget | URL | Dépendances Grist |
+|--------|-----|-------------------|
+| `ajout-etablissement` | `/widgets/emile/ajout-etablissement` | `ETABLISSEMENTS`, `DPTS_REGIONS`, `_grist_Tables*` |
+| `creation-compte-orienteur` | `/widgets/emile/creation-compte-orienteur` | `ETABLISSEMENTS`, `ACCOMPAGNANTS`, `_grist_Tables*` |
+
+Ces widgets chargent des **tables entières** (sans filtre) pour alimenter leurs dropdowns. L'URL expression du nœud n8n intègre le filtre conditionnellement : si absent, aucun `?filter=` n'est ajouté → Grist retourne tous les enregistrements.
+
+---
+
 ## Limitations actuelles
 
-- **Lecture seule fonctionnelle** — la sauvegarde (PATCH) via le proxy n8n nécessite la gestion du preflight CORS `OPTIONS` + `PATCH` (non encore configuré dans n8n)
-- **Seul l'onglet "Administratif"** est mappé sur des colonnes Grist (`src/lib/emile/fieldmap.ts`) — les autres onglets affichent un message "non mappé"
+- **Sauvegarde (PATCH/POST) en mode REST** — les widgets formulaire utilisent `AddRecord` (POST) qui fonctionne. La sauvegarde dans `fiche-candidat` (UpdateRecord → PATCH) nécessite la gestion du preflight CORS `OPTIONS` + `PATCH` (non encore configuré dans n8n)
+- **Seul l'onglet "Administratif"** de `fiche-candidat` est mappé sur des colonnes Grist (`src/lib/emile/fieldmap.ts`) — les autres onglets affichent un message "non mappé"
 - Le magic link est **public** — toute personne ayant l'URL peut voir le dossier ; à sécuriser si besoin (token signé, authentification)
