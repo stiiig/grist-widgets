@@ -221,13 +221,27 @@ export function AttachmentField({
             const name  = meta?.fileName || `fichier_${id}`;
             const mime  = meta?.fileType || "";
             const dlUrl = getDownloadUrl?.(id);
+            const handleDownload = dlUrl ? async () => {
+              try {
+                const res = await fetch(dlUrl);
+                const blob = await res.blob();
+                const blobUrl = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = blobUrl;
+                a.download = name;
+                a.click();
+                URL.revokeObjectURL(blobUrl);
+              } catch {
+                window.open(dlUrl, "_blank", "noopener,noreferrer");
+              }
+            } : null;
             return dlUrl ? (
               <button
                 key={id}
                 type="button"
                 className="att-item att-item__link"
                 title={`Télécharger ${name}`}
-                onClick={() => window.open(dlUrl, "_blank", "noopener,noreferrer")}
+                onClick={handleDownload ?? undefined}
               >
                 <i className={`${fileIcon(mime, name)} att-item__icon`} aria-hidden="true" />
                 <span className="att-item__name">{name}</span>
