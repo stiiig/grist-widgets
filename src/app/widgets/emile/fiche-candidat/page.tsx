@@ -1105,6 +1105,14 @@ export default function Page() {
       const updates: Record<string, any> = {};
       for (const c of cols) {
         if (!isEditable(c)) continue;
+        // Champs Attachments non modifiés : les exclure du UpdateRecord.
+        // Envoyer la valeur ["L", id1, id2] d'un champ PJ inchangé via UpdateRecord
+        // provoque un effacement des pièces jointes côté Grist.
+        // On n'inclut un champ Attachments que s'il a été modifié par l'utilisateur.
+        if (
+          c.type === "Attachments" &&
+          JSON.stringify(draft[c.colId]) === JSON.stringify(selected?.[c.colId])
+        ) continue;
         updates[c.colId] = draft[c.colId];
       }
       await docApi.applyUserActions([["UpdateRecord", TABLE_ID, selected.id, updates]]);
