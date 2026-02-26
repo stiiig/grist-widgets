@@ -37,9 +37,9 @@ Widget → affiche / enregistre les données
 
 ### Pourquoi un proxy ?
 
-L'instance Grist ne renvoie pas les headers CORS nécessaires aux appels JS cross-origin. n8n appelle Grist côté serveur (pas de CORS), et renvoie la réponse avec `Access-Control-Allow-Origin: *`.
+**CORS** — Les widgets tournent sur `stiiig.github.io`. Le navigateur bloque par sécurité tout appel JS vers un autre domaine (`grist.incubateur.dnum...`) sauf si ce domaine répond avec `Access-Control-Allow-Origin: *`. Grist ne le fait pas. n8n appelle Grist côté serveur (pas de CORS), et renvoie la réponse avec le bon header.
 
-Avantage : la **clé API Grist ne transite jamais dans le bundle JS** — elle reste dans n8n.
+**Clé API** — Grist demande un Bearer token pour toute requête. Si on appelait Grist directement depuis le browser, la clé serait visible dans le JS. Avec n8n, elle reste côté serveur, jamais exposée.
 
 ---
 
@@ -102,7 +102,7 @@ Le widget utilise **deux workflows n8n distincts** au même path `grist` :
 - **Workflow GET** — gère les lectures (records, métadonnées, téléchargement de pièces jointes)
 - **Workflow POST** — gère l'upload de pièces jointes
 
-> **Pourquoi deux workflows ?** L'upload `multipart/form-data` sans header custom est une [« simple CORS request »](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS#simple_requests) : le navigateur ne fait pas de preflight OPTIONS. On peut donc utiliser un webhook POST dédié sans avoir à gérer OPTIONS — et sans avoir besoin de « Any Method » sur le webhook GET.
+> **Pourquoi deux workflows ?** La version n8n installée ne propose pas "Any Method" sur les webhooks. L'upload `multipart/form-data` sans header custom est une [« simple CORS request »](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS#simple_requests) : le navigateur ne fait pas de preflight OPTIONS. On peut donc utiliser un webhook POST dédié sans avoir à gérer OPTIONS.
 
 ---
 
@@ -129,6 +129,8 @@ https://n8n.incubateur.dnum.din.developpement-durable.gouv.fr/webhook/grist
 | True → | branche téléchargement pièce jointe |
 | False → | branche records |
 
+> ⚠️ **Piège** : n8n lève "Wrong type: '9' is a string but was expecting a boolean". Activer l'option **"Convert types where required"** dans le nœud IF.
+
 ---
 
 ### Branche **download** (True)
@@ -142,6 +144,8 @@ https://n8n.incubateur.dnum.din.developpement-durable.gouv.fr/webhook/grist
 | Authentication | Generic Credential Type → Bearer Auth → **Bearer Auth Grist** |
 | Response Format | **File** |
 
+> ⚠️ **Piège** : sans `Response Format: File`, n8n tente de parser la réponse comme JSON et échoue.
+
 #### Nœud 4a — Respond to Webhook (binaire)
 
 | Paramètre | Valeur |
@@ -149,9 +153,12 @@ https://n8n.incubateur.dnum.din.developpement-durable.gouv.fr/webhook/grist
 | Respond With | **Binary Data** |
 | Response Data Property Name | `data` |
 | Response Code | 200 |
-| Response Headers | `Access-Control-Allow-Origin: *` |
+| Send Headers | Using Fields Below |
+| Header | `Access-Control-Allow-Origin: *` |
 
-> ℹ️ n8n forward automatiquement les headers `Content-Type` et `Content-Disposition` de la réponse Grist, ce qui déclenche le téléchargement du fichier dans le navigateur.
+> ℹ️ n8n forward automatiquement les headers `Content-Type` et `Content-Disposition` de la réponse Grist.
+
+> ⚠️ **Piège navigateur** : `window.open(url)` affiche les PDFs au lieu de les télécharger. Le code utilise `fetch` + `blob` + `<a download>` pour forcer le téléchargement avec le bon nom de fichier.
 
 ---
 
@@ -186,8 +193,11 @@ Cas couverts :
 |-----------|--------|
 | Respond With | JSON |
 | Response Code | 200 |
-| Response Body | `={{ $json }}` |
-| Response Headers | `Access-Control-Allow-Origin: *` |
+| Response Body | `{{ $json }}` |
+| Send Headers | Using Fields Below |
+| Header | `Access-Control-Allow-Origin: *` |
+
+> ⚠️ **Piège critique** : écrire `{{ $json }}` et **non** `={{ $json }}`. Le `=` est la syntaxe d'expression n8n dans les champs texte — dans le champ Response Body du Respond to Webhook, il ne faut pas le préfixe `=`.
 
 ---
 
@@ -197,11 +207,13 @@ Cas couverts :
 Webhook GET (path: grist)
     │
     ▼
-IF query.attachId is not empty
+IF query.attachId is not empty  [activer "Convert types where required"]
     │
-    ├─ True  ──► HTTP Request GET /attachments/{id}/download ──► Respond Binary
+    ├─ True  ──► HTTP Request GET /attachments/{id}/download (Response Format: File)
+    │                └──► Respond Binary Data (property: data) + CORS header
     │
-    └─ False ──► HTTP Request GET /tables/{table}/records ────► Respond JSON
+    └─ False ──► HTTP Request GET /tables/{table}/records
+                    └──► Respond JSON (body: {{ $json }}) + CORS header
 ```
 
 ---
@@ -228,24 +240,29 @@ https://n8n.incubateur.dnum.din.developpement-durable.gouv.fr/webhook/grist
 
 | Paramètre | Valeur |
 |-----------|--------|
-| Method | POST |
+| Method | **POST** |
 | URL | `https://grist.incubateur.dnum.din.developpement-durable.gouv.fr/api/docs/75GHATRaKvHSmx3FRqCi4f/attachments` |
 | Authentication | Generic Credential Type → Bearer Auth → **Bearer Auth Grist** |
 | Body Content Type | **Form-Data** |
-| Body Parameters | Name: `upload` / Type: **n8n Binary File** / Value: `data` |
+| Body / Name | `upload` |
+| Body / Type | **n8n Binary File** |
+| Body / Input Data Field Name | `upload` |
 
-> ℹ️ `Value: data` fait référence au nom de la propriété binaire dans le nœud webhook. Si n8n nomme autrement la propriété binaire, vérifier l'output du Webhook et adapter.
+> ⚠️ **Piège** : le champ **Name** doit être `upload` (pas `data`). C'est le nom du champ multipart envoyé à Grist. Le champ **Input Data Field Name** est le nom de la propriété binaire dans l'item n8n entrant (vérifiable dans l'onglet **Binary** du Webhook en mode test — il s'appelle `upload` car c'est le nom du champ `fd.append("upload", ...)` envoyé par le browser).
+
+> ⚠️ **Piège** : sans l'**Authentication** configurée sur ce nœud, Grist renvoie une page HTML 403 — n8n lève "Invalid JSON in response body".
 
 ### Nœud 3 — Respond to Webhook (IDs des pièces jointes)
 
 | Paramètre | Valeur |
 |-----------|--------|
 | Respond With | JSON |
-| Response Body | `={{ $json }}` |
+| Response Body | `{{ $json }}` |
 | Response Code | 200 |
-| Response Headers | `Access-Control-Allow-Origin: *` |
+| Send Headers | Using Fields Below |
+| Header | `Access-Control-Allow-Origin: *` |
 
-> La réponse Grist est un tableau d'entiers : `[42, 43]` (rowIds des nouvelles pièces jointes).
+> ℹ️ Grist renvoie `[42]` (tableau d'entiers). n8n le stocke en string dans `$json.data = "[42]"`. Le code `rest.ts` gère cette sérialisation et tous les autres formats possibles selon la version n8n.
 
 ---
 
@@ -255,11 +272,61 @@ https://n8n.incubateur.dnum.din.developpement-durable.gouv.fr/webhook/grist
 Webhook POST (path: grist)
     │
     ▼
-HTTP Request POST /attachments (Form-Data, champ: upload)
+HTTP Request POST /attachments
+  Body: Form-Data, Name=upload, Type=n8n Binary File, Input Data Field Name=upload
+  Auth: Bearer Auth Grist
     │
     ▼
-Respond JSON [id1, id2, ...] + Access-Control-Allow-Origin: *
+Respond to Webhook
+  body: {{ $json }}   ← PAS ={{ $json }}
+  header: Access-Control-Allow-Origin: *
 ```
+
+---
+
+## Pièges rencontrés — référence complète
+
+Récapitulatif de tous les problèmes rencontrés lors de la mise en place.
+
+### n8n — Webhook
+
+| Problème | Cause | Solution |
+|----------|-------|----------|
+| Pas de "Any Method" dans le dropdown | Version n8n limitée | Deux workflows séparés GET et POST |
+| Condition IF lève "Wrong type: '9' is a string but was expecting a boolean" | Le query param est une string, le comparateur attend un booléen | Activer **"Convert types where required"** dans le nœud IF |
+
+### n8n — HTTP Request
+
+| Problème | Cause | Solution |
+|----------|-------|----------|
+| "Invalid JSON in response body" sur l'upload | Authentication manquante → Grist renvoie du HTML 403 | Configurer Bearer Auth Grist **sur ce nœud spécifiquement** |
+| "Invalid JSON in response body" sur le download | Response Format = JSON alors que Grist renvoie du binaire | Passer Response Format à **File** |
+| Champ **Name** = `data` au lieu de `upload` | Confusion entre le nom du champ Grist (`upload`) et le nom de la propriété n8n | Name = `upload`, Input Data Field Name = `upload` |
+
+### n8n — Respond to Webhook
+
+| Problème | Cause | Solution |
+|----------|-------|----------|
+| Réponse vide ou non-JSON reçue par le browser | `={{ $json }}` (syntaxe expression) au lieu de `{{ $json }}` | Écrire `{{ $json }}` **sans** le `=` préfixe |
+| Le fichier s'ouvre dans un onglet au lieu de se télécharger | n8n ne renvoie pas `Content-Disposition: attachment` systématiquement | Le code utilise `fetch` + `blob` + `<a download>` côté browser |
+
+### n8n — Format de réponse imprévisible
+
+Grist renvoie `[42]` (tableau JSON). n8n transforme cette réponse de manière non déterministe selon sa version et sa config :
+
+| Format reçu par le browser | Quand |
+|---------------------------|-------|
+| `{"data": "[42]"}` | HTTP Request sans Code node — n8n stocke le body brut en string dans `.data` |
+| `{"ids": [{"json": 42, "pairedItem": {...}}]}` | Avec Code node `return [{ json: { ids: items } }]` — `items` contient les objets n8n complets, pas juste les valeurs |
+| `[42]` | Dans certaines versions de n8n |
+
+Le code `uploadAttachmentsRest` dans `rest.ts` gère tous ces formats avec un parsing exhaustif — **ne pas simplifier**.
+
+### Code — React
+
+| Problème | Cause | Solution |
+|----------|-------|----------|
+| "Application error: a client-side exception" sur les pages avec attachments | `return null` conditionnel placé avant un `useCallback` → violation des Rules of Hooks | Déplacer tous les `return` conditionnels **après** tous les hooks |
 
 ---
 
@@ -307,7 +374,7 @@ https://stiiig.github.io/grist-widgets/widgets/emile/fiche-candidat?rowId=<ID_GR
 Les actions `AddRecord` et `UpdateRecord` (sauvegarde de fiche, soumission de formulaire) envoient un `Content-Type: application/json`, ce qui déclenche un **preflight CORS OPTIONS**. Le workflow POST actuel ne gère que le `multipart/form-data` de l'upload.
 
 Pour débloquer ces actions en mode REST, il faudra soit :
-- Ajouter un webhook **PATCH** dédié (avec branche sur `$json.method` dans le workflow POST) et répondre aux OPTIONS avec les bons headers CORS
+- Ajouter un webhook **PATCH** dédié et répondre aux OPTIONS avec les bons headers CORS
 - Ou exposer un endpoint côté serveur (Next.js API route) qui fait le proxy sans contrainte CORS
 
 Jusqu'à ce que ce soit configuré, les sauvegardes en mode REST échoueront.
