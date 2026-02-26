@@ -16,30 +16,13 @@ function apiKey(): string {
   return process.env.NEXT_PUBLIC_GRIST_API_KEY ?? "";
 }
 
-// ── Helpers auth ──────────────────────────────────────────────────────────────
-//
-// GET  → Authorization: Bearer KEY uniquement (pas de Content-Type sur un GET,
-//         ce qui évite un second header dans le preflight CORS).
-//
-// POST/PATCH → Authorization: Bearer KEY + Content-Type: application/json.
-
-/** Headers pour GET — pas de Content-Type pour minimiser le preflight CORS. */
-function readHeaders(): Record<string, string> {
-  return { Authorization: `Bearer ${apiKey()}` };
-}
-
-/** Headers pour POST / PATCH (body JSON + Bearer token). */
-function writeHeaders(): Record<string, string> {
-  return {
-    Authorization: `Bearer ${apiKey()}`,
-    "Content-Type": "application/json",
-  };
-}
 
 function tableUrl(tableId: string, params?: Record<string, string>): string {
   const base = `${server()}/api/docs/${docId()}/tables/${encodeURIComponent(tableId)}/records`;
-  if (!params) return base;
-  return `${base}?${new URLSearchParams(params).toString()}`;
+  // On injecte toujours ?auth=KEY pour éviter le header Authorization qui
+  // déclenche un preflight CORS bloqué par docs.getgrist.com.
+  const allParams = new URLSearchParams({ auth: apiKey(), ...params });
+  return `${base}?${allParams.toString()}`;
 }
 
 type RestRecord = { id: number; fields: Record<string, any> };
@@ -57,11 +40,22 @@ function toColumnar(records: RestRecord[]): Record<string, any[]> {
   return result;
 }
 
+async function gristFetch(url: string, init: RequestInit): Promise<any> {
+  const res = await fetch(url, init);
+  if (!res.ok) {
+    let detail = res.statusText;
+    try {
+      const body = await res.json();
+      if (body?.error) detail = body.error;
+    } catch { /* ignore */ }
+    throw new Error(`Grist API ${res.status}: ${detail}`);
+  }
+  return res.json();
+}
+
 async function fetchTableRest(tableId: string): Promise<Record<string, any[]>> {
   const url = tableUrl(tableId);
-  const res = await fetch(url, { headers: readHeaders() });
-  if (!res.ok) throw new Error(`REST fetchTable(${tableId}): ${res.status} ${res.statusText}`);
-  const { records } = (await res.json()) as { records: RestRecord[] };
+  const { records } = (await gristFetch(url, {})) as { records: RestRecord[] };
   return toColumnar(records);
 }
 
@@ -74,9 +68,7 @@ export async function fetchSingleRowRest(
   rowId: number
 ): Promise<{ id: number; [k: string]: any } | null> {
   const url = tableUrl(tableId, { filter: JSON.stringify({ id: [rowId] }) });
-  const res = await fetch(url, { headers: readHeaders() });
-  if (!res.ok) throw new Error(`REST fetchRecord(${tableId}, ${rowId}): ${res.status} ${res.statusText}`);
-  const { records } = (await res.json()) as { records: RestRecord[] };
+  const { records } = (await gristFetch(url, {})) as { records: RestRecord[] };
   const rec = records.find((r) => r.id === rowId) ?? null;
   if (!rec) return null;
   return { id: rec.id, ...rec.fields };
@@ -93,20 +85,17 @@ async function applyUserActionsRest(actions: any[]): Promise<any> {
     const url = tableUrl(tableId);
 
     if (type === "UpdateRecord") {
-      const res = await fetch(url, {
+      await gristFetch(url, {
         method: "PATCH",
-        headers: writeHeaders(),
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ records: [{ id: rowId, fields }] }),
       });
-      if (!res.ok) throw new Error(`REST UpdateRecord(${tableId}, ${rowId}): ${res.status} ${res.statusText}`);
     } else if (type === "AddRecord") {
-      const res = await fetch(url, {
+      return gristFetch(url, {
         method: "POST",
-        headers: writeHeaders(),
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ records: [{ fields }] }),
       });
-      if (!res.ok) throw new Error(`REST AddRecord(${tableId}): ${res.status} ${res.statusText}`);
-      return res.json();
     } else {
       throw new Error(`REST applyUserActions: action "${type}" non supportée`);
     }
