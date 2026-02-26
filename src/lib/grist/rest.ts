@@ -132,12 +132,27 @@ async function uploadAttachmentsRest(files: FileList): Promise<number[]> {
       throw new Error(`Upload ${res.status}: ${detail}`);
     }
     const body = await res.json();
-    // n8n Code node renvoie { ids: [42] } — on normalise aussi les autres formats au cas où
-    const raw: any[] = Array.isArray(body?.ids) ? body.ids
-      : Array.isArray(body)                     ? body
-      : typeof body === "number"                ? [body]
-      : Object.values(body as object).filter((v) => typeof v === "number");
-    newIds.push(...(raw as number[]).filter((v) => typeof v === "number"));
+    // n8n peut renvoyer plusieurs formats selon sa version et sa config :
+    //   { ids: [26] }          ← Code node qui extrait .json
+    //   { data: "[26]" }       ← HTTP Request sans Code node (réponse brute en string)
+    //   [26]                   ← tableau direct
+    //   { "0": { json: 26 } }  ← items n8n sérialisés avec pairedItem
+    let extracted: number[] = [];
+    if (Array.isArray(body?.ids) && body.ids.every((v: any) => typeof v === "number")) {
+      extracted = body.ids;
+    } else if (typeof body?.data === "string") {
+      try { extracted = JSON.parse(body.data).filter((v: any) => typeof v === "number"); } catch { /* ignore */ }
+    } else if (Array.isArray(body)) {
+      extracted = body.filter((v: any) => typeof v === "number");
+    } else if (body && typeof body === "object") {
+      // items n8n { "0": { json: 26 }, ... } ou { ids: [{ json: 26 }] }
+      const candidates = Array.isArray(body.ids) ? body.ids : Object.values(body);
+      for (const c of candidates) {
+        if (typeof c === "number") extracted.push(c);
+        else if (typeof c?.json === "number") extracted.push(c.json);
+      }
+    }
+    newIds.push(...extracted);
   }
   return newIds;
 }
