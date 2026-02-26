@@ -152,6 +152,9 @@ async function uploadAttachmentsRest(files: FileList): Promise<number[]> {
         else if (typeof c?.json === "number") extracted.push(c.json);
       }
     }
+    if (extracted.length === 0) {
+      throw new Error(`n8n réponse inattendue: ${JSON.stringify(body).slice(0, 300)}`);
+    }
     newIds.push(...extracted);
   }
   return newIds;
