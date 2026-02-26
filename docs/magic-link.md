@@ -104,11 +104,11 @@ https://n8n.incubateur.dnum.din.developpement-durable.gouv.fr/webhook/grist
 | Method | GET |
 | URL | voir ci-dessous (syntaxe `{{ }}`, **pas** de mode expression `fx`) |
 | Authentication | Generic Credential Type → Bearer Auth → **Bearer Auth Grist** |
-| Query Parameters | *(aucun — filtre et action intégrés dans l'URL)* |
+| Query Parameters | *(aucun — supprimer tout param "filter" de "Using Fields Below")* |
 
 **URL** (coller telle quelle dans le champ URL, sans activer `fx`) :
 ```
-https://grist.incubateur.dnum.din.developpement-durable.gouv.fr/api/docs/75GHATRaKvHSmx3FRqCi4f/tables/{{ $json.query.table }}/records{{ $json.query.filter ? '?filter=' + encodeURIComponent($json.query.filter) : '' }}
+https://grist.incubateur.dnum.din.developpement-durable.gouv.fr/api/docs/75GHATRaKvHSmx3FRqCi4f/tables/{{ $json.query.table }}/records{{ $json.query.filter ? '?filter=' + $json.query.filter : '' }}
 ```
 
 Cette URL gère deux cas :
@@ -118,7 +118,9 @@ Cette URL gère deux cas :
 | `?table=ETABLISSEMENTS` | `.../tables/ETABLISSEMENTS/records` (tous les enregistrements) |
 | `?table=CANDIDATS&filter={"id":[42]}` | `.../tables/CANDIDATS/records?filter=%7B...%7D` |
 
-> ℹ️ Le filtre est ajouté uniquement s'il est présent dans la requête entrante. Sans filtre, Grist retourne tous les enregistrements — ce qui permet de charger des tables entières (ex. `_grist_Tables`, `DPTS_REGIONS`) pour alimenter les dropdowns.
+> ⚠️ Ne pas ajouter de Query Parameter `filter` dans "Using Fields Below" — le filtre est géré exclusivement par l'expression dans l'URL. Avoir les deux envoie le filtre en double à Grist et corrompt le JSON reçu.
+>
+> ℹ️ Sans filtre (ex. `_grist_Tables`, `DPTS_REGIONS`), Grist retourne tous les enregistrements de la table.
 
 ### Nœud 3 — Respond to Webhook
 | Paramètre | Valeur |
