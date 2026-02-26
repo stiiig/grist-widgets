@@ -186,24 +186,28 @@ export function AttachmentField({
 
   // En mode REST : affichage lecture seule (pas d'upload ni de téléchargement).
   // Ce return doit être APRÈS tous les hooks (Rules of Hooks).
+  // On affiche toujours le champ (même vide) pour rester cohérent avec le mode plugin.
   if (restMode) {
-    if (ids.length === 0) return null;
     return (
       <div className="emile-field emile-field--wide att-field">
         <div className="emile-field__label">{label}</div>
         <div className="att-list">
-          {ids.map((id) => {
-            const meta = metaMap.get(id);
-            const name = meta?.fileName || `fichier_${id}`;
-            const mime = meta?.fileType || "";
-            return (
-              <div key={id} className="att-item att-item--readonly"
-                   title="Téléchargement disponible uniquement dans Grist">
-                <i className={`${fileIcon(mime, name)} att-item__icon`} aria-hidden="true" />
-                <span className="att-item__name">{name}</span>
-              </div>
-            );
-          })}
+          {ids.length === 0 ? (
+            <span className="att-empty">Aucun document joint</span>
+          ) : (
+            ids.map((id) => {
+              const meta = metaMap.get(id);
+              const name = meta?.fileName || `fichier_${id}`;
+              const mime = meta?.fileType || "";
+              return (
+                <div key={id} className="att-item att-item--readonly"
+                     title="Téléchargement disponible uniquement dans Grist">
+                  <i className={`${fileIcon(mime, name)} att-item__icon`} aria-hidden="true" />
+                  <span className="att-item__name">{name}</span>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
     );
