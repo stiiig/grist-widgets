@@ -67,12 +67,16 @@ Quand cette variable est définie, `src/lib/grist/init.ts` bascule automatiqueme
 
 Implémente `GristDocAPI` via le proxy n8n :
 
-| Méthode | Requête vers n8n | Traduite par n8n en |
-|---------|-----------------|---------------------|
-| `fetchTable(tableId)` | `GET ?table=TABLE` | `GET /tables/TABLE/records` |
-| `fetchSingleRowRest(tableId, rowId)` | `GET ?table=TABLE&filter={"id":[rowId]}` | `GET /tables/TABLE/records?filter=...` |
-| `applyUserActions([["AddRecord", ...]])` | `POST ?table=TABLE` | `POST /tables/TABLE/records` |
-| `applyUserActions([["UpdateRecord", ...]])` | `PATCH ?table=TABLE` | `PATCH /tables/TABLE/records` |
+| Méthode | Requête vers n8n | Traduite par n8n en | Workflow |
+|---------|-----------------|---------------------|----------|
+| `fetchTable(tableId)` | `GET ?table=TABLE` | `GET /tables/TABLE/records` | GET |
+| `fetchSingleRowRest(tableId, rowId)` | `GET ?table=TABLE&filter={"id":[rowId]}` | `GET /tables/TABLE/records?filter=...` | GET |
+| `getAttachmentDownloadUrl(id)` | `GET ?attachId=ID` | `GET /attachments/ID/download` | GET |
+| `uploadAttachments(files)` | `POST multipart/form-data` (champ `upload`) | `POST /attachments` | POST |
+| `applyUserActions([["AddRecord", ...]])` | `POST ?table=TABLE` + JSON | `POST /tables/TABLE/records` | POST* |
+| `applyUserActions([["UpdateRecord", ...]])` | `PATCH ?table=TABLE` + JSON | `PATCH /tables/TABLE/records` | POST* |
+
+> \* Les actions `AddRecord` / `UpdateRecord` envoient du `Content-Type: application/json`, ce qui déclenche un preflight OPTIONS. Le workflow POST devra gérer ce cas si ces actions sont utilisées en mode REST (voir Limitations).
 
 ### `src/lib/grist/meta.ts` — `loadColumnsMetaFor`
 
@@ -91,127 +95,45 @@ Ces deux tables sont accessibles via le proxy n8n comme n'importe quelle table n
 
 ## Configuration n8n
 
-### Workflow
+### Deux workflows séparés
 
-**Webhook URL (production) :**
+Le widget utilise **deux workflows n8n distincts** au même path `grist` :
+
+- **Workflow GET** — gère les lectures (records, métadonnées, téléchargement de pièces jointes)
+- **Workflow POST** — gère l'upload de pièces jointes
+
+> **Pourquoi deux workflows ?** L'upload `multipart/form-data` sans header custom est une [« simple CORS request »](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS#simple_requests) : le navigateur ne fait pas de preflight OPTIONS. On peut donc utiliser un webhook POST dédié sans avoir à gérer OPTIONS — et sans avoir besoin de « Any Method » sur le webhook GET.
+
+---
+
+## Workflow GET — records et téléchargement
+
+**URL (production) :**
 ```
 https://n8n.incubateur.dnum.din.developpement-durable.gouv.fr/webhook/grist
 ```
 
-### Nœud 1 — Webhook
+### Nœud 1 — Webhook (GET)
 
 | Paramètre | Valeur |
 |-----------|--------|
-| HTTP Method | **Any** (pour accepter GET, POST et OPTIONS) |
+| HTTP Method | **GET** |
 | Path | `grist` |
 | Response Mode | Using Respond to Webhook Node |
 
-### Nœud 2 — IF OPTIONS (preflight CORS)
-
-Les navigateurs envoient une requête `OPTIONS` avant tout `POST`. Sans réponse correcte, l'upload est bloqué.
-
-| Paramètre | Valeur |
-|-----------|--------|
-| Condition | `{{ $json.method }}` **equals** `OPTIONS` |
-| True → | Respond to Webhook (voir ci-dessous) |
-| False → | suite du workflow |
-
-**Nœud True — Respond to Webhook (preflight) :**
-
-| Paramètre | Valeur |
-|-----------|--------|
-| Respond With | No Data |
-| Response Code | 200 |
-| Response Headers | `Access-Control-Allow-Origin: *` |
-| | `Access-Control-Allow-Methods: GET, POST, OPTIONS` |
-| | `Access-Control-Allow-Headers: Content-Type, X-Requested-With` |
-
-### Nœud 3 — IF Upload (POST ?action=upload)
-
-| Paramètre | Valeur |
-|-----------|--------|
-| Condition | `{{ $json.query.action }}` **equals** `upload` |
-| True → | branche upload |
-| False → | branche records / download (comportement existant) |
-
----
-
-### Branche **upload** (True du IF Upload)
-
-#### Nœud 4a — HTTP Request (upload vers Grist)
-
-| Paramètre | Valeur |
-|-----------|--------|
-| Method | POST |
-| URL | `https://grist.incubateur.dnum.din.developpement-durable.gouv.fr/api/docs/75GHATRaKvHSmx3FRqCi4f/attachments` |
-| Authentication | Generic Credential Type → Bearer Auth → **Bearer Auth Grist** |
-| Body Content Type | **Form-Data** |
-| Body Parameters | Name: `upload` / Type: **n8n Binary File** / Value: `data` |
-
-> ℹ️ "Value: `data`" fait référence au nom de la propriété binaire dans le nœud webhook. Ajuster si n8n nomme autrement la propriété (inspecter l'output du Webhook pour vérifier).
-
-#### Nœud 5a — Respond to Webhook (IDs des pièces jointes)
-
-| Paramètre | Valeur |
-|-----------|--------|
-| Respond With | JSON |
-| Response Body | `={{ $json }}` |
-| Response Code | 200 |
-| Response Headers | `Access-Control-Allow-Origin: *` |
-
-> La réponse Grist est un tableau d'entiers : `[42, 43]` (rowIds des nouvelles pièces jointes).
-
----
-
-### Nœud 4 — IF Attachment download (branche False du IF Upload)
+### Nœud 2 — IF Attachment download
 
 | Paramètre | Valeur |
 |-----------|--------|
 | Condition | `{{ $json.query.attachId }}` **is not empty** |
 | True → | branche téléchargement pièce jointe |
-| False → | branche records (comportement existant) |
+| False → | branche records |
 
 ---
 
-### Branche **records** (False du IF Attachment)
+### Branche **download** (True)
 
-#### Nœud 5b — HTTP Request (appel Grist — records)
-
-| Paramètre | Valeur |
-|-----------|--------|
-| Method | GET |
-| Authentication | Generic Credential Type → Bearer Auth → **Bearer Auth Grist** |
-| Query Parameters | **Vide** |
-
-**URL** (sans activer `fx`) :
-```
-https://grist.incubateur.dnum.din.developpement-durable.gouv.fr/api/docs/75GHATRaKvHSmx3FRqCi4f/tables/{{ $json.query.table }}/records{{ $json.query.filter ? '?filter=' + $json.query.filter : '' }}
-```
-
-> ⚠️ Ne jamais ajouter de param `filter` dans "Using Fields Below" — cf. section précédente.
-
-Cas couverts :
-
-| Requête entrante | URL envoyée à Grist |
-|-----------------|---------------------|
-| `?table=ETABLISSEMENTS` | `.../tables/ETABLISSEMENTS/records` |
-| `?table=CANDIDATS&filter={"id":[42]}` | `.../tables/CANDIDATS/records?filter=...` |
-| `?table=_grist_Tables` | `.../tables/_grist_Tables/records` |
-
-#### Nœud 4a — Respond to Webhook (JSON)
-
-| Paramètre | Valeur |
-|-----------|--------|
-| Respond With | JSON |
-| Response Code | 200 |
-| Response Body | `={{ $json }}` |
-| Response Headers | `Access-Control-Allow-Origin: *` |
-
----
-
-### Branche **download** (True du IF Attachment)
-
-#### Nœud 5c — HTTP Request (appel Grist — fichier binaire)
+#### Nœud 3a — HTTP Request (fichier binaire)
 
 | Paramètre | Valeur |
 |-----------|--------|
@@ -220,7 +142,7 @@ Cas couverts :
 | Authentication | Generic Credential Type → Bearer Auth → **Bearer Auth Grist** |
 | Response Format | **File** |
 
-#### Nœud 6c — Respond to Webhook (binaire)
+#### Nœud 4a — Respond to Webhook (binaire)
 
 | Paramètre | Valeur |
 |-----------|--------|
@@ -233,27 +155,110 @@ Cas couverts :
 
 ---
 
-### Schéma du workflow complet
+### Branche **records** (False)
+
+#### Nœud 3b — HTTP Request (appel Grist — records)
+
+| Paramètre | Valeur |
+|-----------|--------|
+| Method | GET |
+| Authentication | Generic Credential Type → Bearer Auth → **Bearer Auth Grist** |
+| Query Parameters | **Vide** |
+
+**URL** (sans activer `fx`) :
+```
+https://grist.incubateur.dnum.din.developpement-durable.gouv.fr/api/docs/75GHATRaKvHSmx3FRqCi4f/tables/{{ $json.query.table }}/records{{ $json.query.filter ? '?filter=' + $json.query.filter : '' }}
+```
+
+> ⚠️ Ne jamais ajouter de param `filter` dans "Using Fields Below" — utiliser uniquement l'expression dans l'URL.
+
+Cas couverts :
+
+| Requête entrante | URL envoyée à Grist |
+|-----------------|---------------------|
+| `?table=ETABLISSEMENTS` | `.../tables/ETABLISSEMENTS/records` |
+| `?table=CANDIDATS&filter={"id":[42]}` | `.../tables/CANDIDATS/records?filter=...` |
+| `?table=_grist_Tables` | `.../tables/_grist_Tables/records` |
+
+#### Nœud 4b — Respond to Webhook (JSON)
+
+| Paramètre | Valeur |
+|-----------|--------|
+| Respond With | JSON |
+| Response Code | 200 |
+| Response Body | `={{ $json }}` |
+| Response Headers | `Access-Control-Allow-Origin: *` |
+
+---
+
+### Schéma — Workflow GET
 
 ```
-Webhook (Any Method — path: grist)
+Webhook GET (path: grist)
     │
     ▼
-IF method === "OPTIONS"  ──────────────────────────────► Respond 200 + CORS headers
-    │ False
+IF query.attachId is not empty
+    │
+    ├─ True  ──► HTTP Request GET /attachments/{id}/download ──► Respond Binary
+    │
+    └─ False ──► HTTP Request GET /tables/{table}/records ────► Respond JSON
+```
+
+---
+
+## Workflow POST — upload de pièces jointes
+
+**URL (production) :**
+```
+https://n8n.incubateur.dnum.din.developpement-durable.gouv.fr/webhook/grist
+```
+*(même path que le workflow GET — n8n route par méthode HTTP)*
+
+> ℹ️ Le widget envoie un `POST multipart/form-data` sans header custom → pas de preflight CORS OPTIONS. Le webhook POST n'a donc pas besoin de gérer OPTIONS.
+
+### Nœud 1 — Webhook (POST)
+
+| Paramètre | Valeur |
+|-----------|--------|
+| HTTP Method | **POST** |
+| Path | `grist` |
+| Response Mode | Using Respond to Webhook Node |
+
+### Nœud 2 — HTTP Request (upload vers Grist)
+
+| Paramètre | Valeur |
+|-----------|--------|
+| Method | POST |
+| URL | `https://grist.incubateur.dnum.din.developpement-durable.gouv.fr/api/docs/75GHATRaKvHSmx3FRqCi4f/attachments` |
+| Authentication | Generic Credential Type → Bearer Auth → **Bearer Auth Grist** |
+| Body Content Type | **Form-Data** |
+| Body Parameters | Name: `upload` / Type: **n8n Binary File** / Value: `data` |
+
+> ℹ️ `Value: data` fait référence au nom de la propriété binaire dans le nœud webhook. Si n8n nomme autrement la propriété binaire, vérifier l'output du Webhook et adapter.
+
+### Nœud 3 — Respond to Webhook (IDs des pièces jointes)
+
+| Paramètre | Valeur |
+|-----------|--------|
+| Respond With | JSON |
+| Response Body | `={{ $json }}` |
+| Response Code | 200 |
+| Response Headers | `Access-Control-Allow-Origin: *` |
+
+> La réponse Grist est un tableau d'entiers : `[42, 43]` (rowIds des nouvelles pièces jointes).
+
+---
+
+### Schéma — Workflow POST
+
+```
+Webhook POST (path: grist)
+    │
     ▼
-IF query.action === "upload"  (POST multipart)
+HTTP Request POST /attachments (Form-Data, champ: upload)
     │
-    ├─ True  ──► HTTP Request POST /attachments (Form-Data) ──► Respond JSON (IDs)
-    │
-    └─ False
-           │
-           ▼
-       IF query.attachId is not empty
-           │
-           ├─ True  ──► HTTP Request GET /attachments/{id}/download ──► Respond Binary
-           │
-           └─ False ──► HTTP Request GET /tables/{table}/records ────► Respond JSON
+    ▼
+Respond JSON [id1, id2, ...] + Access-Control-Allow-Origin: *
 ```
 
 ---
@@ -297,14 +302,15 @@ https://stiiig.github.io/grist-widgets/widgets/emile/fiche-candidat?rowId=<ID_GR
 
 ## Limitations connues
 
-### POST / PATCH non gérés par n8n
+### AddRecord / UpdateRecord — preflight CORS bloquant
 
-Le nœud n8n actuel accepte uniquement les requêtes GET. Les formulaires qui créent (`AddRecord` → POST) ou modifient (`UpdateRecord` → PATCH) des données **échoueront silencieusement** en mode REST jusqu'à ce que n8n gère aussi ces méthodes.
+Les actions `AddRecord` et `UpdateRecord` (sauvegarde de fiche, soumission de formulaire) envoient un `Content-Type: application/json`, ce qui déclenche un **preflight CORS OPTIONS**. Le workflow POST actuel ne gère que le `multipart/form-data` de l'upload.
 
-Pour ajouter le support POST/PATCH dans n8n :
-- Passer le webhook en mode "Any Method" (ou créer un second webhook)
-- Ajouter une branche conditionnelle sur `$json.method` pour router vers `/records` en POST ou PATCH selon le cas
-- Configurer les headers CORS pour les preflights OPTIONS
+Pour débloquer ces actions en mode REST, il faudra soit :
+- Ajouter un webhook **PATCH** dédié (avec branche sur `$json.method` dans le workflow POST) et répondre aux OPTIONS avec les bons headers CORS
+- Ou exposer un endpoint côté serveur (Next.js API route) qui fait le proxy sans contrainte CORS
+
+Jusqu'à ce que ce soit configuré, les sauvegardes en mode REST échoueront.
 
 ### Pièces jointes (AttachmentField)
 
@@ -312,10 +318,10 @@ Support en mode REST selon configuration n8n :
 
 | Fonctionnalité | Disponible | Condition |
 |----------------|-----------|-----------|
-| Affichage des noms | ✅ | Automatique (`_grist_Attachments` proxifié) |
-| Téléchargement | ✅ | Branche n8n `?attachId=X` configurée |
-| Upload | ✅ | Branche n8n `POST ?action=upload` configurée |
-| Suppression | ✅ | Upload opérationnel (applique l'action sans l'ID supprimé) |
+| Affichage des noms | ✅ | Automatique (`_grist_Attachments` proxifié via workflow GET) |
+| Téléchargement | ✅ | Branche `?attachId=X` dans le workflow GET configurée |
+| Upload | ✅ | Workflow POST configuré |
+| Suppression | ✅ | Upload opérationnel (ré-enregistre la liste sans l'ID supprimé) |
 
 ### Fiche candidat — onglets non mappés
 

@@ -115,7 +115,9 @@ async function applyUserActionsRest(actions: any[]): Promise<any> {
  * Retourne les rowIds des nouvelles pièces jointes.
  */
 async function uploadAttachmentsRest(files: FileList): Promise<number[]> {
-  const url = `${proxyUrl()}?action=upload`;
+  // POST vers le même proxy mais méthode POST (workflow n8n séparé).
+  // Pas de header custom → multipart/form-data = "simple CORS request" → pas de preflight OPTIONS.
+  const url = proxyUrl();
   const newIds: number[] = [];
   for (const file of Array.from(files)) {
     const fd = new FormData();
@@ -123,7 +125,6 @@ async function uploadAttachmentsRest(files: FileList): Promise<number[]> {
     const res = await fetch(url, {
       method: "POST",
       body: fd,
-      headers: { "X-Requested-With": "XMLHttpRequest" },
     });
     if (!res.ok) {
       let detail = res.statusText;
