@@ -122,6 +122,8 @@ export function AttachmentField({
   const [metaMap, setMetaMap] = useState<Map<number, AttachMeta>>(new Map());
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
+  // Mode REST : getAccessToken absent → champ pièces jointes non rendu
+  const [restMode, setRestMode] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   // Token + métadonnées au montage
@@ -129,7 +131,7 @@ export function AttachmentField({
     if (!docApi) return;
     // getAccessToken n'existe qu'en mode plugin Grist (pas en mode REST standalone)
     if (typeof docApi.getAccessToken !== "function") {
-      setError("Pièces jointes non disponibles en accès direct.");
+      setRestMode(true);
       return;
     }
     Promise.all([
@@ -140,6 +142,9 @@ export function AttachmentField({
       setMetaMap(map);
     }).catch(() => setError("Token indisponible."));
   }, [docApi]);
+
+  // En mode REST, ne pas afficher le champ (pas de token disponible)
+  if (restMode) return null;
 
   const handleFiles = useCallback(
     async (files: FileList | null) => {

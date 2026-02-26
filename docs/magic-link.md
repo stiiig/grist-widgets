@@ -108,18 +108,17 @@ https://n8n.incubateur.dnum.din.developpement-durable.gouv.fr/webhook/grist
 
 **URL** (coller telle quelle dans le champ URL, sans activer `fx`) :
 ```
-https://grist.incubateur.dnum.din.developpement-durable.gouv.fr/api/docs/75GHATRaKvHSmx3FRqCi4f/tables/{{ $json.query.table }}/{{ $json.query.action === 'columns' ? 'columns' : 'records' }}{{ $json.query.filter ? '?filter=' + encodeURIComponent($json.query.filter) : '' }}
+https://grist.incubateur.dnum.din.developpement-durable.gouv.fr/api/docs/75GHATRaKvHSmx3FRqCi4f/tables/{{ $json.query.table }}/records{{ $json.query.filter ? '?filter=' + encodeURIComponent($json.query.filter) : '' }}
 ```
 
-Cette URL gère trois cas :
+Cette URL gère deux cas :
 
 | Requête entrante | URL vers Grist |
 |-----------------|----------------|
-| `?table=ETABLISSEMENTS` | `.../tables/ETABLISSEMENTS/records` |
+| `?table=ETABLISSEMENTS` | `.../tables/ETABLISSEMENTS/records` (tous les enregistrements) |
 | `?table=CANDIDATS&filter={"id":[42]}` | `.../tables/CANDIDATS/records?filter=%7B...%7D` |
-| `?table=ETABLISSEMENTS&action=columns` | `.../tables/ETABLISSEMENTS/columns` |
 
-> ℹ️ Le param `action=columns` est envoyé par `fetchColumnsRest` dans `rest.ts` pour charger les métadonnées des colonnes (choices, types…) sans passer par les tables internes `_grist_Tables` / `_grist_Tables_column`.
+> ℹ️ Le filtre est ajouté uniquement s'il est présent dans la requête entrante. Sans filtre, Grist retourne tous les enregistrements — ce qui permet de charger des tables entières (ex. `_grist_Tables`, `DPTS_REGIONS`) pour alimenter les dropdowns.
 
 ### Nœud 3 — Respond to Webhook
 | Paramètre | Valeur |
@@ -177,7 +176,7 @@ En plus de `fiche-candidat`, les widgets suivants fonctionnent en accès direct 
 | `ajout-etablissement` | `/widgets/emile/ajout-etablissement` | `ETABLISSEMENTS`, `DPTS_REGIONS` + `/columns` |
 | `creation-compte-orienteur` | `/widgets/emile/creation-compte-orienteur` | `ETABLISSEMENTS`, `ACCOMPAGNANTS` + `/columns` |
 
-Ces widgets chargent des **tables entières** (sans filtre) et utilisent l'endpoint `/columns` pour les métadonnées (choices des dropdowns Dispositif, Organisme gestionnaire, Fonction). Le nœud n8n route automatiquement vers `/columns` ou `/records` selon le param `action`.
+Ces widgets chargent des **tables entières** (sans filtre) via `/records`, y compris les tables internes `_grist_Tables` et `_grist_Tables_column` pour les métadonnées des colonnes (choices des dropdowns Dispositif, Organisme gestionnaire, Fonction).
 
 ---
 

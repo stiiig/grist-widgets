@@ -130,8 +130,10 @@ async function fetchColumnsRest(tableId: string): Promise<ColMeta[]> {
 /** Crée un objet GristDocAPI utilisant l'API REST Grist. */
 export function createRestDocApi(): GristDocAPI {
   return {
-    fetchTable:    fetchTableRest,
+    fetchTable:       fetchTableRest,
     applyUserActions: applyUserActionsRest,
-    fetchColumns:  fetchColumnsRest,
+    // fetchColumns non utilisé : l'endpoint /columns n'est pas disponible sur cette
+    // instance Grist. loadColumnsMetaFor utilise le chemin _grist_Tables à la place,
+    // ce qui fonctionne maintenant que le filtre conditionnel est corrigé dans n8n.
   };
 }
