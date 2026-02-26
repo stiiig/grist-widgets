@@ -2,7 +2,8 @@
 // Client REST Grist — implémente la même interface que grist.docApi (Plugin API)
 // Utilisé en mode standalone (hors iframe Grist) via le proxy n8n (NEXT_PUBLIC_GRIST_PROXY_URL).
 
-import type { GristDocAPI } from "./meta";
+import type { GristDocAPI, ColMeta } from "./meta";
+import { parseWidgetOptions } from "./meta";
 
 function proxyUrl(): string {
   return (process.env.NEXT_PUBLIC_GRIST_PROXY_URL ?? "").replace(/\/$/, "");
@@ -98,10 +99,39 @@ async function applyUserActionsRest(actions: any[]): Promise<any> {
   }
 }
 
+/**
+ * Charge les métadonnées des colonnes via l'endpoint REST /columns.
+ * Évite de requêter les tables internes _grist_Tables / _grist_Tables_column
+ * qui ne sont pas fiablement accessibles via le proxy n8n.
+ *
+ * n8n doit router ?action=columns vers /tables/{table}/columns
+ * au lieu de /tables/{table}/records.
+ */
+async function fetchColumnsRest(tableId: string): Promise<ColMeta[]> {
+  const url = tableUrl(tableId, { action: "columns" });
+  // Grist /columns retourne : { columns: [{ id: "colId", fields: { label, type, widgetOptions, ... } }] }
+  const data = await gristFetch(url, {});
+  return (data.columns ?? []).map((col: any): ColMeta => {
+    const rawOpts: string = col.fields?.widgetOptions ?? "";
+    return {
+      colId:              String(col.id ?? ""),
+      label:              String(col.fields?.label ?? col.id ?? ""),
+      type:               String(col.fields?.type ?? "Text"),
+      widgetOptions:      rawOpts,
+      widgetOptionsParsed: parseWidgetOptions(rawOpts),
+      isFormula:          !!(col.fields?.isFormula),
+      description:        String(col.fields?.description ?? ""),
+      visibleColRowId:    (col.fields?.visibleCol as number) || null,
+      displayColRowId:    (col.fields?.displayCol as number) || null,
+    };
+  });
+}
+
 /** Crée un objet GristDocAPI utilisant l'API REST Grist. */
 export function createRestDocApi(): GristDocAPI {
   return {
-    fetchTable: fetchTableRest,
+    fetchTable:    fetchTableRest,
     applyUserActions: applyUserActionsRest,
+    fetchColumns:  fetchColumnsRest,
   };
 }

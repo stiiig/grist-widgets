@@ -2,6 +2,11 @@
 export type GristDocAPI = {
   fetchTable: (tableId: string) => Promise<any>;
   applyUserActions: (actions: any[]) => Promise<any>;
+  /**
+   * Mode REST uniquement : charge directement les ColMeta via l'endpoint
+   * /columns (évite de requêter _grist_Tables et _grist_Tables_column).
+   */
+  fetchColumns?: (tableId: string) => Promise<ColMeta[]>;
 };
 
 export type ColMeta = {
@@ -64,10 +69,24 @@ export function normalizeChoices(raw: any): string[] {
 }
 
 /**
- * Charge la meta des colonnes (équivalent de ton loadColumnsMetaFor)
- * via _grist_Tables puis _grist_Tables_column.  [oai_citation:5‡index.html](sediment://file_00000000c8307246a79ff09ceabb26c4)
+ * Charge la meta des colonnes pour une table donnée.
+ *
+ * • Mode REST (fetchColumns disponible) : appelle directement l'endpoint
+ *   /columns de Grist via le proxy n8n — évite de requêter les tables
+ *   internes _grist_Tables / _grist_Tables_column qui ne sont pas
+ *   fiablement accessibles via l'API REST publique.
+ *
+ * • Mode plugin Grist : requête les tables internes comme avant.
  */
 export async function loadColumnsMetaFor(docApi: GristDocAPI, tableId: string) {
+  // ── Mode REST : fetchColumns injecté par createRestDocApi ──────────────
+  if (docApi.fetchColumns) {
+    const cols = await docApi.fetchColumns(tableId);
+    cols.sort((a, b) => a.colId.localeCompare(b.colId));
+    return cols;
+  }
+
+  // ── Mode plugin Grist : via tables internes ────────────────────────────
   const tables = await docApi.fetchTable("_grist_Tables");
   const idx = tables.tableId.findIndex((t: string) => t === tableId);
   if (idx < 0) throw new Error(`Table introuvable: ${tableId}`);
