@@ -1,28 +1,18 @@
 // src/lib/grist/rest.ts
 // Client REST Grist — implémente la même interface que grist.docApi (Plugin API)
-// Utilisé en mode standalone (hors iframe Grist) avec NEXT_PUBLIC_GRIST_API_KEY.
+// Utilisé en mode standalone (hors iframe Grist) via le proxy n8n (NEXT_PUBLIC_GRIST_PROXY_URL).
 
 import type { GristDocAPI } from "./meta";
 
-function server(): string {
-  return (process.env.NEXT_PUBLIC_GRIST_SERVER ?? "https://docs.getgrist.com").replace(/\/$/, "");
+function proxyUrl(): string {
+  return (process.env.NEXT_PUBLIC_GRIST_PROXY_URL ?? "").replace(/\/$/, "");
 }
-
-function docId(): string {
-  return process.env.NEXT_PUBLIC_GRIST_DOC_ID ?? "";
-}
-
-function apiKey(): string {
-  return process.env.NEXT_PUBLIC_GRIST_API_KEY ?? "";
-}
-
 
 function tableUrl(tableId: string, params?: Record<string, string>): string {
-  const base = `${server()}/api/docs/${docId()}/tables/${encodeURIComponent(tableId)}/records`;
-  // On injecte toujours ?auth=KEY pour éviter le header Authorization qui
-  // déclenche un preflight CORS bloqué par docs.getgrist.com.
-  const allParams = new URLSearchParams({ auth: apiKey(), ...params });
-  return `${base}?${allParams.toString()}`;
+  // Passe par le proxy n8n (GET /webhook/grist?table=X&filter=Y)
+  // → n8n appelle Grist server-side avec le Bearer token (pas de CORS côté navigateur)
+  const allParams = new URLSearchParams({ table: tableId, ...params });
+  return `${proxyUrl()}?${allParams.toString()}`;
 }
 
 type RestRecord = { id: number; fields: Record<string, any> };
