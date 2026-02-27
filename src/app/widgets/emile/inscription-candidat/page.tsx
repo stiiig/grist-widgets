@@ -626,9 +626,10 @@ function TelField({
         {/* Numéro */}
         <input
           type="tel"
+          inputMode="numeric"
           className="ins-input"
           value={value}
-          onChange={(e) => onValueChange(e.target.value)}
+          onChange={(e) => onValueChange(e.target.value.replace(/\D/g, ""))}
           style={{ flex: 1 }}
         />
       </div>
@@ -1198,6 +1199,34 @@ function EligibilityScreen({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "0.9rem" }}>
+
+      {/* ── Bannière de confirmation de soumission ── */}
+      <div style={{
+        ...W,
+        background: "#f0fdf4", border: "1px solid #bbf7d0",
+        borderRadius: "0.75rem", padding: "0.85rem 1.1rem",
+        display: "flex", alignItems: "center", gap: "0.75rem",
+      }}>
+        <span style={{
+          width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
+          background: "#16a34a", color: "#fff",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: "1rem",
+        }}>
+          <i className="fa-solid fa-check" />
+        </span>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "#15803d" }}>
+            Inscription enregistrée avec succès
+          </div>
+          <div style={{ fontSize: "0.78rem", color: "#166534", marginTop: "0.15rem", lineHeight: 1.4 }}>
+            {id2
+              ? <>Le dossier <strong>{id2}</strong> a bien été soumis.</>
+              : "Le dossier a bien été soumis."
+            }
+          </div>
+        </div>
+      </div>
 
       {/* ── Carte candidat·e ── */}
       <div style={W}>
@@ -1841,6 +1870,22 @@ export default function InscriptionPage() {
         </header>
         {showFaq && docApi && <FAQPanel docApi={docApi} onClose={() => setShowFaq(false)} />}
         <div className="ins-body">
+          {/* ── Barre de progression — étape 4 active ── */}
+          <div className="ins-progress">
+            {[1, 2, 3, 4].map((s) => (
+              <div key={s} className={`ins-progress__step${s === 4 ? " active" : " done"}`}>
+                <div className="ins-progress__dot">
+                  {s < 4 ? <i className="fa-solid fa-check" /> : 4}
+                </div>
+                <span className="ins-progress__label">
+                  {s === 1 ? "Identité" : s === 2 ? "Situation" : s === 3 ? "Engagement" : "Confirmation"}
+                </span>
+              </div>
+            ))}
+            <div className="ins-progress__bar">
+              <div className="ins-progress__fill" style={{ width: "100%" }} />
+            </div>
+          </div>
           <SummaryScreen
             form={form}
             dptsOptions={dptsOptions}
@@ -1887,18 +1932,18 @@ export default function InscriptionPage() {
 
           {/* ── Barre de progression ── */}
           <div className="ins-progress">
-            {[1, 2, 3].map((s) => (
+            {[1, 2, 3, 4].map((s) => (
               <div key={s} className={`ins-progress__step${s === step ? " active" : s < step ? " done" : ""}`}>
                 <div className="ins-progress__dot">
                   {s < step ? <i className="fa-solid fa-check" /> : s}
                 </div>
                 <span className="ins-progress__label">
-                  {s === 1 ? "Identité" : s === 2 ? "Situation" : "Engagement"}
+                  {s === 1 ? "Identité" : s === 2 ? "Situation" : s === 3 ? "Engagement" : "Confirmation"}
                 </span>
               </div>
             ))}
             <div className="ins-progress__bar">
-              <div className="ins-progress__fill" style={{ width: `${((step - 1) / (TOTAL_STEPS - 1)) * 100}%` }} />
+              <div className="ins-progress__fill" style={{ width: `${((step - 1) / 3) * 100}%` }} />
             </div>
           </div>
 
