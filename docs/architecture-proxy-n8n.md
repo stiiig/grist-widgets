@@ -90,29 +90,49 @@ La branche **faux** (pas de token) couvre toutes les requêtes de métadonnées 
 
 > ⚠️ **Piège critique** : la branche **faux** du IF token doit pointer vers **IF attachId**, pas vers un Respond 403. Les requêtes de métadonnées (`_grist_Tables`, etc.) n'ont jamais de token — si elles tombent sur un 403, le widget ne peut plus charger les types de colonnes et les dropdowns.
 
-### Workflow POST — upload de pièces jointes
+### Workflow POST — écritures Grist (AddRecord/UpdateRecord) + upload de pièces jointes
+
+Le workflow POST gère deux cas selon le `Content-Type` de la requête entrante :
 
 ```
-Webhook POST (multipart/form-data)
+Webhook POST
     │
     ▼
-HTTP Request POST /attachments (Form-Data, champ upload, Bearer Auth)
+IF Content-Type contient "text/plain"
     │
-    ▼
-Respond JSON { data: "[42]" } + CORS header
+    ├─ True  → Code (JSON.parse du body texte → extrait table, _action, id, fields)
+    │           │
+    │           ├─ _action = "add"
+    │           │     → HTTP Request POST /tables/{table}/records (body JSON des fields)
+    │           │         → Code { retValues: [newId] }
+    │           │             → Respond JSON { retValues: [newId] } + CORS header
+    │           │
+    │           └─ _action = "update"
+    │                 → HTTP Request PATCH /tables/{table}/records/{id} (body JSON des fields)
+    │                     → Respond JSON {} + CORS header
+    │
+    └─ False → (multipart/form-data — upload de pièce jointe)
+                HTTP Request POST /attachments (Form-Data, champ upload, Bearer Auth)
+                    → Respond JSON { data: "[42]" } + CORS header
 ```
 
-L'upload utilise `multipart/form-data` sans header custom — c'est ce qu'on appelle une *simple CORS request* (spec WHATWG Fetch) : le navigateur ne fait pas de preflight `OPTIONS` avant l'envoi. On peut donc utiliser un webhook POST simple sans avoir à gérer le handshake CORS OPTIONS.
+**Clé : éviter le preflight CORS OPTIONS**
+
+Ni les écritures ni l'upload ne déclenchent de preflight, parce que :
+- `text/plain;charset=UTF-8` sans header custom → *simple CORS request* (spec WHATWG Fetch)
+- `multipart/form-data` sans header custom → également une *simple CORS request*
+
+À l'inverse, `Content-Type: application/json` ou la méthode `PATCH` depuis le navigateur déclenchent un preflight OPTIONS que n8n ne gère pas. La solution consiste à n'utiliser que `text/plain` côté `rest.ts` pour toutes les écritures — le champ `_action` dans le body JSON permet à n8n de distinguer AddRecord d'UpdateRecord.
 
 Le code `rest.ts` parse la réponse de manière défensive car n8n sérialise les tableaux JSON de manière non déterministe selon sa version (`{"data":"[42]"}`, `[42]`, ou des objets items `{json: 42, pairedItem: ...}`).
 
 ### Workflow GENERATE — génération de magic links
 
 ```
-Webhook POST /webhook/grist-generate  (Basic Auth)
+Webhook GET /webhook/grist-generate?rowId=X
     │
     ▼
-Code (extrait rowId du body)
+Code (extrait rowId depuis $json.query.rowId)
     │
     ▼
 Crypto HMAC-SHA256 (même secret que le workflow GET)
@@ -124,7 +144,12 @@ Code (construit token = rowId.HMAC et URL complète)
 Respond to Webhook { rowId, token, url }
 ```
 
-Génère un token signé `rowId.HMAC` pour un candidat donné. Appelé manuellement (curl) ou via une automation Grist à la création d'un enregistrement.
+Génère un token signé `rowId.HMAC` pour un candidat donné. Appelé automatiquement par le formulaire `inscription-candidat` après la création du candidat, ou manuellement via un script.
+
+**Pas d'authentification côté webhook** — le formulaire appelle ce GET sans header custom (pas de preflight CORS). La sécurité repose sur :
+- l'obscurité de l'URL du webhook
+- le secret HMAC : même en connaissant l'URL, on ne peut pas forger un token valide sans le secret
+- en production : possibilité d'ajouter une restriction IP côté n8n si nécessaire
 
 ---
 
@@ -140,7 +165,8 @@ Sans modifier Grist, sans plugin, sans compte Grist côté utilisateur :
 | Afficher les pièces jointes (noms) | `GET ?table=_grist_Attachments` |
 | Télécharger une pièce jointe | `GET ?attachId=42` → binaire |
 | Uploader une pièce jointe | `POST multipart/form-data` |
-| Générer un magic link signé | `POST /webhook/grist-generate` (Basic Auth) |
+| Soumettre le formulaire d'inscription (AddRecord) | `POST text/plain { _action:"add", fields }` → workflow POST → branche AddRecord |
+| Générer un magic link signé | `GET /webhook/grist-generate?rowId=X` (appelé automatiquement par `inscription-candidat`) |
 
 ---
 
@@ -173,15 +199,11 @@ Le paramètre `?rowId=123` (sans signature) est conservé comme **fallback de d�
 
 ## Limitations et chantiers ouverts
 
-### Sauvegarde et soumission de formulaires
+### ~~Sauvegarde et soumission de formulaires~~ — ✅ Résolu
 
-Les requêtes `POST` et `PATCH` avec `Content-Type: application/json` déclenchent un preflight `OPTIONS`. n8n doit répondre aux OPTIONS avec les bons headers CORS avant que le browser n'envoie la vraie requête — ce n'est pas encore configuré.
+La soumission du formulaire `inscription-candidat` (AddRecord) est opérationnelle en mode REST. La technique retenue : `rest.ts` envoie toutes les écritures avec `Content-Type: text/plain;charset=UTF-8` (pas de preflight CORS), et le workflow POST n8n détecte ce Content-Type via un nœud IF pour router vers la branche AddRecord/UpdateRecord. Le champ `_action` dans le body JSON permet de distinguer les deux opérations.
 
-En pratique : lecture et upload de fichiers fonctionnent, mais le bouton "Enregistrer" de la fiche candidat et la soumission des formulaires d'ajout échoueront en mode REST jusqu'à résolution.
-
-Options envisagées :
-- Ajouter des webhooks PATCH et OPTIONS dans n8n
-- Ou créer une **Next.js API Route** côté serveur (dans le repo) qui proxifie sans contrainte CORS — plus propre, pas de dépendance à n8n pour les écritures
+Voir le workflow POST dans `docs/rest-mode.md` pour la configuration n8n détaillée.
 
 ### Clé de service Grist
 
@@ -201,4 +223,5 @@ Les magic links sont permanents. Pour des dossiers sensibles, une expiration (da
 | `src/lib/grist/init.ts` | Détecte `NEXT_PUBLIC_GRIST_PROXY_URL` et bascule en mode REST |
 | `src/lib/grist/meta.ts` | Charge métadonnées colonnes via `_grist_Tables` |
 | `src/components/AttachmentField.tsx` | Gestion pièces jointes (affichage, download fetch+blob, upload) |
+| `src/app/widgets/emile/inscription-candidat/page.tsx` | Formulaire d'inscription — AddRecord via `text/plain` + génération du magic link |
 | `docs/rest-mode.md` | Config n8n pas-à-pas avec tous les pièges rencontrés |

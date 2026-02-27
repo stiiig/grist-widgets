@@ -11,6 +11,7 @@ Les widgets EMILE fonctionnent normalement dans un **iframe Grist** (mode plugin
 | `fiche-candidat` | `/widgets/emile/fiche-candidat?token=ID.HMAC` | Consultation/édition d'un dossier candidat via magic link signé |
 | `ajout-etablissement` | `/widgets/emile/ajout-etablissement` | Formulaire d'ajout d'un établissement |
 | `creation-compte-orienteur` | `/widgets/emile/creation-compte-orienteur` | Formulaire de création d'un compte orienteur |
+| `inscription-candidat` | `/widgets/emile/inscription-candidat` | Formulaire d'inscription candidat — AddRecord + génération automatique du magic link |
 
 ---
 
@@ -49,14 +50,16 @@ Widget → affiche / enregistre les données
 
 Contrôlé par la variable d'environnement `NEXT_PUBLIC_GRIST_PROXY_URL` (baked dans le bundle au build Next.js).
 
-| Variable | Valeur |
-|----------|--------|
-| `NEXT_PUBLIC_GRIST_PROXY_URL` | `https://n8n.incubateur.dnum.din.developpement-durable.gouv.fr/webhook/grist` |
+| Variable | Valeur | Obligatoire |
+|----------|--------|------------|
+| `NEXT_PUBLIC_GRIST_PROXY_URL` | `https://n8n.incubateur.dnum.din.developpement-durable.gouv.fr/webhook/grist` | ✅ — active le mode REST |
+| `NEXT_PUBLIC_GRIST_GENERATE_URL` | `https://n8n.incubateur.dnum.din.developpement-durable.gouv.fr/webhook/grist-generate` | ✅ — génération du magic link dans `inscription-candidat` |
 
-Déclarée dans `.github/workflows/deploy.yml` :
+Déclarées dans `.github/workflows/deploy.yml` :
 ```yaml
 env:
-  NEXT_PUBLIC_GRIST_PROXY_URL: ${{ secrets.NEXT_PUBLIC_GRIST_PROXY_URL }}
+  NEXT_PUBLIC_GRIST_PROXY_URL:    ${{ secrets.NEXT_PUBLIC_GRIST_PROXY_URL }}
+  NEXT_PUBLIC_GRIST_GENERATE_URL: ${{ secrets.NEXT_PUBLIC_GRIST_GENERATE_URL }}
 ```
 
 Quand cette variable est définie, `src/lib/grist/init.ts` bascule automatiquement en mode `rest` et utilise `createRestDocApi()` au lieu du plugin Grist.
@@ -76,10 +79,10 @@ Implémente `GristDocAPI` via le proxy n8n :
 | `fetchSingleRowRest(tableId, rowId)` | `GET ?table=TABLE&filter={"id":[rowId]}` | `GET /tables/TABLE/records?filter=...` (dev fallback, sans vérif) | GET |
 | `getAttachmentDownloadUrl(id)` | `GET ?attachId=ID` | `GET /attachments/ID/download` | GET |
 | `uploadAttachments(files)` | `POST multipart/form-data` (champ `upload`) | `POST /attachments` | POST |
-| `applyUserActions([["AddRecord", ...]])` | `POST ?table=TABLE` + JSON | `POST /tables/TABLE/records` | POST* |
-| `applyUserActions([["UpdateRecord", ...]])` | `PATCH ?table=TABLE` + JSON | `PATCH /tables/TABLE/records` | POST* |
+| `applyUserActions([["AddRecord", ...]])` | `POST text/plain { _action:"add", fields }` | `POST /tables/TABLE/records` | POST |
+| `applyUserActions([["UpdateRecord", ...]])` | `POST text/plain { _action:"update", id, fields }` | `PATCH /tables/TABLE/records/{id}` | POST |
 
-> \* Les actions `AddRecord` / `UpdateRecord` envoient du `Content-Type: application/json`, ce qui déclenche un preflight OPTIONS. Le workflow POST devra gérer ce cas si ces actions sont utilisées en mode REST (voir Limitations).
+> `text/plain;charset=UTF-8` est une *simple CORS request* (spec WHATWG Fetch) — pas de preflight OPTIONS. Le champ `_action` permet à n8n de distinguer AddRecord d'UpdateRecord dans le même workflow POST.
 
 ### `src/lib/grist/meta.ts` — `loadColumnsMetaFor`
 
@@ -104,7 +107,7 @@ Ces deux tables sont accessibles via le proxy n8n comme n'importe quelle table n
 |----------|---------|------|-------|
 | GET | GET | `/webhook/grist` | Lecture records, métadonnées, téléchargement PJ, vérification magic link |
 | POST | POST | `/webhook/grist` | Upload pièces jointes |
-| GENERATE | POST | `/webhook/grist-generate` | Génération de magic links signés (Basic Auth) |
+| GENERATE | GET | `/webhook/grist-generate` | Génération de magic links signés |
 
 ---
 
@@ -276,7 +279,7 @@ IF query.token is not empty
 
 ---
 
-## Workflow POST — upload de pièces jointes
+## Workflow POST — écritures Grist (AddRecord/UpdateRecord) + upload de pièces jointes
 
 **URL (production) :**
 ```
@@ -284,7 +287,11 @@ https://n8n.incubateur.dnum.din.developpement-durable.gouv.fr/webhook/grist
 ```
 *(même path que le workflow GET — n8n route par méthode HTTP)*
 
-> ℹ️ Le widget envoie un `POST multipart/form-data` sans header custom → pas de preflight CORS OPTIONS. Le webhook POST n'a donc pas besoin de gérer OPTIONS.
+> ℹ️ Le workflow POST reçoit deux types de requêtes, toutes deux sans preflight CORS OPTIONS :
+> - `text/plain;charset=UTF-8` (écritures Grist — AddRecord/UpdateRecord)
+> - `multipart/form-data` (upload de pièces jointes)
+>
+> Un nœud IF au début du workflow route vers la bonne branche selon le Content-Type.
 
 ### Nœud 1 — Webhook (POST)
 
@@ -294,7 +301,84 @@ https://n8n.incubateur.dnum.din.developpement-durable.gouv.fr/webhook/grist
 | Path | `grist` |
 | Response Mode | Using Respond to Webhook Node |
 
-### Nœud 2 — HTTP Request (upload vers Grist)
+### Nœud 2 — IF Content-Type text/plain (écritures)
+
+| Paramètre | Valeur |
+|-----------|--------|
+| Condition | `{{ $json.headers["content-type"] }}` **contains** `text/plain` |
+| True → | branche AddRecord/UpdateRecord |
+| False → | branche upload (multipart) |
+
+---
+
+### Branche **True** — AddRecord / UpdateRecord
+
+#### Nœud 3a — Code (parser le body text/plain)
+
+```javascript
+// rest.ts envoie du JSON sérialisé en texte brut (Content-Type: text/plain)
+// n8n ne parse pas automatiquement text/plain — on le fait manuellement ici
+const raw = $json.body;
+const parsed = JSON.parse(raw);             // { _action, table, id?, fields }
+
+// La table cible est dans le query param (ex: ?table=CANDIDATS)
+const table  = $json.query.table;
+const action = parsed._action;             // "add" ou "update"
+const id     = parsed.id ?? null;
+const fields = parsed.fields ?? {};
+
+return [{ json: { table, action, id, fields } }];
+```
+
+> ⚠️ **Piège** : ne pas essayer d'interpoler `{{ $json.fields }}` directement dans un body JSON n8n — un objet JavaScript ne peut pas être injecté comme valeur d'un champ de template JSON. Il faut passer par un nœud Code qui fait `JSON.stringify`, puis utiliser un body **Raw** (voir nœud suivant).
+
+#### Nœud 4a — HTTP Request (AddRecord → POST Grist)
+
+Pour la branche `action === "add"` :
+
+| Paramètre | Valeur |
+|-----------|--------|
+| Method | **POST** |
+| URL | `https://grist.incubateur.dnum.din.developpement-durable.gouv.fr/api/docs/75GHATRaKvHSmx3FRqCi4f/tables/{{ $json.table }}/records` |
+| Authentication | Generic Credential Type → Bearer Auth → **Bearer Auth Grist** |
+| Body Content Type | **Raw** |
+| Content Type | `application/json` |
+| Body | Code node suivant (voir ci-dessous) |
+
+Dans le **nœud Code** qui précède l'HTTP Request, construire le body Grist complet :
+
+```javascript
+const fields = $json.fields;
+const body = JSON.stringify({ records: [{ fields }] });
+return [{ json: { ...$json, gristBody: body } }];
+```
+
+Puis dans l'HTTP Request, Body = `{{ $json.gristBody }}`.
+
+#### Nœud 5a — Code (formater la réponse)
+
+```javascript
+// Grist renvoie { records: [{ id: 42, fields: {} }] }
+// rest.ts attend { retValues: [42] }
+const records = $json.records ?? [];
+const newId = records[0]?.id ?? null;
+return [{ json: { retValues: [newId] } }];
+```
+
+#### Nœud 6a — Respond to Webhook (AddRecord)
+
+| Paramètre | Valeur |
+|-----------|--------|
+| Respond With | **JSON** |
+| Response Body | `{{ $json }}` |
+| Response Code | 200 |
+| Header | `Access-Control-Allow-Origin: *` |
+
+---
+
+### Branche **False** — Upload de pièces jointes (multipart/form-data)
+
+#### Nœud 3b — HTTP Request (upload vers Grist)
 
 | Paramètre | Valeur |
 |-----------|--------|
@@ -310,7 +394,7 @@ https://n8n.incubateur.dnum.din.developpement-durable.gouv.fr/webhook/grist
 
 > ⚠️ Sans l'**Authentication** configurée sur ce nœud, Grist renvoie une page HTML 403 — n8n lève "Invalid JSON in response body".
 
-### Nœud 3 — Respond to Webhook
+#### Nœud 4b — Respond to Webhook (upload)
 
 | Paramètre | Valeur |
 |-----------|--------|
@@ -321,6 +405,25 @@ https://n8n.incubateur.dnum.din.developpement-durable.gouv.fr/webhook/grist
 
 ---
 
+### Schéma — Workflow POST
+
+```
+Webhook POST (path: grist)
+    │
+    ▼
+IF content-type contains "text/plain"
+    │
+    ├─ True ──► Code (JSON.parse du body texte → extrait table, action, id, fields)
+    │           └──► HTTP Request POST /tables/{table}/records (body Raw JSON)
+    │                └──► Code { retValues: [newId] }
+    │                     └──► Respond JSON { retValues: [newId] } + CORS header
+    │
+    └─ False ──► HTTP Request POST /attachments (Form-Data, champ upload, Bearer Auth)
+                 └──► Respond JSON {{ $json }} + CORS header
+```
+
+---
+
 ## Workflow GENERATE — génération de magic links
 
 **URL (production) :**
@@ -328,23 +431,28 @@ https://n8n.incubateur.dnum.din.developpement-durable.gouv.fr/webhook/grist
 https://n8n.incubateur.dnum.din.developpement-durable.gouv.fr/webhook/grist-generate
 ```
 
-Protégé par **Basic Auth** — à appeler depuis une automation Grist ou manuellement.
+Appelé automatiquement par le formulaire `inscription-candidat` après la création d'un candidat (`GET ?rowId=X`). Peut aussi être appelé manuellement depuis un script ou une automation Grist.
 
-### Nœud 1 — Webhook (POST, Basic Auth)
+**Pas d'authentification** — le formulaire appelle ce GET sans header custom (pas de preflight CORS). La sécurité repose sur l'obscurité de l'URL et l'impossibilité de forger un token HMAC sans le secret.
+
+### Nœud 1 — Webhook (GET)
 
 | Paramètre | Valeur |
 |-----------|--------|
-| HTTP Method | **POST** |
+| HTTP Method | **GET** |
 | Path | `grist-generate` |
-| Authentication | Basic Auth → credential **Emile generate token** |
+| Authentication | **None** |
 | Respond | **Using Respond to Webhook Node** |
+
+> ℹ️ Anciennement POST + Basic Auth. Changé en GET pour permettre l'appel depuis le navigateur sans preflight CORS (un GET sans header custom = *simple CORS request*).
 
 ### Nœud 2 — Code (extraire rowId)
 
 ```javascript
-const rowId = $json.body.rowId;
-if (!rowId || isNaN(Number(rowId))) throw new Error("rowId requis");
-return [{ json: { rowId: Number(rowId), rowIdStr: rowId.toString() } }];
+// rowId arrive en query param : GET /webhook/grist-generate?rowId=42
+const rowId = parseInt($json.query.rowId);
+if (!rowId || isNaN(rowId)) throw new Error("rowId requis");
+return [{ json: { rowId, rowIdStr: rowId.toString() } }];
 ```
 
 ### Nœud 3 — Crypto (HMAC-SHA256)
@@ -374,15 +482,12 @@ return [{ json: { rowId, token, url } }];
 |-----------|--------|
 | Respond With | **First Incoming Item** |
 
-Retourne `{ rowId, token, url }`.
+Retourne `{ rowId, token, url }`. Le header `Access-Control-Allow-Origin: *` est ajouté automatiquement par n8n sur les webhooks GET.
 
-### Exemple d'appel
+### Exemple d'appel manuel
 
 ```bash
-curl -X POST "https://n8n.incubateur.dnum.din.developpement-durable.gouv.fr/webhook/grist-generate" \
-  -u "user:password" \
-  -H "Content-Type: application/json" \
-  -d '{"rowId": 42}'
+curl "https://n8n.incubateur.dnum.din.developpement-durable.gouv.fr/webhook/grist-generate?rowId=42"
 # → { "rowId": 42, "token": "42.a3f9b2...", "url": "https://stiiig.github.io/...?token=42.a3f9b2..." }
 ```
 
@@ -413,6 +518,9 @@ curl -X POST "https://n8n.incubateur.dnum.din.developpement-durable.gouv.fr/webh
 | "Invalid JSON in response body" sur l'upload | Authentication manquante → Grist renvoie du HTML 403 | Configurer Bearer Auth Grist **sur ce nœud spécifiquement** |
 | "Invalid JSON in response body" sur le download | Response Format = JSON alors que Grist renvoie du binaire | Passer Response Format à **File** |
 | Champ **Name** = `data` au lieu de `upload` | Confusion entre le nom du champ Grist et la propriété n8n | Name = `upload`, Input Data Field Name = `upload` |
+| "JSON parameter needs to be valid JSON" sur AddRecord | `{{ $json.fields }}` est un objet JS — ne peut pas être interpolé dans un template JSON n8n | Passer par un nœud Code qui fait `JSON.stringify({ records: [{ fields }] })`, puis body **Raw** dans l'HTTP Request |
+| GENERATE retourne 404 après migration GET | Le workflow était encore configuré en POST | Changer la méthode du webhook GENERATE de **POST** à **GET**, supprimer l'Authentication |
+| `rowId` est `NaN` dans GENERATE | Code node lit encore `$json.body.rowId` (ancien format POST) | Lire `parseInt($json.query.rowId)` — le rowId arrive en query param avec GET |
 
 ### n8n — Respond to Webhook
 
@@ -444,12 +552,17 @@ Le code `uploadAttachmentsRest` dans `rest.ts` gère tous ces formats — **ne p
 
 ## Générer un magic link (fiche candidat)
 
+### Automatiquement (depuis le formulaire d'inscription)
+
+Le formulaire `inscription-candidat` génère le magic link automatiquement après la soumission réussie. Le lien s'affiche avec un bouton "Copier" pour être partagé par email ou SMS.
+
+Il suffit de déployer le formulaire avec `NEXT_PUBLIC_GRIST_GENERATE_URL` configurée — aucune action manuelle nécessaire.
+
+### Manuellement (curl ou automation Grist)
+
 ```bash
 # Générer un token signé pour le rowId 42
-curl -X POST "https://n8n.incubateur.dnum.din.developpement-durable.gouv.fr/webhook/grist-generate" \
-  -u "user:password" \
-  -H "Content-Type: application/json" \
-  -d '{"rowId": 42}'
+curl "https://n8n.incubateur.dnum.din.developpement-durable.gouv.fr/webhook/grist-generate?rowId=42"
 ```
 
 Réponse :
@@ -494,13 +607,9 @@ Tables utilisées par les widgets EMILE :
 
 ## Limitations connues
 
-### AddRecord / UpdateRecord — preflight CORS bloquant
+### ~~AddRecord / UpdateRecord — preflight CORS bloquant~~ — ✅ Résolu
 
-Les actions `AddRecord` et `UpdateRecord` (sauvegarde de fiche, soumission de formulaire) envoient un `Content-Type: application/json`, ce qui déclenche un **preflight CORS OPTIONS**. Le workflow POST actuel ne gère que le `multipart/form-data` de l'upload.
-
-Pour débloquer ces actions en mode REST, il faudra soit :
-- Ajouter un webhook **PATCH** dédié et répondre aux OPTIONS avec les bons headers CORS
-- Ou exposer un endpoint côté serveur (Next.js API route) qui fait le proxy sans contrainte CORS
+Les actions `AddRecord` et `UpdateRecord` sont opérationnelles en mode REST. La technique : `rest.ts` envoie toutes les écritures avec `Content-Type: text/plain;charset=UTF-8` (simple CORS request, pas de preflight) et un champ `_action` dans le body JSON pour que n8n distingue les deux opérations. Le workflow POST a été mis à jour avec un nœud IF pour router selon le Content-Type.
 
 ### Pièces jointes (AttachmentField)
 
