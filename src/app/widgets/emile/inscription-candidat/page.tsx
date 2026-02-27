@@ -18,7 +18,8 @@ import { DIAL_CODES, PINNED_PAYS, TYPE_TAG, FALLBACK_COLS } from "@/lib/emile/co
 import { EMAIL_REGEX, validatePhone } from "@/lib/emile/validators";
 
 const TABLE_ID    = "CANDIDATS";
-const TOTAL_STEPS = 3;
+const TOTAL_STEPS = 4;
+const ORIENTEUR_WIDGET_URL = "/emile/creation-compte-orienteur/";
 
 /* ─── Types ─────────────────────────────────────────────────── */
 type FormData = {
@@ -1619,6 +1620,12 @@ export default function InscriptionPage() {
   const [submittedId2, setSubmittedId2]           = useState<string | null>(null);
   const [submittedMagicLink, setSubmittedMagicLink] = useState<string | null>(null);
 
+  // Étape 1 — Orienteur
+  const [orienteurEmail, setOrienteurEmail]         = useState("");
+  const [orienteurChecking, setOrienteurChecking]   = useState(false);
+  const [orienteurError, setOrienteurError]         = useState("");
+  const [orienteurFound, setOrienteurFound]         = useState<{ id: number; nom: string } | null>(null);
+
   /* ── Choix dynamiques depuis métadonnées Grist ── */
   const choicesMap = useMemo(() => {
     const m = new Map<string, string[]>();
@@ -1729,9 +1736,44 @@ export default function InscriptionPage() {
     setValidError("");
   }
 
+  /* ── Vérification email orienteur (ACCOMPAGNANTS) ── */
+  async function checkOrienteur() {
+    const email = orienteurEmail.trim().toLowerCase();
+    if (!email) { setOrienteurError("L'adresse email est requise."); return; }
+    if (!EMAIL_REGEX.test(email)) { setOrienteurError("L'adresse email n'est pas valide."); return; }
+    if (!docApi) { setOrienteurError("Grist non disponible."); return; }
+    setOrienteurChecking(true);
+    setOrienteurError("");
+    setOrienteurFound(null);
+    try {
+      const table: any = await docApi.fetchTable("ACCOMPAGNANTS");
+      const ids = table.id as number[];
+      let found: { id: number; nom: string } | null = null;
+      for (let i = 0; i < ids.length; i++) {
+        const rowEmail = String(table["Email"]?.[i] ?? "").trim().toLowerCase();
+        if (rowEmail === email) {
+          const prenom = String(table["Prenom"]?.[i] ?? "").trim();
+          const nom    = String(table["Nom_de_famille"]?.[i] ?? table["Nom"]?.[i] ?? "").trim();
+          const fullName = [prenom, nom].filter(Boolean).join(" ") || email;
+          found = { id: ids[i], nom: fullName };
+          break;
+        }
+      }
+      if (found) {
+        setOrienteurFound(found);
+      } else {
+        setOrienteurError("Aucun compte orienteur trouvé pour cette adresse email.");
+      }
+    } catch {
+      setOrienteurError("Erreur lors de la vérification. Veuillez réessayer.");
+    } finally {
+      setOrienteurChecking(false);
+    }
+  }
+
   /* ── Validation par étape ── */
   function validateStep(s: number): string | null {
-    if (s === 1) {
+    if (s === 2) {
       if (!form.Prenom.trim())         return "Le prénom est requis.";
       if (!form.Nom_de_famille.trim()) return "Le nom est requis.";
       if (!form.Date_de_naissance)     return "La date de naissance est requise.";
@@ -1743,7 +1785,7 @@ export default function InscriptionPage() {
       const telErr = validatePhone(form.Tel, true);
       if (telErr) return telErr;
     }
-    if (s === 2) {
+    if (s === 3) {
       if (form.Departement_domicile_inscription === null) return "Le département est requis.";
       if (!form.Adresse.trim())                   return "L'adresse est requise.";
       if (!form.Precarite_de_logement)            return "La situation de précarité est requise.";
@@ -1771,7 +1813,7 @@ export default function InscriptionPage() {
 
   /* ── Soumission ── */
   async function handleSubmit() {
-    const err = validateStep(3);
+    const err = validateStep(4);
     if (err) { setValidError(err); return; }
     if (!docApi) { setSubmitError("Grist non disponible."); return; }
 
@@ -1880,7 +1922,7 @@ export default function InscriptionPage() {
             paysOptions={paysOptions}
             id2={submittedId2}
             magicLink={submittedMagicLink}
-            onNew={() => { setForm(INITIAL); setDone(false); setShowSummary(false); setStep(1); setValidError(""); setSubmitError(""); setSubmittedId2(null); setSubmittedMagicLink(null); }}
+            onNew={() => { setForm(INITIAL); setDone(false); setShowSummary(false); setStep(1); setValidError(""); setSubmitError(""); setSubmittedId2(null); setSubmittedMagicLink(null); setOrienteurEmail(""); setOrienteurFound(null); setOrienteurError(""); }}
           />
         </div>
       </div>
@@ -1901,15 +1943,15 @@ export default function InscriptionPage() {
         </header>
         {showFaq && docApi && <FAQPanel docApi={docApi} onClose={() => setShowFaq(false)} />}
         <div className="ins-body">
-          {/* ── Barre de progression — étape 4 active ── */}
+          {/* ── Barre de progression — étape 5 active ── */}
           <div className="ins-progress">
-            {[1, 2, 3, 4].map((s) => (
-              <div key={s} className={`ins-progress__step${s === 4 ? " active" : " done"}`}>
+            {[1, 2, 3, 4, 5].map((s) => (
+              <div key={s} className={`ins-progress__step${s === 5 ? " active" : " done"}`}>
                 <div className="ins-progress__dot">
-                  {s < 4 ? <i className="fa-solid fa-check" /> : 4}
+                  {s < 5 ? <i className="fa-solid fa-check" /> : 5}
                 </div>
                 <span className="ins-progress__label">
-                  {s === 1 ? "Identité" : s === 2 ? "Situation" : s === 3 ? "Engagement" : "Confirmation"}
+                  {s === 1 ? "Orienteur" : s === 2 ? "Identité" : s === 3 ? "Situation" : s === 4 ? "Engagement" : "Confirmation"}
                 </span>
               </div>
             ))}
@@ -1963,27 +2005,159 @@ export default function InscriptionPage() {
 
           {/* ── Barre de progression ── */}
           <div className="ins-progress">
-            {[1, 2, 3, 4].map((s) => (
+            {[1, 2, 3, 4, 5].map((s) => (
               <div key={s} className={`ins-progress__step${s === step ? " active" : s < step ? " done" : ""}`}>
                 <div className="ins-progress__dot">
                   {s < step ? <i className="fa-solid fa-check" /> : s}
                 </div>
                 <span className="ins-progress__label">
-                  {s === 1 ? "Identité" : s === 2 ? "Situation" : s === 3 ? "Engagement" : "Confirmation"}
+                  {s === 1 ? "Orienteur" : s === 2 ? "Identité" : s === 3 ? "Situation" : s === 4 ? "Engagement" : "Confirmation"}
                 </span>
               </div>
             ))}
             <div className="ins-progress__bar">
-              <div className="ins-progress__fill" style={{ width: `${((step - 1) / 3) * 100}%` }} />
+              <div className="ins-progress__fill" style={{ width: `${((step - 1) / 4) * 100}%` }} />
             </div>
           </div>
 
           <form className="ins-form" onSubmit={(e) => e.preventDefault()} noValidate>
 
-            {/* ══ ÉTAPE 1 — Identité ══ */}
+            {/* ══ ÉTAPE 1 — Orienteur·se ══ */}
             {step === 1 && (
               <>
-                <StepHeader step={1} title="Identité du / de la candidat·e" subtitle="Toutes les informations sont obligatoires." />
+                <StepHeader step={1} title="Identité de l'orienteur·se" subtitle="Vérifiez votre compte orienteur avant de commencer." />
+
+                <div className="ins-field ins-field--wide">
+                  <label className="ins-label">
+                    Adresse email de votre compte orienteur<span className="ins-required"> *</span>
+                  </label>
+                  <div style={{ display: "flex", gap: "0.5rem", alignItems: "flex-start" }}>
+                    <input
+                      type="email"
+                      className="ins-input"
+                      style={{ flex: 1 }}
+                      value={orienteurEmail}
+                      placeholder="prenom.nom@exemple.fr"
+                      onChange={(e) => {
+                        setOrienteurEmail(e.target.value);
+                        setOrienteurFound(null);
+                        setOrienteurError("");
+                      }}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); checkOrienteur(); } }}
+                      disabled={orienteurChecking}
+                    />
+                    <button
+                      type="button"
+                      className="ins-btn ins-btn--primary"
+                      style={{ flexShrink: 0 }}
+                      onClick={checkOrienteur}
+                      disabled={orienteurChecking || !orienteurEmail.trim()}
+                    >
+                      {orienteurChecking
+                        ? <><i className="fa-solid fa-spinner fa-spin" aria-hidden="true" /> Vérification…</>
+                        : <>Vérifier <i className="fa-solid fa-magnifying-glass" aria-hidden="true" /></>
+                      }
+                    </button>
+                  </div>
+
+                  {/* Résultat trouvé */}
+                  {orienteurFound && (
+                    <div style={{
+                      marginTop: "0.75rem", display: "flex", alignItems: "center",
+                      gap: "0.6rem", padding: "0.6rem 0.9rem",
+                      background: "#f0fdf4", border: "1px solid #bbf7d0",
+                      borderRadius: "0.5rem",
+                    }}>
+                      <i className="fa-solid fa-circle-check" style={{ color: "#16a34a", fontSize: "1.1rem", flexShrink: 0 }} />
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: "0.87rem", color: "#15803d" }}>
+                          Compte trouvé : {orienteurFound.nom}
+                        </div>
+                        <div style={{ fontSize: "0.75rem", color: "#166534", marginTop: "0.1rem" }}>
+                          Vous pouvez poursuivre l&apos;inscription.
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        style={{
+                          marginLeft: "auto", background: "none", border: "none",
+                          fontSize: "0.72rem", color: "#166534", cursor: "pointer",
+                          textDecoration: "underline", fontFamily: "inherit", padding: 0,
+                        }}
+                        onClick={() => { setOrienteurFound(null); setOrienteurEmail(""); }}
+                      >
+                        Modifier
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Erreur */}
+                  {orienteurError && (
+                    <div style={{
+                      marginTop: "0.75rem", padding: "0.6rem 0.9rem",
+                      background: "#fef2f2", border: "1px solid #fecaca",
+                      borderRadius: "0.5rem",
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem" }}>
+                        <i className="fa-solid fa-circle-xmark" style={{ color: "#dc2626", flexShrink: 0 }} />
+                        <span style={{ fontSize: "0.85rem", color: "#991b1b", fontWeight: 600 }}>
+                          {orienteurError}
+                        </span>
+                      </div>
+                      <a
+                        href={ORIENTEUR_WIDGET_URL}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          display: "inline-flex", alignItems: "center", gap: "0.35rem",
+                          fontSize: "0.8rem", color: "#000091", fontWeight: 600,
+                          textDecoration: "underline", textUnderlineOffset: "2px",
+                        }}
+                      >
+                        Créer un compte orienteur <i className="fa-solid fa-arrow-up-right-from-square" style={{ fontSize: "0.7rem" }} />
+                      </a>
+                    </div>
+                  )}
+                </div>
+
+                {/* Lien création compte (toujours visible) */}
+                {!orienteurError && !orienteurFound && (
+                  <div style={{ marginTop: "0.25rem" }}>
+                    <a
+                      href={ORIENTEUR_WIDGET_URL}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        fontSize: "0.8rem", color: "#000091",
+                        textDecoration: "underline", textUnderlineOffset: "2px",
+                        display: "inline-flex", alignItems: "center", gap: "0.35rem",
+                      }}
+                    >
+                      <i className="fa-solid fa-user-plus" style={{ fontSize: "0.72rem" }} />
+                      Vous n&apos;avez pas encore de compte orienteur ? Créez-en un
+                    </a>
+                  </div>
+                )}
+
+                {/* Bouton Continuer (seulement si trouvé) */}
+                {orienteurFound && (
+                  <div className="ins-nav-row" style={{ justifyContent: "flex-end" }}>
+                    <button
+                      type="button"
+                      className="ins-btn ins-btn--primary"
+                      onClick={() => { setValidError(""); setStep(2); window.scrollTo(0, 0); }}
+                    >
+                      Continuer <i className="fa-solid fa-arrow-right" aria-hidden="true" />
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* ══ ÉTAPE 2 — Identité ══ */}
+            {step === 2 && (
+              <>
+                <StepHeader step={2} title="Identité du / de la candidat·e" subtitle="Toutes les informations sont obligatoires." />
 
                 <SectionTitle title="Informations administratives" />
 
@@ -2017,10 +2191,10 @@ export default function InscriptionPage() {
               </>
             )}
 
-            {/* ══ ÉTAPE 2 — Situation ══ */}
-            {step === 2 && (
+            {/* ══ ÉTAPE 3 — Situation ══ */}
+            {step === 3 && (
               <>
-                <StepHeader step={2} title="Situation du / de la candidat·e" subtitle="Informations obligatoires *" />
+                <StepHeader step={3} title="Situation du / de la candidat·e" subtitle="Informations obligatoires *" />
 
                 <SectionTitle title="Domiciliation" />
                 <FieldWrap label="Département du domicile actuel" required>
@@ -2098,10 +2272,10 @@ export default function InscriptionPage() {
               </>
             )}
 
-            {/* ══ ÉTAPE 3 — Engagement ══ */}
-            {step === 3 && (
+            {/* ══ ÉTAPE 4 — Engagement ══ */}
+            {step === 4 && (
               <>
-                <StepHeader step={3} title="Engagement de l'orienteur / l'orienteuse" />
+                <StepHeader step={4} title="Engagement de l'orienteur / l'orienteuse" />
                 <ToggleOuiNon
                   label="Je suis engagé·e et disponible pour co-accompagner le / la candidat·e"
                   value={form.Engagement_orienteur}
@@ -2120,34 +2294,34 @@ export default function InscriptionPage() {
               </div>
             )}
 
-            {/* ── Navigation ── */}
-            <div className="ins-nav-row">
-              {step > 1 && (
+            {/* ── Navigation (masqué sur step 1 qui a ses propres boutons) ── */}
+            {step > 1 && (
+              <div className="ins-nav-row">
                 <button type="button" className="ins-btn ins-btn--secondary" onClick={prevStep}>
                   <i className="fa-solid fa-arrow-left" aria-hidden="true" /> Précédent
                 </button>
-              )}
-              {step < TOTAL_STEPS ? (
-                <button type="button" className="ins-btn ins-btn--primary" onClick={nextStep}>
-                  Suivant <i className="fa-solid fa-arrow-right" aria-hidden="true" />
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="ins-btn ins-btn--primary"
-                  disabled={form.Engagement_orienteur === null}
-                  onClick={() => {
-                    const err = validateStep(3);
-                    if (err) { setValidError(err); return; }
-                    setValidError("");
-                    setShowSummary(true);
-                    window.scrollTo(0, 0);
-                  }}
-                >
-                  Vérifier et confirmer <i className="fa-solid fa-arrow-right" aria-hidden="true" />
-                </button>
-              )}
-            </div>
+                {step < TOTAL_STEPS ? (
+                  <button type="button" className="ins-btn ins-btn--primary" onClick={nextStep}>
+                    Suivant <i className="fa-solid fa-arrow-right" aria-hidden="true" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="ins-btn ins-btn--primary"
+                    disabled={form.Engagement_orienteur === null}
+                    onClick={() => {
+                      const err = validateStep(4);
+                      if (err) { setValidError(err); return; }
+                      setValidError("");
+                      setShowSummary(true);
+                      window.scrollTo(0, 0);
+                    }}
+                  >
+                    Vérifier et confirmer <i className="fa-solid fa-arrow-right" aria-hidden="true" />
+                  </button>
+                )}
+              </div>
+            )}
 
           </form>
         </div>
