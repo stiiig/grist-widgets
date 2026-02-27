@@ -564,6 +564,7 @@ curl "https://n8n.incubateur.dnum.din.developpement-durable.gouv.fr/webhook/gris
 | Toutes les requêtes de métadonnées retournent 403 | Branche faux du IF token connectée au Respond 403 | La brancher sur **IF attachId** — les métadonnées n'ont jamais de token |
 | Token invalide alors que le secret est correct | Les deux Crypto nodes utilisent des credentials différents | Vérifier que GENERATE et GET utilisent **le même credential** |
 | `sig` tronqué dans n8n (ex: `887512` au lieu de 64 chars) | URL du magic link copiée/collée tronquée | Copier l'URL complète depuis la réponse JSON du workflow GENERATE |
+| IF action toujours False — UpdateRecord passe en branche AddRecord | Code (parse) construisait `requestBody` (body Grist complet) sans jamais extraire `action` → `$json.action` toujours `undefined` | Code (parse) doit retourner `{ table, action, id, fields }` **sans** construire le body — déléguer la construction du body aux nœuds Code dans chaque branche (5a-update / 5a-add) |
 
 ### n8n — HTTP Request
 
