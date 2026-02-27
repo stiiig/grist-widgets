@@ -94,7 +94,7 @@ function AttachmentItem({
         <span className="att-item__name">{name}</span>
       </button>
       {!disabled && (
-        <button type="button" className="att-item__rm" onClick={onRemove} title="Retirer">
+        <button type="button" className="att-item__rm" onClick={onRemove} title="Supprimer">
           <i className="fa-solid fa-xmark" aria-hidden="true" />
         </button>
       )}
@@ -261,7 +261,7 @@ export function AttachmentField({
                   <button
                     type="button"
                     className="att-item__rm"
-                    title="Retirer"
+                    title="Supprimer"
                     onClick={() => onChange(encodeAttachmentCell(ids.filter((x) => x !== id)))}
                   >
                     <i className="fa-solid fa-xmark" aria-hidden="true" />
