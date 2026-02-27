@@ -1396,6 +1396,7 @@ function SummaryScreen({
   const W: React.CSSProperties = { maxWidth: 560, width: "100%", margin: "0 auto" };
   const dialCode = DIAL_CODES.find((d) => d.name === form.TelCode)?.code ?? "";
   const telDisplay = form.Tel ? `${dialCode} ${form.Tel}`.trim() : "—";
+  const [dataOpen, setDataOpen] = useState(false);
 
   function SRow({ label, value }: { label: string; value: React.ReactNode }) {
     return (
@@ -1426,17 +1427,54 @@ function SummaryScreen({
     );
   }
 
+  /* Boutons d'action — réutilisés en haut et en bas */
+  function ActionButtons() {
+    return (
+      <div style={{ display: "flex", gap: "0.75rem", justifyContent: "space-between" }}>
+        <button
+          type="button"
+          className="ins-btn ins-btn--secondary"
+          onClick={onEdit}
+          disabled={submitting}
+        >
+          <i className="fa-solid fa-arrow-left" aria-hidden="true" /> Modifier
+        </button>
+        <button
+          type="button"
+          className="ins-btn ins-btn--primary"
+          onClick={onConfirm}
+          disabled={submitting}
+        >
+          {submitting
+            ? <><i className="fa-solid fa-spinner fa-spin" aria-hidden="true" /> Enregistrement…</>
+            : <>Confirmer l&apos;inscription <i className="fa-solid fa-check" aria-hidden="true" /></>
+          }
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "0.9rem" }}>
 
-      {/* ── Titre ── */}
-      <div style={{ ...W, textAlign: "center" }}>
-        <h2 style={{ fontSize: "1rem", fontWeight: 700, color: "#1e1e1e", margin: 0 }}>
-          Vérification avant inscription
-        </h2>
-        <p style={{ fontSize: "0.82rem", color: "#666", margin: "0.3rem 0 0", lineHeight: 1.45 }}>
-          Veuillez vérifier les informations ci-dessous avant de confirmer l&apos;inscription.
-        </p>
+      {/* ── Notice d'appel à l'action ── */}
+      <div style={{
+        ...W,
+        background: "#eff6ff", border: "1px solid #bfdbfe",
+        borderRadius: "0.75rem", padding: "1rem 1.1rem",
+      }}>
+        <div style={{ display: "flex", gap: "0.6rem", alignItems: "flex-start", marginBottom: "0.85rem" }}>
+          <i className="fa-solid fa-circle-info" style={{ color: "#2563eb", fontSize: "1.05rem", marginTop: "0.1rem", flexShrink: 0 }} />
+          <div>
+            <div style={{ fontWeight: 700, color: "#1e40af", fontSize: "0.9rem" }}>
+              Vérifiez les critères et confirmez l&apos;inscription
+            </div>
+            <div style={{ color: "#1e3a8a", fontSize: "0.78rem", marginTop: "0.2rem", lineHeight: 1.45 }}>
+              Les critères d&apos;éligibilité sont calculés ci-dessous. Vous pouvez modifier les données ou confirmer l&apos;inscription.
+            </div>
+          </div>
+        </div>
+        <ActionButtons />
       </div>
 
       {/* ── Carte candidat·e ── */}
@@ -1447,59 +1485,68 @@ function SummaryScreen({
         />
       </div>
 
-      {/* ── Informations saisies ── */}
-      <div style={{
-        ...W,
-        background: "#fff", border: "1px solid #e5e5e5",
-        borderRadius: "0.75rem", padding: "0.75rem 1.2rem",
-      }}>
-        <div style={{
-          fontSize: "0.68rem", fontWeight: 700, color: "#888",
-          textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "0.1rem",
-        }}>
-          Informations saisies
-        </div>
-        <SSection title="Identité">
-          <SRow label="Prénom" value={form.Prenom} />
-          <SRow label="Nom de famille" value={form.Nom_de_famille} />
-          <SRow label="Genre" value={form.Genre} />
-          <SRow label="Nationalité" value={nationaliteLabel} />
-          <SRow label="Date de naissance" value={form.Date_de_naissance
-            ? `${form.Date_de_naissance}${age != null ? ` (${age} an${age > 1 ? "s" : ""})` : ""}`
-            : null}
-          />
-          <SRow label="Email" value={form.Email} />
-          <SRow label="Téléphone" value={form.Tel ? telDisplay : null} />
-        </SSection>
-        <SSection title="Situation">
-          <SRow label="Département" value={deptLabel
-            ? [deptLabel, deptOpt?.tag ?? null].filter(Boolean).join(" — ")
-            : null}
-          />
-          <SRow label="Adresse" value={form.Adresse} />
-          <SRow label="Précarité du logement" value={form.Precarite_de_logement} />
-          <SRow label="Consentement EMILE" value={
-            form.Consentement_volontaire === null ? null : form.Consentement_volontaire ? "Oui" : "Non"
-          } />
-          <SRow label="Niveau de langue" value={niveauLabel} />
-          <SRow label="Composition du foyer" value={form.Foyer} />
-          <SRow label="En situation régulière" value={form.Regularite_situation} />
-          <SRow label="Primo-arrivant·e" value={
-            form.Primo_arrivant === null ? "Non précisé" : form.Primo_arrivant ? "Oui" : "Non"
-          } />
-          <SRow label="BPI" value={
-            form.Bpi === null ? "Non précisé" : form.Bpi ? "Oui" : "Non"
-          } />
-          {form.Pret_a_se_former.length > 0 && (
-            <SRow label="Secteurs de formation" value={form.Pret_a_se_former.join(", ")} />
-          )}
-        </SSection>
-        <SSection title="Engagement orienteur">
-          <SRow label="Co-accompagnement" value={
-            form.Engagement_orienteur === null ? "Non renseigné"
-            : form.Engagement_orienteur ? "Oui" : "Non"
-          } />
-        </SSection>
+      {/* ── Informations saisies (accordéon) ── */}
+      <div style={{ ...W, border: "1px solid #e5e5e5", borderRadius: "0.75rem", overflow: "hidden" }}>
+        <button
+          type="button"
+          onClick={() => setDataOpen((v) => !v)}
+          style={{
+            width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+            padding: "0.75rem 1.2rem", background: "#fafafa", border: 0,
+            cursor: "pointer", fontFamily: "inherit",
+          }}
+        >
+          <span style={{ fontSize: "0.72rem", fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: "0.07em" }}>
+            <i className="fa-solid fa-list-ul" style={{ marginRight: "0.45rem", color: "#888" }} />
+            Informations saisies
+          </span>
+          <i className={`fa-solid fa-chevron-${dataOpen ? "up" : "down"}`} style={{ fontSize: "0.68rem", color: "#aaa" }} />
+        </button>
+        {dataOpen && (
+          <div style={{ padding: "0.25rem 1.2rem 0.9rem" }}>
+            <SSection title="Identité">
+              <SRow label="Prénom" value={form.Prenom} />
+              <SRow label="Nom de famille" value={form.Nom_de_famille} />
+              <SRow label="Genre" value={form.Genre} />
+              <SRow label="Nationalité" value={nationaliteLabel} />
+              <SRow label="Date de naissance" value={form.Date_de_naissance
+                ? `${form.Date_de_naissance}${age != null ? ` (${age} an${age > 1 ? "s" : ""})` : ""}`
+                : null}
+              />
+              <SRow label="Email" value={form.Email} />
+              <SRow label="Téléphone" value={form.Tel ? telDisplay : null} />
+            </SSection>
+            <SSection title="Situation">
+              <SRow label="Département" value={deptLabel
+                ? [deptLabel, deptOpt?.tag ?? null].filter(Boolean).join(" — ")
+                : null}
+              />
+              <SRow label="Adresse" value={form.Adresse} />
+              <SRow label="Précarité du logement" value={form.Precarite_de_logement} />
+              <SRow label="Consentement EMILE" value={
+                form.Consentement_volontaire === null ? null : form.Consentement_volontaire ? "Oui" : "Non"
+              } />
+              <SRow label="Niveau de langue" value={niveauLabel} />
+              <SRow label="Composition du foyer" value={form.Foyer} />
+              <SRow label="En situation régulière" value={form.Regularite_situation} />
+              <SRow label="Primo-arrivant·e" value={
+                form.Primo_arrivant === null ? "Non précisé" : form.Primo_arrivant ? "Oui" : "Non"
+              } />
+              <SRow label="BPI" value={
+                form.Bpi === null ? "Non précisé" : form.Bpi ? "Oui" : "Non"
+              } />
+              {form.Pret_a_se_former.length > 0 && (
+                <SRow label="Secteurs de formation" value={form.Pret_a_se_former.join(", ")} />
+              )}
+            </SSection>
+            <SSection title="Engagement orienteur">
+              <SRow label="Co-accompagnement" value={
+                form.Engagement_orienteur === null ? "Non renseigné"
+                : form.Engagement_orienteur ? "Oui" : "Non"
+              } />
+            </SSection>
+          </div>
+        )}
       </div>
 
       {/* ── Critères d'éligibilité ── */}
@@ -1530,27 +1577,9 @@ function SummaryScreen({
         </div>
       )}
 
-      {/* ── Boutons ── */}
-      <div style={{ ...W, display: "flex", gap: "0.75rem", justifyContent: "space-between" }}>
-        <button
-          type="button"
-          className="ins-btn ins-btn--secondary"
-          onClick={onEdit}
-          disabled={submitting}
-        >
-          <i className="fa-solid fa-arrow-left" aria-hidden="true" /> Modifier
-        </button>
-        <button
-          type="button"
-          className="ins-btn ins-btn--primary"
-          onClick={onConfirm}
-          disabled={submitting}
-        >
-          {submitting
-            ? <><i className="fa-solid fa-spinner fa-spin" aria-hidden="true" /> Enregistrement…</>
-            : <>Confirmer l&apos;inscription <i className="fa-solid fa-check" aria-hidden="true" /></>
-          }
-        </button>
+      {/* ── Boutons (répétés en bas) ── */}
+      <div style={W}>
+        <ActionButtons />
       </div>
 
     </div>
