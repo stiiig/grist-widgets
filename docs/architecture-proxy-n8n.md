@@ -102,14 +102,15 @@ IF Content-Type contient "text/plain"
     │
     ├─ True  → Code (JSON.parse du body texte → extrait table, _action, id, fields)
     │           │
-    │           ├─ _action = "add"
-    │           │     → HTTP Request POST /tables/{table}/records (body JSON des fields)
-    │           │         → Code { retValues: [newId] }
-    │           │             → Respond JSON { retValues: [newId] } + CORS header
+    │           IF _action = "update"
+    │           ├─ True  → Code (build PATCH body)
+    │           │           → HTTP Request PATCH /tables/{table}/records (body JSON { records:[{id,fields}] })
+    │           │               → Respond JSON {} + CORS header
     │           │
-    │           └─ _action = "update"
-    │                 → HTTP Request PATCH /tables/{table}/records/{id} (body JSON des fields)
-    │                     → Respond JSON {} + CORS header
+    │           └─ False → Code (build POST body)
+    │                       → HTTP Request POST /tables/{table}/records (body JSON { records:[{fields}] })
+    │                           → Code { retValues: [newId] }
+    │                               → Respond JSON { retValues: [newId] } + CORS header
     │
     └─ False → (multipart/form-data — upload de pièce jointe)
                 HTTP Request POST /attachments (Form-Data, champ upload, Bearer Auth)

@@ -311,7 +311,7 @@ https://n8n.incubateur.dnum.din.developpement-durable.gouv.fr/webhook/grist
 
 ---
 
-### Branche **True** — AddRecord / UpdateRecord
+### Branche **True** — écritures (text/plain)
 
 #### Nœud 3a — Code (parser le body text/plain)
 
@@ -319,7 +319,7 @@ https://n8n.incubateur.dnum.din.developpement-durable.gouv.fr/webhook/grist
 // rest.ts envoie du JSON sérialisé en texte brut (Content-Type: text/plain)
 // n8n ne parse pas automatiquement text/plain — on le fait manuellement ici
 const raw = $json.body;
-const parsed = JSON.parse(raw);             // { _action, table, id?, fields }
+const parsed = JSON.parse(raw);             // { _action, id?, fields }
 
 // La table cible est dans le query param (ex: ?table=CANDIDATS)
 const table  = $json.query.table;
@@ -332,9 +332,62 @@ return [{ json: { table, action, id, fields } }];
 
 > ⚠️ **Piège** : ne pas essayer d'interpoler `{{ $json.fields }}` directement dans un body JSON n8n — un objet JavaScript ne peut pas être injecté comme valeur d'un champ de template JSON. Il faut passer par un nœud Code qui fait `JSON.stringify`, puis utiliser un body **Raw** (voir nœud suivant).
 
-#### Nœud 4a — HTTP Request (AddRecord → POST Grist)
+#### Nœud 4a — IF action (add vs update)
 
-Pour la branche `action === "add"` :
+| Paramètre | Valeur |
+|-----------|--------|
+| Condition | `{{ $json.action }}` **equals** `update` |
+| True → | branche UpdateRecord (PATCH) |
+| False → | branche AddRecord (POST) |
+
+---
+
+### Sous-branche **True** (Nœud 4a) — UpdateRecord
+
+#### Nœud 5a-update — Code (construire le body PATCH)
+
+```javascript
+const id     = $json.id;
+const fields = $json.fields;
+const body   = JSON.stringify({ records: [{ id, fields }] });
+return [{ json: { ...$json, gristBody: body } }];
+```
+
+#### Nœud 6a-update — HTTP Request (UpdateRecord → PATCH Grist)
+
+| Paramètre | Valeur |
+|-----------|--------|
+| Method | **PATCH** |
+| URL | `https://grist.incubateur.dnum.din.developpement-durable.gouv.fr/api/docs/75GHATRaKvHSmx3FRqCi4f/tables/{{ $json.table }}/records` |
+| Authentication | Generic Credential Type → Bearer Auth → **Bearer Auth Grist** |
+| Body Content Type | **Raw** |
+| Content Type | `application/json` |
+| Body | `{{ $json.gristBody }}` |
+
+> ℹ️ n8n appelle Grist en PATCH côté serveur — il n'y a pas de contrainte CORS ici. La requête browser → n8n est un `POST text/plain` (simple CORS), c'est n8n qui fait le PATCH vers Grist.
+
+#### Nœud 7a-update — Respond to Webhook (UpdateRecord)
+
+| Paramètre | Valeur |
+|-----------|--------|
+| Respond With | **JSON** |
+| Response Body | `{}` |
+| Response Code | 200 |
+| Header | `Access-Control-Allow-Origin: *` |
+
+---
+
+### Sous-branche **False** (Nœud 4a) — AddRecord
+
+#### Nœud 5a-add — Code (construire le body POST)
+
+```javascript
+const fields = $json.fields;
+const body   = JSON.stringify({ records: [{ fields }] });
+return [{ json: { ...$json, gristBody: body } }];
+```
+
+#### Nœud 6a-add — HTTP Request (AddRecord → POST Grist)
 
 | Paramètre | Valeur |
 |-----------|--------|
@@ -343,19 +396,9 @@ Pour la branche `action === "add"` :
 | Authentication | Generic Credential Type → Bearer Auth → **Bearer Auth Grist** |
 | Body Content Type | **Raw** |
 | Content Type | `application/json` |
-| Body | Code node suivant (voir ci-dessous) |
+| Body | `{{ $json.gristBody }}` |
 
-Dans le **nœud Code** qui précède l'HTTP Request, construire le body Grist complet :
-
-```javascript
-const fields = $json.fields;
-const body = JSON.stringify({ records: [{ fields }] });
-return [{ json: { ...$json, gristBody: body } }];
-```
-
-Puis dans l'HTTP Request, Body = `{{ $json.gristBody }}`.
-
-#### Nœud 5a — Code (formater la réponse)
+#### Nœud 7a-add — Code (formater la réponse)
 
 ```javascript
 // Grist renvoie { records: [{ id: 42, fields: {} }] }
@@ -365,7 +408,7 @@ const newId = records[0]?.id ?? null;
 return [{ json: { retValues: [newId] } }];
 ```
 
-#### Nœud 6a — Respond to Webhook (AddRecord)
+#### Nœud 8a-add — Respond to Webhook (AddRecord)
 
 | Paramètre | Valeur |
 |-----------|--------|
@@ -376,7 +419,7 @@ return [{ json: { retValues: [newId] } }];
 
 ---
 
-### Branche **False** — Upload de pièces jointes (multipart/form-data)
+### Branche **False** (Nœud 2) — Upload de pièces jointes (multipart/form-data)
 
 #### Nœud 3b — HTTP Request (upload vers Grist)
 
@@ -405,21 +448,28 @@ return [{ json: { retValues: [newId] } }];
 
 ---
 
-### Schéma — Workflow POST
+### Schéma complet — Workflow POST
 
 ```
 Webhook POST (path: grist)
     │
     ▼
-IF content-type contains "text/plain"
+IF content-type contains "text/plain"         [Noeud 2]
     │
-    ├─ True ──► Code (JSON.parse du body texte → extrait table, action, id, fields)
-    │           └──► HTTP Request POST /tables/{table}/records (body Raw JSON)
-    │                └──► Code { retValues: [newId] }
-    │                     └──► Respond JSON { retValues: [newId] } + CORS header
+    ├─ True ──► Code (parse body → table, action, id, fields)   [Noeud 3a]
+    │           └──► IF action equals "update"                   [Noeud 4a]
+    │                 │
+    │                 ├─ True  ──► Code (build PATCH body)       [Noeud 5a-update]
+    │                 │            └──► HTTP PATCH /tables/{table}/records  [Noeud 6a-update]
+    │                 │                 └──► Respond JSON {} + CORS         [Noeud 7a-update]
+    │                 │
+    │                 └─ False ──► Code (build POST body)        [Noeud 5a-add]
+    │                              └──► HTTP POST /tables/{table}/records   [Noeud 6a-add]
+    │                                   └──► Code { retValues: [newId] }    [Noeud 7a-add]
+    │                                        └──► Respond JSON { retValues } + CORS  [Noeud 8a-add]
     │
-    └─ False ──► HTTP Request POST /attachments (Form-Data, champ upload, Bearer Auth)
-                 └──► Respond JSON {{ $json }} + CORS header
+    └─ False ──► HTTP POST /attachments (Form-Data)              [Noeud 3b]
+                 └──► Respond JSON {{ $json }} + CORS            [Noeud 4b]
 ```
 
 ---
