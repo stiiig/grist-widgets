@@ -1486,21 +1486,22 @@ function SummaryScreen({
       </div>
 
       {/* ── Informations saisies (accordéon) ── */}
-      <div style={{ ...W, border: "1px solid #e5e5e5", borderRadius: "0.75rem", overflow: "hidden" }}>
+      <div style={{ ...W, border: "1px solid #c8c8e8", borderRadius: "0.75rem", overflow: "hidden", background: "#fff" }}>
         <button
           type="button"
           onClick={() => setDataOpen((v) => !v)}
           style={{
             width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
-            padding: "0.75rem 1.2rem", background: "#fafafa", border: 0,
+            padding: "0.75rem 1.2rem", background: "#fff", border: 0,
+            borderBottom: dataOpen ? "1px solid #c8c8e8" : "none",
             cursor: "pointer", fontFamily: "inherit",
           }}
         >
-          <span style={{ fontSize: "0.72rem", fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: "0.07em" }}>
-            <i className="fa-solid fa-list-ul" style={{ marginRight: "0.45rem", color: "#888" }} />
+          <span style={{ fontSize: "0.72rem", fontWeight: 700, color: "#000091", textTransform: "uppercase", letterSpacing: "0.07em" }}>
+            <i className="fa-solid fa-list-ul" style={{ marginRight: "0.45rem" }} />
             Informations saisies
           </span>
-          <i className={`fa-solid fa-chevron-${dataOpen ? "up" : "down"}`} style={{ fontSize: "0.68rem", color: "#aaa" }} />
+          <i className={`fa-solid fa-chevron-${dataOpen ? "up" : "down"}`} style={{ fontSize: "0.68rem", color: "#000091" }} />
         </button>
         {dataOpen && (
           <div style={{ padding: "0.25rem 1.2rem 0.9rem" }}>
