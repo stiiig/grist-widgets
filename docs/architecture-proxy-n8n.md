@@ -40,10 +40,11 @@ L'API Grist REST exige un `Authorization: Bearer <clé>` sur chaque requête. Si
 ```
 Browser (GitHub Pages)
       │
-      │  GET https://n8n.incubateur.dnum.../webhook/grist?table=CANDIDATS&filter=...
+      │  GET https://n8n.incubateur.dnum.../webhook/grist?table=CANDIDATS&token=ID.HMAC
       │  (pas de clé API, pas de contrainte CORS)
       ▼
 n8n (accessible publiquement)
+      │  vérifie HMAC-SHA256 du token
       │  Authorization: Bearer <clé API>   ← jamais vue par le browser
       │  GET https://grist.incubateur.dnum.../api/docs/{docId}/tables/CANDIDATS/records
       ▼
@@ -55,29 +56,39 @@ n8n → ajoute Access-Control-Allow-Origin: *
 Browser → données disponibles dans React
 ```
 
-Le proxy joue trois rôles :
+Le proxy joue quatre rôles :
 1. **Contournement CORS** — il appelle Grist server-side, sans contrainte cross-origin
 2. **Isolation de la clé API** — elle reste dans les credentials n8n, jamais dans le bundle JS
 3. **Passerelle réseau** — Grist est sur le réseau interne, n8n peut l'atteindre, le browser non
+4. **Vérification du magic link** — HMAC-SHA256 vérifié côté n8n, secret jamais exposé
 
 ---
 
-## Architecture actuelle — deux workflows n8n
+## Architecture actuelle — trois workflows n8n
 
-La version n8n déployée ne supporte pas "Any Method" sur les webhooks (uniquement GET, POST, PATCH…). On a donc deux workflows distincts au même path `/webhook/grist`, routés par méthode HTTP :
-
-### Workflow GET — lecture + téléchargement de pièces jointes
+### Workflow GET — lecture + téléchargement + vérification magic link
 
 ```
-Webhook GET (?table=X ou ?attachId=Y)
+Webhook GET (?table=X&token=ID.HMAC  ou  ?table=X&filter=JSON  ou  ?attachId=Y)
     │
     ▼
-IF query.attachId est présent
-    ├─ True  → GET /attachments/{id}/download → Respond Binary (Content-Type forwarded)
-    └─ False → GET /tables/{table}/records   → Respond JSON
+IF query.token est présent
+    ├─ True  → Code (extrait rowId + sig)
+    │          → Crypto HMAC-SHA256 (même secret que GENERATE)
+    │          → IF sig === HMAC calculé
+    │              ├─ True  → IF query.attachId est présent
+    │              │           ├─ True  → GET /attachments/{id}/download → Respond Binary
+    │              │           └─ False → GET /tables/CANDIDATS/records?filter={"id":[rowId]}
+    │              └─ False → Respond 403 { "error": "Token invalide" }
+    │
+    └─ False → IF query.attachId est présent
+                ├─ True  → GET /attachments/{id}/download → Respond Binary
+                └─ False → GET /tables/{table}/records    → Respond JSON
 ```
 
-Couvre : chargement de toutes les tables, métadonnées colonnes (`_grist_Tables`, `_grist_Tables_column`), noms des pièces jointes (`_grist_Attachments`), téléchargement de fichiers.
+La branche **faux** (pas de token) couvre toutes les requêtes de métadonnées et de tables de référence qui ne nécessitent pas de vérification (`_grist_Tables`, `_grist_Tables_column`, `DPTS_REGIONS`, etc.).
+
+> ⚠️ **Piège critique** : la branche **faux** du IF token doit pointer vers **IF attachId**, pas vers un Respond 403. Les requêtes de métadonnées (`_grist_Tables`, etc.) n'ont jamais de token — si elles tombent sur un 403, le widget ne peut plus charger les types de colonnes et les dropdowns.
 
 ### Workflow POST — upload de pièces jointes
 
@@ -95,6 +106,26 @@ L'upload utilise `multipart/form-data` sans header custom — c'est ce qu'on app
 
 Le code `rest.ts` parse la réponse de manière défensive car n8n sérialise les tableaux JSON de manière non déterministe selon sa version (`{"data":"[42]"}`, `[42]`, ou des objets items `{json: 42, pairedItem: ...}`).
 
+### Workflow GENERATE — génération de magic links
+
+```
+Webhook POST /webhook/grist-generate  (Basic Auth)
+    │
+    ▼
+Code (extrait rowId du body)
+    │
+    ▼
+Crypto HMAC-SHA256 (même secret que le workflow GET)
+    │
+    ▼
+Code (construit token = rowId.HMAC et URL complète)
+    │
+    ▼
+Respond to Webhook { rowId, token, url }
+```
+
+Génère un token signé `rowId.HMAC` pour un candidat donné. Appelé manuellement (curl) ou via une automation Grist à la création d'un enregistrement.
+
 ---
 
 ## Ce que ça permet concrètement
@@ -103,12 +134,40 @@ Sans modifier Grist, sans plugin, sans compte Grist côté utilisateur :
 
 | Fonctionnalité | Mécanisme |
 |----------------|-----------|
-| Afficher la fiche d'un candidat via lien email | `GET ?table=CANDIDATS&filter={"id":[42]}` |
+| Afficher la fiche d'un candidat via lien signé | `GET ?table=CANDIDATS&token=ID.HMAC` |
 | Charger les listes déroulantes (départements, établissements…) | `GET ?table=DPTS_REGIONS` etc. |
 | Lire les types/options de colonnes | `GET ?table=_grist_Tables` + `_grist_Tables_column` |
 | Afficher les pièces jointes (noms) | `GET ?table=_grist_Attachments` |
 | Télécharger une pièce jointe | `GET ?attachId=42` → binaire |
 | Uploader une pièce jointe | `POST multipart/form-data` |
+| Générer un magic link signé | `POST /webhook/grist-generate` (Basic Auth) |
+
+---
+
+## Sécurité du magic link
+
+### Token format
+
+```
+token = rowId + "." + HMAC-SHA256(rowId.toString(), SECRET)
+```
+
+- **rowId** — identifiant de l'enregistrement Grist (entier)
+- **HMAC-SHA256** — signature cryptographique avec un secret partagé entre les deux workflows n8n
+- **SECRET** — stocké uniquement dans les credentials n8n (type Crypto), jamais dans le code ni dans le repo
+
+### Propriétés
+
+| Propriété | Valeur |
+|-----------|--------|
+| Forgeable sans le secret | ❌ Non |
+| Expiration | ❌ Permanent (pas d'expiration) |
+| Révocable | ⚠️ Uniquement en changeant le secret (invalide tous les tokens) |
+| Lié à un candidat spécifique | ✅ Oui (rowId dans le token) |
+
+### Fallback dev
+
+Le paramètre `?rowId=123` (sans signature) est conservé comme **fallback de développement** uniquement — le workflow GET n'exige pas de token pour les requêtes sans `?token=`. Ne pas utiliser en production.
 
 ---
 
@@ -128,9 +187,9 @@ Options envisagées :
 
 Actuellement la clé API configurée dans n8n est une clé personnelle. Une **clé de service** (compte applicatif, permissions minimales, rotation sans impact humain) est nécessaire pour la production. En attente de provisionnement côté infra Grist.
 
-### Sécurité du magic link
+### Expiration des tokens
 
-L'URL `?rowId=42` est publique — quiconque l'a peut consulter le dossier. À sécuriser : token signé (HMAC ou JWT), expiration, éventuellement vérification par email/SMS. Non prioritaire tant que les liens sont distribués à la demande.
+Les magic links sont permanents. Pour des dossiers sensibles, une expiration (date butoir dans le token, vérifiée par n8n) pourrait être ajoutée ultérieurement.
 
 ---
 
