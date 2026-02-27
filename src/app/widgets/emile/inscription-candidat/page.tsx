@@ -900,6 +900,7 @@ function EligibilityScreen({
   niveauEligibilite,
   paysOptions,
   id2,
+  magicLink,
   onNew,
 }: {
   form: FormData;
@@ -909,6 +910,7 @@ function EligibilityScreen({
   niveauEligibilite: Map<number, string>;
   paysOptions: PaysOption[];
   id2?: string | null;
+  magicLink?: string | null;
   onNew: () => void;
 }) {
   const age      = computeAge(form.Date_de_naissance);
@@ -923,6 +925,8 @@ function EligibilityScreen({
   const nationaliteLabel = form.Nationalite != null
     ? paysOptions.find((o) => o.id === form.Nationalite)?.label ?? null
     : null;
+
+  const [copied, setCopied] = useState(false);
 
   const isFemme = form.Genre === "Femme";
   const isHomme = form.Genre === "Homme";
@@ -1193,6 +1197,65 @@ function EligibilityScreen({
         </div>
       )}
 
+      {/* ── Magic link (usage interne — dev/test) ── */}
+      {magicLink && (
+        <div style={{
+          ...W,
+          background: "#fafafa", border: "1px dashed #c8c8e8",
+          borderRadius: "0.5rem", padding: "0.7rem 1rem",
+        }}>
+          <div style={{
+            fontSize: "0.65rem", fontWeight: 700, color: "#888",
+            textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "0.45rem",
+            display: "flex", alignItems: "center", gap: "0.35rem",
+          }}>
+            <i className="fa-solid fa-link" style={{ fontSize: "0.7rem" }} />
+            Lien magic (test)
+          </div>
+          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+            <input
+              readOnly
+              value={magicLink}
+              onClick={(e) => (e.target as HTMLInputElement).select()}
+              style={{
+                flex: 1, fontSize: "0.72rem", fontFamily: "monospace",
+                border: "1px solid #d0d0d0", borderRadius: 4,
+                padding: "0.3rem 0.5rem", background: "#fff",
+                color: "#333", overflow: "hidden", textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                cursor: "text",
+                outline: "none",
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard.writeText(magicLink).then(() => {
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                });
+              }}
+              style={{
+                flexShrink: 0, height: "1.9rem", padding: "0 0.75rem",
+                border: "1px solid",
+                borderColor: copied ? "#16a34a" : "#000091",
+                borderRadius: 4,
+                background: copied ? "#f0fdf4" : "#000091",
+                color: copied ? "#15803d" : "#fff",
+                cursor: "pointer", fontSize: "0.75rem", fontFamily: "inherit", fontWeight: 600,
+                display: "flex", alignItems: "center", gap: "0.3rem",
+                transition: "all 0.15s",
+              }}
+            >
+              {copied
+                ? <><i className="fa-solid fa-check" /> Copié !</>
+                : <><i className="fa-solid fa-copy" /> Copier</>
+              }
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── Lien retour accueil ── */}
       <div style={{ ...W, textAlign: "center" }}>
         <button
@@ -1242,6 +1305,7 @@ export default function InscriptionPage() {
   const [dptsIsDepart, setDptsIsDepart]           = useState<Map<number, boolean>>(new Map());
   const [niveauEligibilite, setNiveauEligibilite] = useState<Map<number, string>>(new Map());
   const [submittedId2, setSubmittedId2]           = useState<string | null>(null);
+  const [submittedMagicLink, setSubmittedMagicLink] = useState<string | null>(null);
 
   /* ── Choix dynamiques depuis métadonnées Grist ── */
   const choicesMap = useMemo(() => {
@@ -1447,12 +1511,32 @@ export default function InscriptionPage() {
       const result = await docApi.applyUserActions([["AddRecord", TABLE_ID, null, fields]]);
       const newRowId = result?.retValues?.[0] as number | undefined;
       if (newRowId) {
+        // Récupération ID2 (non bloquant)
         try {
           const table = await docApi.fetchTable(TABLE_ID);
           const ids = table.id as number[];
           const idx = ids.indexOf(newRowId);
           if (idx >= 0) setSubmittedId2(String(table["ID2"]?.[idx] ?? "").trim() || null);
         } catch { /* non bloquant */ }
+
+        // Génération du magic link via le webhook n8n GENERATE (usage interne / test)
+        try {
+          const generateUrl = process.env.NEXT_PUBLIC_GRIST_GENERATE_URL;
+          if (generateUrl) {
+            const generateAuth = process.env.NEXT_PUBLIC_GRIST_GENERATE_AUTH; // base64("user:pass")
+            const headers: HeadersInit = { "Content-Type": "application/json" };
+            if (generateAuth) headers["Authorization"] = `Basic ${generateAuth}`;
+            const genRes = await fetch(generateUrl, {
+              method: "POST",
+              headers,
+              body: JSON.stringify({ rowId: newRowId }),
+            });
+            if (genRes.ok) {
+              const genData = await genRes.json();
+              if (genData?.url) setSubmittedMagicLink(genData.url);
+            }
+          }
+        } catch { /* non bloquant — le formulaire est déjà soumis */ }
       }
       setDone(true);
     } catch {
@@ -1488,7 +1572,8 @@ export default function InscriptionPage() {
             niveauEligibilite={niveauEligibilite}
             paysOptions={paysOptions}
             id2={submittedId2}
-            onNew={() => { setForm(INITIAL); setDone(false); setStep(1); setValidError(""); setSubmitError(""); setSubmittedId2(null); }}
+            magicLink={submittedMagicLink}
+            onNew={() => { setForm(INITIAL); setDone(false); setStep(1); setValidError(""); setSubmitError(""); setSubmittedId2(null); setSubmittedMagicLink(null); }}
           />
         </div>
       </div>
