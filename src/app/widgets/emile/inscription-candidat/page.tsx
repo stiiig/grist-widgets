@@ -1203,27 +1203,28 @@ function EligibilityScreen({
       {/* ── Bannière de confirmation de soumission ── */}
       <div style={{
         ...W,
-        background: "#f0fdf4", border: "1px solid #bbf7d0",
+        background: "#eff6ff", border: "1px solid #bfdbfe",
         borderRadius: "0.75rem", padding: "0.85rem 1.1rem",
         display: "flex", alignItems: "center", gap: "0.75rem",
       }}>
         <span style={{
           width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
-          background: "#16a34a", color: "#fff",
+          background: "#000091", color: "#fff",
           display: "flex", alignItems: "center", justifyContent: "center",
           fontSize: "1rem",
         }}>
           <i className="fa-solid fa-check" />
         </span>
         <div>
-          <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "#15803d" }}>
+          <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "#000091" }}>
             Inscription enregistrée avec succès
           </div>
-          <div style={{ fontSize: "0.78rem", color: "#166534", marginTop: "0.15rem", lineHeight: 1.4 }}>
+          <div style={{ fontSize: "0.78rem", color: "#1e3a8a", marginTop: "0.15rem", lineHeight: 1.4 }}>
             {id2
               ? <>Le dossier <strong>{id2}</strong> a bien été soumis.</>
               : "Le dossier a bien été soumis."
             }
+            {" "}Un email récapitulatif de l'inscription a été envoyé à l'orienteur·se.
           </div>
         </div>
       </div>
