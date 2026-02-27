@@ -58,13 +58,25 @@ async function fetchTableRest(tableId: string): Promise<Record<string, any[]>> {
 /**
  * Récupère un seul enregistrement par rowId (plus efficace que fetchTable entier).
  * Retourne {id, col1, col2, ...} ou null si non trouvé.
+ *
+ * @param token  Token signé "rowId.HMAC" (magic link). Si fourni, envoyé à n8n qui
+ *               vérifie l'HMAC côté serveur avant de faire le fetch Grist.
+ *               Sans token (dev fallback ?rowId=), on utilise ?filter=.
  */
 export async function fetchSingleRowRest(
   tableId: string,
-  rowId: number
+  rowId: number,
+  token?: string | null,
 ): Promise<{ id: number; [k: string]: any } | null> {
-  const filter = JSON.stringify({ id: [rowId] });
-  const url = tableUrl(tableId, { filter });
+  let url: string;
+  if (token) {
+    // Magic link : envoie le token signé — n8n vérifie le HMAC et extrait le rowId
+    url = tableUrl(tableId, { token });
+  } else {
+    // Dev fallback (?rowId= sans signature) : filtre direct côté proxy
+    const filter = JSON.stringify({ id: [rowId] });
+    url = tableUrl(tableId, { filter });
+  }
   const { records } = (await gristFetch(url, {})) as { records: RestRecord[] };
   const rec = records.find((r) => r.id === rowId) ?? null;
   if (!rec) return null;

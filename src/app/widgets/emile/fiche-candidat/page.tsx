@@ -970,13 +970,25 @@ function DateNaissanceSpecialField({ value, onChange, disabled, col, genreValue 
 export default function Page() {
   const { mode, docApi } = useGristInit({ requiredAccess: "full" });
 
-  // ── Magic link : rowId lu dans l'URL (?rowId=123) ──
+  // ── Magic link : ?token=rowId.HMAC (prod) ou ?rowId=123 (dev fallback) ──
   const [rowIdFromUrl, setRowIdFromUrl] = useState<number | null>(null);
+  const [tokenFromUrl, setTokenFromUrl] = useState<string | null>(null);
   useEffect(() => {
     if (typeof window === "undefined") return;
     const p = new URLSearchParams(window.location.search);
-    const v = p.get("rowId");
-    if (v) setRowIdFromUrl(parseInt(v, 10));
+    const token = p.get("token");
+    if (token) {
+      // Format : "rowId.HMAC" — rowId extrait localement pour le state
+      const rowId = parseInt(token.split(".")[0], 10);
+      if (!isNaN(rowId)) {
+        setTokenFromUrl(token);
+        setRowIdFromUrl(rowId);
+      }
+    } else {
+      // Fallback dev : ?rowId=123 sans signature
+      const v = p.get("rowId");
+      if (v) setRowIdFromUrl(parseInt(v, 10));
+    }
   }, []);
 
   const [cols, setCols] = useState<ColMeta[]>([]);
@@ -1038,22 +1050,24 @@ export default function Page() {
     grist.ready({ requiredAccess: "full" });
   }, [docApi, mode]);
 
-  // ── Mode REST (standalone magic link) : fetch par rowId ─
+  // ── Mode REST (standalone magic link) : fetch par token ou rowId ─
   useEffect(() => {
     if (!docApi || mode !== "rest" || !rowIdFromUrl) return;
     setLoadingRest(true);
     (async () => {
       try {
-        const row = await fetchSingleRowRest(TABLE_ID, rowIdFromUrl);
+        // tokenFromUrl : "rowId.HMAC" → vérification HMAC côté n8n
+        // null         : dev fallback ?rowId= → filtre direct (pas de vérif HMAC)
+        const row = await fetchSingleRowRest(TABLE_ID, rowIdFromUrl, tokenFromUrl);
         if (row) setSelected(row);
-        else setStatus("Dossier introuvable (rowId=" + rowIdFromUrl + ").");
+        else setStatus("Dossier introuvable.");
       } catch (e: any) {
         setStatus("Erreur: " + (e?.message ?? String(e)));
       } finally {
         setLoadingRest(false);
       }
     })();
-  }, [docApi, mode, rowIdFromUrl]);
+  }, [docApi, mode, rowIdFromUrl, tokenFromUrl]);
 
   useEffect(() => {
     if (!selected) { setDraft({}); return; }
@@ -1243,7 +1257,7 @@ export default function Page() {
           <div className="fr-alert fr-alert--info">
             <p className="fr-alert__title">En attente</p>
             <p>{mode === "rest"
-              ? "Aucun dossier chargé. Vérifie que le lien contient un paramètre ?rowId=."
+              ? "Aucun dossier chargé. Vérifie que le lien contient un paramètre ?token=."
               : "Sélectionne un candidat dans Grist pour afficher son dossier."
             }</p>
           </div>
