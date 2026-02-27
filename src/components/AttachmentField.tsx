@@ -245,22 +245,28 @@ export function AttachmentField({
                 window.open(dlUrl, "_blank", "noopener,noreferrer");
               }
             } : null;
-            return dlUrl ? (
-              <button
-                key={id}
-                type="button"
-                className="att-item att-item__link"
-                title={`Télécharger ${name}`}
-                onClick={handleDownload ?? undefined}
-              >
-                <i className={`${fileIcon(mime, name)} att-item__icon`} aria-hidden="true" />
-                <span className="att-item__name">{name}</span>
-              </button>
-            ) : (
-              <div key={id} className="att-item att-item--readonly"
-                   title="Téléchargement disponible uniquement dans Grist">
-                <i className={`${fileIcon(mime, name)} att-item__icon`} aria-hidden="true" />
-                <span className="att-item__name">{name}</span>
+            return (
+              <div key={id} className="att-item">
+                <button
+                  type="button"
+                  className="att-item__link"
+                  title={dlUrl ? `Télécharger ${name}` : "Téléchargement disponible uniquement dans Grist"}
+                  onClick={handleDownload ?? undefined}
+                  disabled={!dlUrl}
+                >
+                  <i className={`${fileIcon(mime, name)} att-item__icon`} aria-hidden="true" />
+                  <span className="att-item__name">{name}</span>
+                </button>
+                {!disabled && doUpload && (
+                  <button
+                    type="button"
+                    className="att-item__rm"
+                    title="Retirer"
+                    onClick={() => onChange(encodeAttachmentCell(ids.filter((x) => x !== id)))}
+                  >
+                    <i className="fa-solid fa-xmark" aria-hidden="true" />
+                  </button>
+                )}
               </div>
             );
           })}

@@ -179,11 +179,13 @@ body {
 }
 .emile-nav-tab i { font-size: 0.78rem; }
 .emile-nav-tab:hover { color: #000091; }
+.emile-nav-tab:active { color: #000091; background: transparent; }
 .emile-nav-tab.active {
   color: #000091;
   border-bottom-color: #000091;
   font-weight: 700;
 }
+.emile-nav-tab.active:active { color: #000091; background: transparent; }
 
 /* ================= BARRE L2 (subtabs) ================= */
 .emile-subnav {
@@ -221,10 +223,20 @@ body {
   border-color: #000091;
   color: #000091;
 }
+.emile-subnav-tab:active {
+  background: #000091 !important;
+  border-color: #000091 !important;
+  color: #fff !important;
+}
 .emile-subnav-tab.active {
   background: #000091;
   border-color: #000091;
   color: #fff;
+}
+.emile-subnav-tab.active:active {
+  background: #000091 !important;
+  border-color: #000091 !important;
+  color: #fff !important;
 }
 
 /* ================= CONTENU SCROLLABLE ================= */
