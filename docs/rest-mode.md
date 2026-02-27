@@ -54,12 +54,16 @@ Contrôlé par la variable d'environnement `NEXT_PUBLIC_GRIST_PROXY_URL` (baked 
 |----------|--------|------------|
 | `NEXT_PUBLIC_GRIST_PROXY_URL` | `https://n8n.incubateur.dnum.din.developpement-durable.gouv.fr/webhook/grist` | ✅ — active le mode REST |
 | `NEXT_PUBLIC_GRIST_GENERATE_URL` | `https://n8n.incubateur.dnum.din.developpement-durable.gouv.fr/webhook/grist-generate` | ✅ — génération du magic link dans `inscription-candidat` |
+| `NEXT_PUBLIC_GRIST_GENERATE_AUTH` | *(non utilisée)* | ❌ — legacy, supprimable |
+
+> ℹ️ `NEXT_PUBLIC_GRIST_GENERATE_AUTH` a été ajoutée quand le webhook GENERATE était en `POST + Basic Auth`. Depuis la migration vers `GET` sans authentification, cette variable n'est plus lue par le code. Le secret GitHub correspondant peut rester vide ou être supprimé.
 
 Déclarées dans `.github/workflows/deploy.yml` :
 ```yaml
 env:
   NEXT_PUBLIC_GRIST_PROXY_URL:    ${{ secrets.NEXT_PUBLIC_GRIST_PROXY_URL }}
   NEXT_PUBLIC_GRIST_GENERATE_URL: ${{ secrets.NEXT_PUBLIC_GRIST_GENERATE_URL }}
+  # NEXT_PUBLIC_GRIST_GENERATE_AUTH — non utilisée (legacy POST+BasicAuth, supprimable)
 ```
 
 Quand cette variable est définie, `src/lib/grist/init.ts` bascule automatiquement en mode `rest` et utilise `createRestDocApi()` au lieu du plugin Grist.
