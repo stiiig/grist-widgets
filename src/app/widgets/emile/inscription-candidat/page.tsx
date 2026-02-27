@@ -1520,17 +1520,12 @@ export default function InscriptionPage() {
         } catch { /* non bloquant */ }
 
         // Génération du magic link via le webhook n8n GENERATE (usage interne / test)
+        // GET simple (?rowId=X) = pas de preflight CORS (pas de header custom)
         try {
           const generateUrl = process.env.NEXT_PUBLIC_GRIST_GENERATE_URL;
           if (generateUrl) {
-            const generateAuth = process.env.NEXT_PUBLIC_GRIST_GENERATE_AUTH; // base64("user:pass")
-            const headers: HeadersInit = { "Content-Type": "application/json" };
-            if (generateAuth) headers["Authorization"] = `Basic ${generateAuth}`;
-            const genRes = await fetch(generateUrl, {
-              method: "POST",
-              headers,
-              body: JSON.stringify({ rowId: newRowId }),
-            });
+            const url = `${generateUrl.replace(/\/$/, "")}?rowId=${newRowId}`;
+            const genRes = await fetch(url); // GET sans header → "simple CORS request"
             if (genRes.ok) {
               const genData = await genRes.json();
               if (genData?.url) setSubmittedMagicLink(genData.url);

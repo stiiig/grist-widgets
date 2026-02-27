@@ -85,14 +85,18 @@ export async function fetchSingleRowRest(
 }
 
 /**
- * Applique des actions Grist via le proxy n8n (POST / PATCH).
+ * Applique des actions Grist via le proxy n8n.
  *
- * ⚠️  n8n doit accepter POST et PATCH (pas seulement GET) et gérer
- *     le preflight CORS OPTIONS pour les requêtes avec Content-Type JSON.
+ * Pour éviter le preflight CORS OPTIONS (déclenché par Content-Type JSON et
+ * par la méthode PATCH), on encode les écritures en requêtes "simples" :
  *
- * Actions supportées :
- *   ["AddRecord",    tableId, null, fields] → POST   /webhook/grist?table=TABLE
- *   ["UpdateRecord", tableId, rowId, fields] → PATCH /webhook/grist?table=TABLE
+ *   AddRecord    → POST text/plain  (text/plain = simple CORS request, pas de preflight)
+ *   UpdateRecord → POST text/plain  (on évite PATCH qui déclenche un preflight)
+ *
+ * Le body est le JSON sérialisé en string. Le champ `_action` permet à n8n
+ * de distinguer AddRecord (pas de rowId) et UpdateRecord (rowId présent).
+ *
+ * n8n POST workflow doit détecter text/plain et parser le body comme JSON.
  */
 async function applyUserActionsRest(actions: any[]): Promise<any> {
   for (const action of actions) {
@@ -105,16 +109,18 @@ async function applyUserActionsRest(actions: any[]): Promise<any> {
     const url = tableUrl(tableId);
 
     if (type === "UpdateRecord") {
+      // POST text/plain pour éviter le preflight CORS (PATCH déclenche OPTIONS)
       await gristFetch(url, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ records: [{ id: rowId, fields }] }),
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=UTF-8" },
+        body: JSON.stringify({ _action: "update", id: rowId, fields }),
       });
     } else if (type === "AddRecord") {
+      // POST text/plain : "simple CORS request" — pas de preflight OPTIONS
       return gristFetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ records: [{ fields }] }),
+        headers: { "Content-Type": "text/plain;charset=UTF-8" },
+        body: JSON.stringify({ _action: "add", fields }),
       });
     } else {
       throw new Error(`REST applyUserActions: action "${type}" non supportée`);
