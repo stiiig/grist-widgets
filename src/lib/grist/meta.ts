@@ -18,6 +18,7 @@ export type ColMeta = {
   widgetOptions: string;
   widgetOptionsParsed: Record<string, any>;
   isFormula: boolean;
+  formula: string;
   description?: string;
   visibleColRowId?: number | null;
   displayColRowId?: number | null;
@@ -100,6 +101,7 @@ export async function loadColumnsMetaFor(docApi: GristDocAPI, tableId: string) {
       widgetOptions: rawOpts,
       widgetOptionsParsed: parseWidgetOptions(rawOpts),
       isFormula: !!cols.isFormula?.[i],
+      formula: cols.formula?.[i] || "",
       description: (cols.description ? cols.description[i] || "" : ""),
       visibleColRowId: (cols.visibleCol ? cols.visibleCol[i] : null),
       displayColRowId: (cols.displayCol ? cols.displayCol[i] : null),
@@ -110,7 +112,9 @@ export async function loadColumnsMetaFor(docApi: GristDocAPI, tableId: string) {
 }
 
 export function isEditable(col: ColMeta) {
-  if (col.isFormula) return false;
+  // "Empty column" dans Grist a isFormula=true mais formula="" → traiter comme donnée éditable.
+  // Seules les colonnes avec une vraie formule non vide sont en lecture seule.
+  if (col.isFormula && col.formula) return false;
   const ban = new Set(["id", "manualSort", "ManualSort", "CreatedAt", "UpdatedAt"]);
   return !ban.has(col.colId);
 }

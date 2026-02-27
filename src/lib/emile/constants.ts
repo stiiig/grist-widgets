@@ -240,6 +240,7 @@ export const FALLBACK_COLS: ColMeta[] = [
       ],
     },
     isFormula: false,
+    formula: "",
   },
   {
     colId: "Foyer",
@@ -254,6 +255,7 @@ export const FALLBACK_COLS: ColMeta[] = [
       ],
     },
     isFormula: false,
+    formula: "",
   },
   {
     colId: "Pret_a_se_former",
@@ -268,6 +270,7 @@ export const FALLBACK_COLS: ColMeta[] = [
       ],
     },
     isFormula: false,
+    formula: "",
   },
 ];
 
