@@ -121,10 +121,7 @@ export default function OrienteurPage() {
     if (err) { setError(err); return; }
     setError(null);
 
-    if (!docApi) {
-      setDone(true);
-      return;
-    }
+    if (!docApi) { setError("Grist non disponible — ce formulaire nécessite une connexion."); return; }
 
     setSubmitting(true);
     try {
@@ -144,6 +141,25 @@ export default function OrienteurPage() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  /* ── Mode non disponible (pas de proxy n8n, pas d'iframe Grist) ── */
+  if (mode === "none") {
+    return (
+      <div className="occ-shell">
+        <header className="occ-header">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={logoEmile.src} alt="EMILE" style={{ height: "2rem", width: "auto" }} />
+          <span className="occ-header__appname">Création compte orienteur·ice</span>
+        </header>
+        <main className="occ-body">
+          <div className="fr-alert fr-alert--warning">
+            <p className="fr-alert__title">Non disponible</p>
+            <p>Ce widget doit être ouvert dans Grist ou via une URL configurée.</p>
+          </div>
+        </main>
+      </div>
+    );
   }
 
   /* ── Spinner boot ───────────────────────────────────────────── */
