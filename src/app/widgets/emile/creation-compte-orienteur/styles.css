@@ -207,6 +207,9 @@
   transition: border-color 0.15s, background 0.15s;
   box-sizing: border-box;
 }
+.occ-input::placeholder {
+  color: #999;
+}
 .occ-input:focus,
 .occ-select:focus {
   border-color: #000091;
