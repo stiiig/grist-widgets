@@ -89,6 +89,16 @@ export default function EtablissementPage() {
 
     setSubmitting(true);
     try {
+      // Vérification doublon nom d'établissement
+      const existingTable = await docApi.fetchTable(TABLE_ID);
+      const existingNames = (existingTable.Nom_etablissement as string[]) ?? [];
+      const nomNorm = form.Nom_etablissement.trim().toLowerCase();
+      if (existingNames.some((n) => String(n).trim().toLowerCase() === nomNorm)) {
+        setError("Un établissement avec ce nom existe déjà.");
+        setSubmitting(false);
+        return;
+      }
+
       await docApi.applyUserActions([
         ["AddRecord", TABLE_ID, null, {
           Nom_etablissement:      form.Nom_etablissement.trim(),

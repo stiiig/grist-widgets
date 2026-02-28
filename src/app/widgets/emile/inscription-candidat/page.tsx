@@ -1844,9 +1844,23 @@ export default function InscriptionPage() {
     return null;
   }
 
-  function nextStep() {
+  async function nextStep() {
     const err = validateStep(step);
     if (err) { setValidError(err); return; }
+
+    // Vérification doublon email candidat à l'étape 2
+    if (step === 2 && docApi) {
+      try {
+        const existingTable = await docApi.fetchTable("CANDIDATS");
+        const existingEmails = (existingTable.Email as string[]) ?? [];
+        const emailNorm = form.Email.trim().toLowerCase();
+        if (existingEmails.some((e) => String(e).trim().toLowerCase() === emailNorm)) {
+          setValidError("Un·e candidat·e avec cette adresse email est déjà inscrit·e.");
+          return;
+        }
+      } catch { /* non bloquant : on laisse passer si l'API échoue */ }
+    }
+
     setValidError("");
     setStep((s) => s + 1);
     window.scrollTo(0, 0);

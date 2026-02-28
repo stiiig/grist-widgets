@@ -127,6 +127,16 @@ export default function OrienteurPage() {
 
     setSubmitting(true);
     try {
+      // Vérification doublon email orienteur
+      const existingTable = await docApi.fetchTable(TABLE_ID);
+      const existingEmails = (existingTable.Email as string[]) ?? [];
+      const emailNorm = form.Email.trim().toLowerCase();
+      if (existingEmails.some((e) => String(e).trim().toLowerCase() === emailNorm)) {
+        setError("Un compte orienteur·ice existe déjà avec cette adresse email.");
+        setSubmitting(false);
+        return;
+      }
+
       const result = await docApi.applyUserActions([
         ["AddRecord", TABLE_ID, null, {
           Etablissement:  form.Etablissement,
