@@ -917,6 +917,7 @@ function buildEligibilityCriteria(
   niveauOptions: Option[],
   niveauEligibilite: Map<number, string>,
   paysOptions: PaysOption[],
+  orienteurInfo?: { nom: string; email: string } | null,
 ): EligibilityData {
   const age = computeAge(form.Date_de_naissance);
   const deptOpt = form.Departement_domicile_inscription != null
@@ -938,6 +939,7 @@ function buildEligibilityCriteria(
       id: "engagement",
       label: "Orienteur·se co-accompagnant·e engagé·e",
       ok: form.Engagement_orienteur === null ? null : form.Engagement_orienteur,
+      detail: orienteurInfo ? `${orienteurInfo.nom} — ${orienteurInfo.email}` : undefined,
     },
     {
       id: "territoire",
@@ -1180,6 +1182,8 @@ function EligibilityScreen({
   id2,
   magicLink,
   onNew,
+  orienteurNom,
+  orienteurEmail: orienteurEmailProp,
 }: {
   form: FormData;
   dptsOptions: Option[];
@@ -1190,9 +1194,12 @@ function EligibilityScreen({
   id2?: string | null;
   magicLink?: string | null;
   onNew: () => void;
+  orienteurNom?: string | null;
+  orienteurEmail?: string | null;
 }) {
+  const orienteurInfo = orienteurNom ? { nom: orienteurNom, email: orienteurEmailProp ?? "" } : null;
   const { age, deptLabel, deptOpt, niveauLabel, nationaliteLabel, e, criteria, failingCount, unknownCount, eligible, fullName } =
-    buildEligibilityCriteria(form, dptsOptions, dptsIsDepart, niveauOptions, niveauEligibilite, paysOptions);
+    buildEligibilityCriteria(form, dptsOptions, dptsIsDepart, niveauOptions, niveauEligibilite, paysOptions, orienteurInfo);
 
   const [copied, setCopied] = useState(false);
 
@@ -1220,12 +1227,22 @@ function EligibilityScreen({
           <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "#000091" }}>
             Inscription enregistrée avec succès
           </div>
-          <div style={{ fontSize: "0.78rem", color: "#1e3a8a", marginTop: "0.15rem", lineHeight: 1.4 }}>
-            {id2
-              ? <>Le dossier <strong>{id2}</strong> a bien été soumis.</>
-              : "Le dossier a bien été soumis."
-            }
-            {" "}Un email récapitulatif de l'inscription a été envoyé à l'orienteur·se.
+          <div style={{ fontSize: "0.78rem", color: "#1e3a8a", marginTop: "0.15rem", lineHeight: 1.5 }}>
+            <div>
+              {id2
+                ? <>Le dossier <strong>{id2}</strong> a bien été soumis.</>
+                : "Le dossier a bien été soumis."
+              }
+              {" "}Un email récapitulatif de l'inscription a été envoyé à l'orienteur·se.
+            </div>
+            {orienteurInfo && (
+              <div style={{ marginTop: "0.3rem", display: "flex", alignItems: "center", gap: "0.4rem", flexWrap: "wrap" }}>
+                <i className="fa-solid fa-user-tie" style={{ color: "#000091", fontSize: "0.75rem" }} />
+                <strong style={{ color: "#000091" }}>{orienteurInfo.nom}</strong>
+                <span style={{ color: "#6b7280" }}>·</span>
+                <span style={{ color: "#1e3a8a" }}>{orienteurInfo.email}</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1380,6 +1397,8 @@ function SummaryScreen({
   submitError,
   onEdit,
   onConfirm,
+  orienteurNom,
+  orienteurEmail: orienteurEmailProp,
 }: {
   form: FormData;
   dptsOptions: Option[];
@@ -1391,9 +1410,12 @@ function SummaryScreen({
   submitError: string;
   onEdit: () => void;
   onConfirm: () => void;
+  orienteurNom?: string | null;
+  orienteurEmail?: string | null;
 }) {
+  const orienteurInfo = orienteurNom ? { nom: orienteurNom, email: orienteurEmailProp ?? "" } : null;
   const { age, deptLabel, deptOpt, niveauLabel, nationaliteLabel, e, criteria, failingCount, unknownCount, eligible, fullName } =
-    buildEligibilityCriteria(form, dptsOptions, dptsIsDepart, niveauOptions, niveauEligibilite, paysOptions);
+    buildEligibilityCriteria(form, dptsOptions, dptsIsDepart, niveauOptions, niveauEligibilite, paysOptions, orienteurInfo);
 
   const W: React.CSSProperties = { maxWidth: 560, width: "100%", margin: "0 auto" };
   const dialCode = DIAL_CODES.find((d) => d.name === form.TelCode)?.code ?? "";
@@ -1624,7 +1646,7 @@ export default function InscriptionPage() {
   const [orienteurEmail, setOrienteurEmail]         = useState("");
   const [orienteurChecking, setOrienteurChecking]   = useState(false);
   const [orienteurError, setOrienteurError]         = useState("");
-  const [orienteurFound, setOrienteurFound]         = useState<{ id: number; nom: string } | null>(null);
+  const [orienteurFound, setOrienteurFound]         = useState<{ id: number; nom: string; email: string } | null>(null);
 
   /* ── Choix dynamiques depuis métadonnées Grist ── */
   const choicesMap = useMemo(() => {
@@ -1748,14 +1770,14 @@ export default function InscriptionPage() {
     try {
       const table: any = await docApi.fetchTable("ACCOMPAGNANTS");
       const ids = table.id as number[];
-      let found: { id: number; nom: string } | null = null;
+      let found: { id: number; nom: string; email: string } | null = null;
       for (let i = 0; i < ids.length; i++) {
         const rowEmail = String(table["Email"]?.[i] ?? "").trim().toLowerCase();
         if (rowEmail === email) {
           const prenom = String(table["Prenom"]?.[i] ?? "").trim();
           const nom    = String(table["Nom_de_famille"]?.[i] ?? table["Nom"]?.[i] ?? "").trim();
           const fullName = [prenom, nom].filter(Boolean).join(" ") || email;
-          found = { id: ids[i], nom: fullName };
+          found = { id: ids[i], nom: fullName, email };
           break;
         }
       }
@@ -1922,6 +1944,8 @@ export default function InscriptionPage() {
             paysOptions={paysOptions}
             id2={submittedId2}
             magicLink={submittedMagicLink}
+            orienteurNom={orienteurFound?.nom ?? null}
+            orienteurEmail={orienteurFound?.email ?? null}
             onNew={() => { setForm(INITIAL); setDone(false); setShowSummary(false); setStep(1); setValidError(""); setSubmitError(""); setSubmittedId2(null); setSubmittedMagicLink(null); setOrienteurEmail(""); setOrienteurFound(null); setOrienteurError(""); }}
           />
         </div>
@@ -1970,6 +1994,8 @@ export default function InscriptionPage() {
             submitError={submitError}
             onEdit={() => { setShowSummary(false); window.scrollTo(0, 0); }}
             onConfirm={handleSubmit}
+            orienteurNom={orienteurFound?.nom ?? null}
+            orienteurEmail={orienteurFound?.email ?? null}
           />
         </div>
       </div>
@@ -2278,6 +2304,23 @@ export default function InscriptionPage() {
             {step === 4 && (
               <>
                 <StepHeader step={4} title="Engagement de l'orienteur / l'orienteuse" />
+
+                {orienteurFound && (
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: "0.6rem",
+                    padding: "0.55rem 0.85rem",
+                    background: "#f5f5fe", border: "1px solid #c8c8e8",
+                    borderRadius: "0.5rem", marginBottom: "0.25rem",
+                  }}>
+                    <i className="fa-solid fa-user-tie" style={{ color: "#000091", fontSize: "0.9rem", flexShrink: 0 }} />
+                    <div style={{ fontSize: "0.82rem", lineHeight: 1.4 }}>
+                      <span style={{ fontWeight: 700, color: "#000091" }}>{orienteurFound.nom}</span>
+                      <span style={{ color: "#6b7280", margin: "0 0.3rem" }}>·</span>
+                      <span style={{ color: "#555" }}>{orienteurFound.email}</span>
+                    </div>
+                  </div>
+                )}
+
                 <ToggleOuiNon
                   label="Je suis engagé·e et disponible pour co-accompagner le / la candidat·e"
                   value={form.Engagement_orienteur}
