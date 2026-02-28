@@ -1903,7 +1903,14 @@ export default function InscriptionPage() {
             const genRes = await fetch(url); // GET sans header → "simple CORS request"
             if (genRes.ok) {
               const genData = await genRes.json();
-              if (genData?.url) setSubmittedMagicLink(genData.url);
+              if (genData?.url) {
+                const generatedUrl = genData.url as string;
+                setSubmittedMagicLink(generatedUrl);
+                // Écriture du magic link dans Lien_acces (non bloquant)
+                try {
+                  await docApi.applyUserActions([["UpdateRecord", TABLE_ID, newRowId, { Lien_acces: generatedUrl }]]);
+                } catch { /* non bloquant */ }
+              }
             }
           }
         } catch { /* non bloquant — le formulaire est déjà soumis */ }
