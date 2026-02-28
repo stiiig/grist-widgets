@@ -311,26 +311,11 @@ export default function OrienteurPage() {
               </span>
             </div>
 
-            <div className="occ-nav-row" style={{ justifyContent: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
-              <button
-                type="button"
-                className="occ-btn occ-btn--secondary"
-                style={{ marginLeft: 0 }}
-                onClick={() => {
-                  setForm(INITIAL);
-                  setStep(1);
-                  setValidationLink(null);
-                  setCopied(false);
-                  setError(null);
-                }}
-              >
-                <i className="fa-solid fa-plus" />
-                Ajouter un autre compte
-              </button>
+            <div className="occ-nav-row" style={{ justifyContent: "flex-start" }}>
               <Link
                 href="/widgets/emile/inscription-candidat/"
                 className="occ-btn occ-btn--primary"
-                style={{ textDecoration: "none" }}
+                style={{ textDecoration: "none", marginLeft: 0 }}
               >
                 Inscrire un·e candidat·e <i className="fa-solid fa-arrow-right" />
               </Link>
