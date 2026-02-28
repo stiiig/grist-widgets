@@ -134,15 +134,17 @@
   color: #fff;
 }
 .ins-progress__label {
-  font-size: 0.62rem;
+  font-size: 0.6rem;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
   color: #999;
   text-align: center;
-  max-width: 72px;
+  max-width: 100px;
   white-space: normal;
   line-height: 1.3;
+  word-break: keep-all;
+  overflow-wrap: normal;
 }
 .ins-progress__step.active .ins-progress__label,
 .ins-progress__step.done .ins-progress__label {
