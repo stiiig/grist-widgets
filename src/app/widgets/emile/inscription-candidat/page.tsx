@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import Link from "next/link";
 import "./styles.css";
 import logoEmile from "../assets/logo-emile-white.png";
 import {
@@ -2126,7 +2127,7 @@ export default function InscriptionPage() {
                           {orienteurError}
                         </span>
                       </div>
-                      <a
+                      <Link
                         href={ORIENTEUR_WIDGET_URL}
                         target="_blank"
                         rel="noreferrer"
@@ -2134,7 +2135,7 @@ export default function InscriptionPage() {
                         style={{ fontSize: "0.8rem", color: "#000091", fontWeight: 600 }}
                       >
                         Créer un compte orienteur·se
-                      </a>
+                      </Link>
                     </div>
                   )}
                 </div>
@@ -2144,7 +2145,7 @@ export default function InscriptionPage() {
                   <div style={{ marginTop: "0.25rem" }}>
                     <span style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
                       <i className="fa-solid fa-user-plus" style={{ fontSize: "0.72rem", color: "#000091" }} />
-                      <a
+                      <Link
                         href={ORIENTEUR_WIDGET_URL}
                         target="_blank"
                         rel="noreferrer"
@@ -2152,7 +2153,7 @@ export default function InscriptionPage() {
                         style={{ fontSize: "0.8rem", color: "#000091" }}
                       >
                         Vous n&apos;avez pas encore de compte orienteur·se ? Créez-en un
-                      </a>
+                      </Link>
                     </span>
                   </div>
                 )}

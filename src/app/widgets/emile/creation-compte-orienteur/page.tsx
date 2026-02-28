@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import "./styles.css";
 import logoEmile from "../assets/logo-emile-white.png";
 import {
@@ -278,7 +279,7 @@ export default function OrienteurPage() {
                 <i className="fa-solid fa-circle-info occ-infobox__icon" />
                 <span>
                   Si votre établissement n&apos;apparaît pas dans la liste,{" "}
-                  <a
+                  <Link
                     href="/emile/ajout-etablissement/"
                     target="_blank"
                     rel="noreferrer"
@@ -289,7 +290,7 @@ export default function OrienteurPage() {
                     }}
                   >
                     ajoutez-le maintenant
-                  </a>.
+                  </Link>.
                 </span>
               </div>
             </>
