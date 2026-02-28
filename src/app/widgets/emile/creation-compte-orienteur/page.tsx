@@ -277,7 +277,19 @@ export default function OrienteurPage() {
               <div className="occ-infobox">
                 <i className="fa-solid fa-circle-info occ-infobox__icon" />
                 <span>
-                  Si votre établissement n&apos;apparaît pas dans la liste, ajoutez-le maintenant.
+                  Si votre établissement n&apos;apparaît pas dans la liste,{" "}
+                  <a
+                    href="/emile/ajout-etablissement/"
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      color: "#000091", fontWeight: 600,
+                      textDecoration: "none",
+                      borderBottom: "1px solid #000091", paddingBottom: "1px",
+                    }}
+                  >
+                    ajoutez-le maintenant
+                  </a>.
                 </span>
               </div>
             </>
