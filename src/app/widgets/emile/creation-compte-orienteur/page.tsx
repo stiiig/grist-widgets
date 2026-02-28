@@ -311,7 +311,7 @@ export default function OrienteurPage() {
               </span>
             </div>
 
-            <div className="occ-nav-row" style={{ justifyContent: "flex-start" }}>
+            <div className="occ-nav-row" style={{ justifyContent: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
               <button
                 type="button"
                 className="occ-btn occ-btn--secondary"
@@ -327,6 +327,13 @@ export default function OrienteurPage() {
                 <i className="fa-solid fa-plus" />
                 Ajouter un autre compte
               </button>
+              <Link
+                href="/widgets/emile/inscription-candidat/"
+                className="occ-btn occ-btn--primary"
+                style={{ textDecoration: "none" }}
+              >
+                Inscrire un·e candidat·e <i className="fa-solid fa-arrow-right" />
+              </Link>
             </div>
           </div>
 
