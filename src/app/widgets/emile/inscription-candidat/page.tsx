@@ -2144,7 +2144,8 @@ export default function InscriptionPage() {
                           rel="noreferrer"
                           style={{
                             fontSize: "0.8rem", color: "#000091", fontWeight: 600,
-                            textDecoration: "underline", textUnderlineOffset: "2px",
+                            textDecoration: "none",
+                            borderBottom: "1px solid #000091", paddingBottom: "1px",
                           }}
                         >
                           Créer un compte orienteur
@@ -2166,7 +2167,8 @@ export default function InscriptionPage() {
                         rel="noreferrer"
                         style={{
                           fontSize: "0.8rem", color: "#000091",
-                          textDecoration: "underline", textUnderlineOffset: "2px",
+                          textDecoration: "none",
+                          borderBottom: "1px solid #000091", paddingBottom: "1px",
                         }}
                       >
                         Vous n&apos;avez pas encore de compte orienteur ? Créez-en un
