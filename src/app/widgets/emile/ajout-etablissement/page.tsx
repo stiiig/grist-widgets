@@ -186,10 +186,13 @@ export default function EtablissementPage() {
               </div>
             </div>
             <div className="ae-done__actions">
-              <button type="button" className="ae-btn ae-btn--secondary" onClick={handleReset}>
-                <i className="fa-solid fa-plus" />
-                Ajouter un autre
-              </button>
+              <a
+                href="https://stiiig.github.io/grist-widgets/widgets/emile/creation-compte-orienteur/"
+                className="ae-btn ae-btn--primary"
+                style={{ textDecoration: "none" }}
+              >
+                Créer un compte orienteur·ice <i className="fa-solid fa-arrow-right" />
+              </a>
             </div>
           </div>
         </main>
