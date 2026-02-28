@@ -1975,7 +1975,7 @@ export default function InscriptionPage() {
                   {s < 5 ? <i className="fa-solid fa-check" /> : 5}
                 </div>
                 <span className="ins-progress__label">
-                  {s === 1 ? "Orienteur" : s === 2 ? "Identité" : s === 3 ? "Situation" : s === 4 ? "Engagement" : "Confirmation"}
+                  {s === 1 ? "Orienteur·se" : s === 2 ? "Identité candidat·e" : s === 3 ? "Situation candidat·e" : s === 4 ? "Engagement orienteur·se" : "Confirmation"}
                 </span>
               </div>
             ))}
@@ -2037,7 +2037,7 @@ export default function InscriptionPage() {
                   {s < step ? <i className="fa-solid fa-check" /> : s}
                 </div>
                 <span className="ins-progress__label">
-                  {s === 1 ? "Orienteur" : s === 2 ? "Identité" : s === 3 ? "Situation" : s === 4 ? "Engagement" : "Confirmation"}
+                  {s === 1 ? "Orienteur·se" : s === 2 ? "Identité candidat·e" : s === 3 ? "Situation candidat·e" : s === 4 ? "Engagement orienteur·se" : "Confirmation"}
                 </span>
               </div>
             ))}
@@ -2051,7 +2051,7 @@ export default function InscriptionPage() {
             {/* ══ ÉTAPE 1 — Orienteur·se ══ */}
             {step === 1 && (
               <>
-                <StepHeader step={1} title="Identité de l'orienteur·se" subtitle="Vérifiez votre compte orienteur avant de commencer." />
+                <StepHeader step={1} title="Identité de l'orienteur·se" subtitle="Vérifiez votre compte avant de commencer." />
 
                 <div className="ins-field ins-field--wide">
                   <label className="ins-label">
@@ -2100,7 +2100,7 @@ export default function InscriptionPage() {
                           Compte trouvé : {orienteurFound.nom}
                         </div>
                         <div style={{ fontSize: "0.75rem", color: "#166534", marginTop: "0.1rem" }}>
-                          Vous pouvez poursuivre l&apos;inscription.
+                          Vous pouvez poursuivre l&apos;inscription du candidat·e.
                         </div>
                       </div>
                       <button
