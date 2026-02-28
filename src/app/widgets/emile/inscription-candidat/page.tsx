@@ -1784,7 +1784,7 @@ export default function InscriptionPage() {
       if (found) {
         setOrienteurFound(found);
       } else {
-        setOrienteurError("Aucun compte orienteur trouvé pour cette adresse email.");
+        setOrienteurError("Aucun compte orienteur·se trouvé pour cette adresse email.");
       }
     } catch {
       setOrienteurError("Erreur lors de la vérification. Veuillez réessayer.");
@@ -2070,7 +2070,7 @@ export default function InscriptionPage() {
                       className="ins-input"
                       style={{ flex: 1 }}
                       value={orienteurEmail}
-                      placeholder="prenom.nom@exemple.fr"
+
                       onChange={(e) => {
                         setOrienteurEmail(e.target.value);
                         setOrienteurFound(null);
@@ -2148,7 +2148,7 @@ export default function InscriptionPage() {
                             borderBottom: "1px solid #000091", paddingBottom: "1px",
                           }}
                         >
-                          Créer un compte orienteur
+                          Créer un compte orienteur·se
                         </a>
                         <i className="fa-solid fa-arrow-up-right-from-square" style={{ fontSize: "0.7rem", color: "#000091" }} />
                       </span>
@@ -2171,7 +2171,7 @@ export default function InscriptionPage() {
                           borderBottom: "1px solid #000091", paddingBottom: "1px",
                         }}
                       >
-                        Vous n&apos;avez pas encore de compte orienteur ? Créez-en un
+                        Vous n&apos;avez pas encore de compte orienteur·se ? Créez-en un
                       </a>
                     </span>
                   </div>
