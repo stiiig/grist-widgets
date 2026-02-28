@@ -146,6 +146,13 @@
   word-break: keep-all;
   overflow-wrap: normal;
 }
+/* Lien externe : !important pour écraser le UA stylesheet Firefox (a { text-decoration: underline }) */
+.ins-ext-link {
+  text-decoration: none !important;
+  border-bottom: 1px solid currentColor;
+  padding-bottom: 1px;
+}
+
 .ins-progress__step.active .ins-progress__label,
 .ins-progress__step.done .ins-progress__label {
   color: #1e1e1e;

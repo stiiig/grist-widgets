@@ -2137,21 +2137,15 @@ export default function InscriptionPage() {
                           {orienteurError}
                         </span>
                       </div>
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
-                        <a
-                          href={ORIENTEUR_WIDGET_URL}
-                          target="_blank"
-                          rel="noreferrer"
-                          style={{
-                            fontSize: "0.8rem", color: "#000091", fontWeight: 600,
-                            textDecoration: "none",
-                            borderBottom: "1px solid #000091", paddingBottom: "1px",
-                          }}
-                        >
-                          Créer un compte orienteur·se
-                        </a>
-                        <i className="fa-solid fa-arrow-up-right-from-square" style={{ fontSize: "0.7rem", color: "#000091" }} />
-                      </span>
+                      <a
+                        href={ORIENTEUR_WIDGET_URL}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="ins-ext-link"
+                        style={{ fontSize: "0.8rem", color: "#000091", fontWeight: 600 }}
+                      >
+                        Créer un compte orienteur·se
+                      </a>
                     </div>
                   )}
                 </div>
@@ -2165,11 +2159,8 @@ export default function InscriptionPage() {
                         href={ORIENTEUR_WIDGET_URL}
                         target="_blank"
                         rel="noreferrer"
-                        style={{
-                          fontSize: "0.8rem", color: "#000091",
-                          textDecoration: "none",
-                          borderBottom: "1px solid #000091", paddingBottom: "1px",
-                        }}
+                        className="ins-ext-link"
+                        style={{ fontSize: "0.8rem", color: "#000091" }}
                       >
                         Vous n&apos;avez pas encore de compte orienteur·se ? Créez-en un
                       </a>
