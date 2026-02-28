@@ -276,6 +276,9 @@
   outline: none;
   transition: border-color 0.15s, background 0.15s;
 }
+.ins-input::placeholder {
+  color: #999;
+}
 .ins-input:focus,
 .ins-select:focus {
   border-color: #000091;

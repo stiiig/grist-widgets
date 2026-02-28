@@ -2082,7 +2082,7 @@ export default function InscriptionPage() {
                     <button
                       type="button"
                       className="ins-btn ins-btn--primary"
-                      style={{ flexShrink: 0 }}
+                      style={{ flexShrink: 0, height: "2.25rem", padding: "0 1rem" }}
                       onClick={checkOrienteur}
                       disabled={orienteurChecking || !orienteurEmail.trim()}
                     >
@@ -2110,17 +2110,6 @@ export default function InscriptionPage() {
                           Vous pouvez poursuivre l&apos;inscription du candidat·e.
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        style={{
-                          marginLeft: "auto", background: "none", border: "none",
-                          fontSize: "0.72rem", color: "#166534", cursor: "pointer",
-                          textDecoration: "underline", fontFamily: "inherit", padding: 0,
-                        }}
-                        onClick={() => { setOrienteurFound(null); setOrienteurEmail(""); }}
-                      >
-                        Modifier
-                      </button>
                     </div>
                   )}
 

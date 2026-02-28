@@ -135,6 +135,9 @@
   transition: border-color 0.15s, background 0.15s;
   box-sizing: border-box;
 }
+.ae-input::placeholder {
+  color: #999;
+}
 .ae-input:focus,
 .ae-select:focus {
   border-color: #000091;
