@@ -338,6 +338,7 @@ export default function OrienteurPage() {
                     value={form.Prenom}
                     onChange={(e) => set("Prenom", e.target.value)}
                     autoComplete="given-name"
+                    placeholder="Votre prénom"
                   />
                 </div>
                 <div className="occ-field">
@@ -350,6 +351,7 @@ export default function OrienteurPage() {
                     value={form.Nom}
                     onChange={(e) => set("Nom", e.target.value)}
                     autoComplete="family-name"
+                    placeholder="Votre nom de famille"
                   />
                 </div>
               </div>
@@ -369,10 +371,12 @@ export default function OrienteurPage() {
                   <input
                     className="occ-input"
                     type="tel"
+                    inputMode="numeric"
                     value={form.Tel}
-                    onChange={(e) => set("Tel", e.target.value)}
+                    onChange={(e) => set("Tel", e.target.value.replace(/\D/g, ""))}
                     autoComplete="tel"
                     style={{ flex: 1 }}
+                    placeholder="Votre numéro de téléphone"
                   />
                 </div>
               </div>
@@ -388,6 +392,7 @@ export default function OrienteurPage() {
                   value={form.Email}
                   onChange={(e) => set("Email", e.target.value)}
                   autoComplete="email"
+                  placeholder="Votre email professionnel"
                 />
               </div>
             </>

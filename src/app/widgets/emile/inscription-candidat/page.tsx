@@ -2130,19 +2130,20 @@ export default function InscriptionPage() {
                           {orienteurError}
                         </span>
                       </div>
-                      <a
-                        href={ORIENTEUR_WIDGET_URL}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{
-                          display: "inline-flex", alignItems: "center", gap: "0.35rem",
-                          fontSize: "0.8rem", color: "#000091", fontWeight: 600,
-                          textDecoration: "none",
-                        }}
-                      >
-                        <span style={{ textDecoration: "underline", textUnderlineOffset: "2px" }}>Créer un compte orienteur</span>
-                        <i className="fa-solid fa-arrow-up-right-from-square" style={{ fontSize: "0.7rem" }} />
-                      </a>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
+                        <a
+                          href={ORIENTEUR_WIDGET_URL}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{
+                            fontSize: "0.8rem", color: "#000091", fontWeight: 600,
+                            textDecoration: "underline", textUnderlineOffset: "2px",
+                          }}
+                        >
+                          Créer un compte orienteur
+                        </a>
+                        <i className="fa-solid fa-arrow-up-right-from-square" style={{ fontSize: "0.7rem", color: "#000091" }} />
+                      </span>
                     </div>
                   )}
                 </div>
@@ -2150,20 +2151,20 @@ export default function InscriptionPage() {
                 {/* Lien création compte (toujours visible) */}
                 {!orienteurError && !orienteurFound && (
                   <div style={{ marginTop: "0.25rem" }}>
-                    <a
-                      href={ORIENTEUR_WIDGET_URL}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={{
-                        display: "inline-flex", alignItems: "center", gap: "0.35rem",
-                        fontSize: "0.8rem", color: "#000091", textDecoration: "none",
-                      }}
-                    >
-                      <i className="fa-solid fa-user-plus" style={{ fontSize: "0.72rem" }} />
-                      <span style={{ textDecoration: "underline", textUnderlineOffset: "2px" }}>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
+                      <i className="fa-solid fa-user-plus" style={{ fontSize: "0.72rem", color: "#000091" }} />
+                      <a
+                        href={ORIENTEUR_WIDGET_URL}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          fontSize: "0.8rem", color: "#000091",
+                          textDecoration: "underline", textUnderlineOffset: "2px",
+                        }}
+                      >
                         Vous n&apos;avez pas encore de compte orienteur ? Créez-en un
-                      </span>
-                    </a>
+                      </a>
+                    </span>
                   </div>
                 )}
 
