@@ -33,10 +33,11 @@ jobs:
       - name: Build (static export)
         run: npm run build
         env:
-          NEXT_PUBLIC_GRIST_PROXY_URL: ${{ secrets.NEXT_PUBLIC_GRIST_PROXY_URL }}
+          NEXT_PUBLIC_GRIST_PROXY_URL:    ${{ secrets.NEXT_PUBLIC_GRIST_PROXY_URL }}
           NEXT_PUBLIC_GRIST_GENERATE_URL: ${{ secrets.NEXT_PUBLIC_GRIST_GENERATE_URL }}
-          NEXT_PUBLIC_OCC_GENERATE_URL: ${{ secrets.NEXT_PUBLIC_OCC_GENERATE_URL }}
-          NEXT_PUBLIC_OCC_VALIDATE_URL: ${{ secrets.NEXT_PUBLIC_OCC_VALIDATE_URL }}
+          NEXT_PUBLIC_OCC_GENERATE_URL:   ${{ secrets.NEXT_PUBLIC_OCC_GENERATE_URL }}
+          NEXT_PUBLIC_OCC_VALIDATE_URL:   ${{ secrets.NEXT_PUBLIC_OCC_VALIDATE_URL }}
+          NEXT_PUBLIC_OCC_LIST_URL:       ${{ secrets.NEXT_PUBLIC_OCC_LIST_URL }}
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

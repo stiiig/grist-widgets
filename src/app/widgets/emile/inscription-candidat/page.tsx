@@ -1186,6 +1186,7 @@ function EligibilityScreen({
   onNew,
   orienteurNom,
   orienteurEmail: orienteurEmailProp,
+  orienteurListUrl,
 }: {
   form: FormData;
   dptsOptions: Option[];
@@ -1198,6 +1199,7 @@ function EligibilityScreen({
   onNew: () => void;
   orienteurNom?: string | null;
   orienteurEmail?: string | null;
+  orienteurListUrl?: string | null;
 }) {
   const orienteurInfo = orienteurNom ? { nom: orienteurNom, email: orienteurEmailProp ?? "" } : null;
   const { age, deptLabel, deptOpt, niveauLabel, nationaliteLabel, e, criteria, failingCount, unknownCount, eligible, fullName } =
@@ -1363,6 +1365,25 @@ function EligibilityScreen({
               }
             </button>
           </div>
+        </div>
+      )}
+
+      {/* ── Lien vers la liste des candidats de l'orienteur ── */}
+      {orienteurListUrl && (
+        <div style={{ ...W, textAlign: "center" }}>
+          <a
+            href={orienteurListUrl}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: "0.4rem",
+              padding: "0.55rem 1.25rem", borderRadius: 4,
+              background: "#000091", color: "#fff",
+              fontSize: "0.85rem", fontWeight: 600,
+              textDecoration: "none", fontFamily: "inherit",
+            }}
+          >
+            <i className="fa-solid fa-users" />
+            Voir mes candidats
+          </a>
         </div>
       )}
 
@@ -1641,8 +1662,9 @@ export default function InscriptionPage() {
   const [showFaq, setShowFaq]         = useState(false);
   const [dptsIsDepart, setDptsIsDepart]           = useState<Map<number, boolean>>(new Map());
   const [niveauEligibilite, setNiveauEligibilite] = useState<Map<number, string>>(new Map());
-  const [submittedId2, setSubmittedId2]           = useState<string | null>(null);
-  const [submittedMagicLink, setSubmittedMagicLink] = useState<string | null>(null);
+  const [submittedId2, setSubmittedId2]                   = useState<string | null>(null);
+  const [submittedMagicLink, setSubmittedMagicLink]       = useState<string | null>(null);
+  const [submittedOrienteurListUrl, setSubmittedOrienteurListUrl] = useState<string | null>(null);
 
   // Étape 1 — Orienteur
   const [orienteurEmail, setOrienteurEmail]         = useState("");
@@ -1922,6 +1944,9 @@ export default function InscriptionPage() {
         fields.Pret_a_se_former = encodeListCell(form.Pret_a_se_former);
       }
 
+      // Lien orienteur → candidat
+      if (orienteurFound?.id) fields.Responsable_candidat = orienteurFound.id;
+
       const result = await docApi.applyUserActions([["AddRecord", TABLE_ID, null, fields]]);
       const newRowId = result?.retValues?.[0] as number | undefined;
       if (newRowId) {
@@ -1953,6 +1978,22 @@ export default function InscriptionPage() {
             }
           }
         } catch { /* non bloquant — le formulaire est déjà soumis */ }
+
+        // Lien "Voir mes candidats" pour l'orienteur (via token OCC)
+        try {
+          const occUrl = process.env.NEXT_PUBLIC_OCC_GENERATE_URL;
+          if (occUrl && orienteurFound) {
+            const url = `${occUrl.replace(/\/$/, "")}?rowId=${orienteurFound.id}`;
+            const occRes = await fetch(url);
+            if (occRes.ok) {
+              const occData = await occRes.json();
+              if (occData?.token) {
+                const base = "https://stiiig.github.io/grist-widgets/widgets/emile/liste-candidats";
+                setSubmittedOrienteurListUrl(`${base}?token=${occData.token}`);
+              }
+            }
+          }
+        } catch { /* non bloquant */ }
       }
       setShowSummary(false);
       setDone(true);
@@ -1992,7 +2033,8 @@ export default function InscriptionPage() {
             magicLink={submittedMagicLink}
             orienteurNom={orienteurFound?.nom ?? null}
             orienteurEmail={orienteurFound?.email ?? null}
-            onNew={() => { setForm(INITIAL); setDone(false); setShowSummary(false); setStep(1); setValidError(""); setSubmitError(""); setSubmittedId2(null); setSubmittedMagicLink(null); setOrienteurEmail(""); setOrienteurFound(null); setOrienteurError(""); setOrienteurResending(false); setOrienteurResent(false); }}
+            orienteurListUrl={submittedOrienteurListUrl}
+            onNew={() => { setForm(INITIAL); setDone(false); setShowSummary(false); setStep(1); setValidError(""); setSubmitError(""); setSubmittedId2(null); setSubmittedMagicLink(null); setSubmittedOrienteurListUrl(null); setOrienteurEmail(""); setOrienteurFound(null); setOrienteurError(""); setOrienteurResending(false); setOrienteurResent(false); }}
           />
         </div>
       </div>

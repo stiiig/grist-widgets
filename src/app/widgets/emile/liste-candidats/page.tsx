@@ -1,0 +1,176 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import "./styles.css";
+import logoEmile from "../assets/logo-emile-white.png";
+
+type Status = "loading" | "ok" | "invalid" | "no_token" | "error";
+
+interface Candidat {
+  id: number;
+  prenom: string;
+  nom: string;
+  email: string;
+  lienAcces: string | null;
+}
+
+export default function ListeCandidatsPage() {
+  const [status,        setStatus]        = useState<Status>("loading");
+  const [orienteurNom,  setOrienteurNom]  = useState("");
+  const [candidats,     setCandidats]     = useState<Candidat[]>([]);
+
+  useEffect(() => {
+    const p     = new URLSearchParams(window.location.search);
+    const token = p.get("token");
+
+    if (!token) {
+      setStatus("no_token");
+      return;
+    }
+
+    const listUrl = process.env.NEXT_PUBLIC_OCC_LIST_URL;
+    if (!listUrl) {
+      setStatus("error");
+      return;
+    }
+
+    const url = `${listUrl.replace(/\/$/, "")}?token=${encodeURIComponent(token)}`;
+
+    fetch(url)
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((data) => {
+        if (data?.status === "ok") {
+          setOrienteurNom(data.orienteurNom ?? "");
+          setCandidats(data.candidats ?? []);
+          setStatus("ok");
+        } else {
+          setStatus("invalid");
+        }
+      })
+      .catch(() => setStatus("error"));
+  }, []);
+
+  return (
+    <div className="lc-shell">
+      <header className="lc-header">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={logoEmile.src} alt="EMILE" style={{ height: "2rem", width: "auto" }} />
+        <span className="lc-header__appname">Mes candidat·e·s</span>
+      </header>
+
+      <main className="lc-body">
+
+        {/* ── Chargement ── */}
+        {status === "loading" && (
+          <div className="lc-card lc-card--center">
+            <div className="lc-spinner">
+              <i className="fa-solid fa-spinner fa-spin" />
+            </div>
+            <p className="lc-message">Chargement de la liste…</p>
+          </div>
+        )}
+
+        {/* ── Liste ── */}
+        {status === "ok" && (
+          <div className="lc-container">
+            <div className="lc-page-header">
+              <h1 className="lc-page-title">
+                <i className="fa-solid fa-users" />
+                {orienteurNom ? `Candidat·e·s de ${orienteurNom}` : "Mes candidat·e·s"}
+              </h1>
+              <span className="lc-badge">
+                {candidats.length === 0
+                  ? "Aucun candidat"
+                  : candidats.length === 1
+                  ? "1 candidat·e"
+                  : `${candidats.length} candidat·e·s`}
+              </span>
+            </div>
+
+            {candidats.length === 0 ? (
+              <div className="lc-card lc-card--center">
+                <i className="fa-solid fa-inbox lc-icon lc-icon--muted" />
+                <p className="lc-message">Aucun candidat·e inscrit·e pour le moment.</p>
+                <a
+                  href="/widgets/emile/inscription-candidat/"
+                  className="lc-btn"
+                >
+                  <i className="fa-solid fa-user-plus" />
+                  Inscrire un·e candidat·e
+                </a>
+              </div>
+            ) : (
+              <ul className="lc-list">
+                {candidats.map((c) => (
+                  <li key={c.id} className="lc-item">
+                    <div className="lc-item__info">
+                      <span className="lc-item__name">
+                        {[c.prenom, c.nom].filter(Boolean).join(" ") || "—"}
+                      </span>
+                      {c.email && (
+                        <span className="lc-item__email">{c.email}</span>
+                      )}
+                    </div>
+                    <div className="lc-item__actions">
+                      {c.lienAcces ? (
+                        <a
+                          href={c.lienAcces}
+                          className="lc-btn lc-btn--sm"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <i className="fa-solid fa-folder-open" />
+                          Voir la fiche
+                        </a>
+                      ) : (
+                        <span className="lc-item__no-link">Fiche non disponible</span>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <div className="lc-footer-actions">
+              <a
+                href="/widgets/emile/inscription-candidat/"
+                className="lc-btn lc-btn--outline"
+              >
+                <i className="fa-solid fa-user-plus" />
+                Inscrire un·e candidat·e
+              </a>
+            </div>
+          </div>
+        )}
+
+        {/* ── Lien invalide / no_token ── */}
+        {(status === "invalid" || status === "no_token") && (
+          <div className="lc-card lc-card--center">
+            <i className="fa-solid fa-circle-xmark lc-icon lc-icon--error" />
+            <h2 className="lc-title">Lien invalide</h2>
+            <p className="lc-message">
+              Ce lien est invalide ou a expiré.<br />
+              Contactez votre administrateur·ice pour en obtenir un nouveau.
+            </p>
+          </div>
+        )}
+
+        {/* ── Erreur réseau ── */}
+        {status === "error" && (
+          <div className="lc-card lc-card--center">
+            <i className="fa-solid fa-triangle-exclamation lc-icon lc-icon--warning" />
+            <h2 className="lc-title">Erreur</h2>
+            <p className="lc-message">
+              Une erreur est survenue lors du chargement.<br />
+              Veuillez réessayer ou contacter votre administrateur·ice.
+            </p>
+          </div>
+        )}
+
+      </main>
+    </div>
+  );
+}
