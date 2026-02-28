@@ -2062,7 +2062,7 @@ export default function InscriptionPage() {
 
                 <div className="ins-field ins-field--wide">
                   <label className="ins-label">
-                    Adresse email de votre compte orienteur<span className="ins-required"> *</span>
+                    Adresse email de votre compte orienteur·se<span className="ins-required"> *</span>
                   </label>
                   <div style={{ display: "flex", gap: "0.5rem", alignItems: "flex-start" }}>
                     <input
