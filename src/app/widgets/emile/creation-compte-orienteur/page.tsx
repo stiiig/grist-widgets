@@ -280,7 +280,7 @@ export default function OrienteurPage() {
                 <span>
                   Si votre établissement n&apos;apparaît pas dans la liste,{" "}
                   <Link
-                    href="/emile/ajout-etablissement/"
+                    href="/widgets/emile/ajout-etablissement/"
                     target="_blank"
                     rel="noreferrer"
                     style={{

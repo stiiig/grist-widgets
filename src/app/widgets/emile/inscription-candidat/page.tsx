@@ -20,7 +20,7 @@ import { EMAIL_REGEX, validatePhone } from "@/lib/emile/validators";
 
 const TABLE_ID    = "CANDIDATS";
 const TOTAL_STEPS = 4;
-const ORIENTEUR_WIDGET_URL = "/emile/creation-compte-orienteur/";
+const ORIENTEUR_WIDGET_URL = "/widgets/emile/creation-compte-orienteur/";
 
 /* ─── Types ─────────────────────────────────────────────────── */
 type FormData = {
