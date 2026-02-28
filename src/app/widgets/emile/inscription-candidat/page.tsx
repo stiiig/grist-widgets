@@ -19,7 +19,7 @@ import { DIAL_CODES, PINNED_PAYS, TYPE_TAG, FALLBACK_COLS } from "@/lib/emile/co
 import { EMAIL_REGEX, validatePhone } from "@/lib/emile/validators";
 
 const TABLE_ID    = "CANDIDATS";
-const TOTAL_STEPS = 5;
+const TOTAL_STEPS = 4;
 const ORIENTEUR_WIDGET_URL = "/widgets/emile/creation-compte-orienteur/";
 
 /* ─── Types ─────────────────────────────────────────────────── */
