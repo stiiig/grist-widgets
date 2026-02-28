@@ -64,9 +64,9 @@ Le proxy joue quatre rôles :
 
 ---
 
-## Architecture actuelle — trois workflows n8n
+## Architecture actuelle — cinq workflows n8n
 
-### Workflow GET — lecture + téléchargement + vérification magic link
+### Workflow GET — lecture + téléchargement + vérification magic link fiche-candidat
 
 ```
 Webhook GET (?table=X&token=ID.HMAC  ou  ?table=X&filter=JSON  ou  ?attachId=Y)
@@ -127,7 +127,7 @@ Ni les écritures ni l'upload ne déclenchent de preflight, parce que :
 
 Le code `rest.ts` parse la réponse de manière défensive car n8n sérialise les tableaux JSON de manière non déterministe selon sa version (`{"data":"[42]"}`, `[42]`, ou des objets items `{json: 42, pairedItem: ...}`).
 
-### Workflow GENERATE — génération de magic links
+### Workflow GENERATE — génération de magic links fiche-candidat
 
 ```
 Webhook GET /webhook/grist-generate?rowId=X
@@ -139,18 +139,81 @@ Code (extrait rowId depuis $json.query.rowId)
 Crypto HMAC-SHA256 (même secret que le workflow GET)
     │
     ▼
-Code (construit token = rowId.HMAC et URL complète)
+Code (construit token = rowId.HMAC et URL complète → fiche-candidat?token=X.HMAC)
     │
     ▼
-Respond to Webhook { rowId, token, url }
+Respond to Webhook { rowId, token, url }  ← le frontend reçoit l'URL immédiatement
+    │
+    ▼
+Code (construit body PATCH)
+    │
+    ▼
+HTTP PATCH CANDIDATS.Lien_acces = url  ← sauvegarde en background dans Grist
 ```
 
 Génère un token signé `rowId.HMAC` pour un candidat donné. Appelé automatiquement par le formulaire `inscription-candidat` après la création du candidat, ou manuellement via un script.
+
+**Clé : Respond to Webhook AVANT le PATCH Grist** — n8n continue l'exécution du workflow après avoir répondu au browser. Le frontend reçoit `{rowId, token, url}` sans attendre la mise à jour Grist. Le champ `Lien_acces` dans `CANDIDATS` est mis à jour en arrière-plan.
 
 **Pas d'authentification côté webhook** — le formulaire appelle ce GET sans header custom (pas de preflight CORS). La sécurité repose sur :
 - l'obscurité de l'URL du webhook
 - le secret HMAC : même en connaissant l'URL, on ne peut pas forger un token valide sans le secret
 - en production : possibilité d'ajouter une restriction IP côté n8n si nécessaire
+
+### Workflow OCC-GENERATE — génération de magic links orienteur
+
+```
+Webhook GET /webhook/occ-generate?rowId=X
+    │
+    ▼
+Code (extrait rowId depuis $json.query.rowId)
+    │
+    ▼
+Crypto HMAC-SHA256 (même secret EMILE HMAC Secret)
+    │
+    ▼
+Code (construit token = rowId.HMAC et URL → validation-compte?token=X.HMAC)
+    │
+    ▼
+Respond to Webhook { rowId, token, url }  ← frontend reçoit l'URL immédiatement
+    │
+    ▼
+Code (construit body PATCH)
+    │
+    ▼
+HTTP PATCH ACCOMPAGNANTS.Lien_validation = url  ← sauvegarde en background dans Grist
+```
+
+OCC = **Orienteur Compte Créer**. Génère un lien d'activation de compte orienteur. Appelé automatiquement par `creation-compte-orienteur` après AddRecord dans `ACCOMPAGNANTS`. Même pattern HMAC que GENERATE, même credential secret — seule l'URL de destination change (`validation-compte` au lieu de `fiche-candidat`).
+
+### Workflow OCC-VALIDATE — vérification et activation du compte orienteur
+
+```
+Webhook GET /webhook/occ-validate?token=X.HMAC
+    │
+    ▼
+Code (extrait rowId + sig du token)
+    │
+    ▼
+Crypto HMAC-SHA256 (credential EMILE HMAC Secret)
+    │
+    ▼
+IF sig === HMAC calculé
+    ├─ False → Respond { "status": "invalid" }
+    │
+    └─ True  → HTTP GET ACCOMPAGNANTS?filter={"id":[rowId]}
+                │
+                ▼
+               Code (extrait Compte_valide)
+                │
+                ▼
+               IF Compte_valide === "Oui"
+                ├─ True  → Respond { "status": "already_validated" }
+                └─ False → HTTP PATCH Compte_valide = "Oui"
+                              → Respond { "status": "ok", "nom": "..." }
+```
+
+Appelé par la page `validation-compte` au chargement. Vérifie le token, lit le compte dans `ACCOMPAGNANTS`, et passe `Compte_valide` de `"En attente"` à `"Oui"` si le token est valide et que le compte n'était pas encore activé.
 
 ---
 
@@ -167,21 +230,25 @@ Sans modifier Grist, sans plugin, sans compte Grist côté utilisateur :
 | Télécharger une pièce jointe | `GET ?attachId=42` → binaire |
 | Uploader une pièce jointe | `POST multipart/form-data` |
 | Soumettre le formulaire d'inscription (AddRecord) | `POST text/plain { _action:"add", fields }` → workflow POST → branche AddRecord |
-| Générer un magic link signé | `GET /webhook/grist-generate?rowId=X` (appelé automatiquement par `inscription-candidat`) |
+| Générer un magic link fiche-candidat | `GET /webhook/grist-generate?rowId=X` (appelé automatiquement par `inscription-candidat`) + sauvegarde `Lien_acces` dans `CANDIDATS` en background |
+| Générer un magic link orienteur (OCC) | `GET /webhook/occ-generate?rowId=X` (appelé automatiquement par `creation-compte-orienteur`) + sauvegarde `Lien_validation` dans `ACCOMPAGNANTS` en background |
+| Activer un compte orienteur via lien signé | `GET /webhook/occ-validate?token=ID.HMAC` (appelé par `validation-compte`) → passe `Compte_valide` à `"Oui"` dans `ACCOMPAGNANTS` |
 
 ---
 
 ## Sécurité du magic link
 
-### Token format
+### Token format (commun à tous les workflows)
 
 ```
 token = rowId + "." + HMAC-SHA256(rowId.toString(), SECRET)
 ```
 
-- **rowId** — identifiant de l'enregistrement Grist (entier)
-- **HMAC-SHA256** — signature cryptographique avec un secret partagé entre les deux workflows n8n
-- **SECRET** — stocké uniquement dans les credentials n8n (type Crypto), jamais dans le code ni dans le repo
+- **rowId** — identifiant de l'enregistrement Grist (entier) : rowId dans `CANDIDATS` pour fiche-candidat, rowId dans `ACCOMPAGNANTS` pour OCC
+- **HMAC-SHA256** — signature cryptographique avec un secret partagé entre les workflows n8n
+- **SECRET** — stocké uniquement dans les credentials n8n (credential `EMILE HMAC Secret` de type Crypto), jamais dans le code ni dans le repo
+
+> ⚠️ Les workflows GENERATE, OCC-GENERATE et OCC-VALIDATE utilisent **tous le même credential** `EMILE HMAC Secret`. Un token généré par GENERATE ne peut pas être utilisé sur OCC-VALIDATE (et vice versa) car les rowIds appartiennent à des tables différentes — mais techniquement la signature est valide. Si une isolation renforcée est souhaitée, utiliser deux credentials secrets distincts.
 
 ### Propriétés
 
@@ -189,8 +256,8 @@ token = rowId + "." + HMAC-SHA256(rowId.toString(), SECRET)
 |-----------|--------|
 | Forgeable sans le secret | ❌ Non |
 | Expiration | ❌ Permanent (pas d'expiration) |
-| Révocable | ⚠️ Uniquement en changeant le secret (invalide tous les tokens) |
-| Lié à un candidat spécifique | ✅ Oui (rowId dans le token) |
+| Révocable | ⚠️ Uniquement en changeant le secret (invalide **tous** les tokens — fiche-candidat ET orienteur) |
+| Lié à un enregistrement spécifique | ✅ Oui (rowId dans le token) |
 
 ### Fallback dev
 
@@ -224,5 +291,7 @@ Les magic links sont permanents. Pour des dossiers sensibles, une expiration (da
 | `src/lib/grist/init.ts` | Détecte `NEXT_PUBLIC_GRIST_PROXY_URL` et bascule en mode REST |
 | `src/lib/grist/meta.ts` | Charge métadonnées colonnes via `_grist_Tables` |
 | `src/components/AttachmentField.tsx` | Gestion pièces jointes (affichage, download fetch+blob, upload) |
-| `src/app/widgets/emile/inscription-candidat/page.tsx` | Formulaire d'inscription — AddRecord via `text/plain` + génération du magic link |
-| `docs/rest-mode.md` | Config n8n pas-à-pas avec tous les pièges rencontrés |
+| `src/app/widgets/emile/inscription-candidat/page.tsx` | Formulaire d'inscription — AddRecord via `text/plain` + génération magic link fiche-candidat (`NEXT_PUBLIC_GRIST_GENERATE_URL`) + sauvegarde `Lien_acces` dans `CANDIDATS` |
+| `src/app/widgets/emile/creation-compte-orienteur/page.tsx` | Formulaire création compte orienteur — AddRecord `ACCOMPAGNANTS` (`Compte_valide: "En attente"`) + génération magic link OCC (`NEXT_PUBLIC_OCC_GENERATE_URL`) + sauvegarde `Lien_validation` dans `ACCOMPAGNANTS` |
+| `src/app/widgets/emile/validation-compte/page.tsx` | Page d'activation compte orienteur — appelle `NEXT_PUBLIC_OCC_VALIDATE_URL?token=X.HMAC`, affiche le résultat (`ok` / `already_validated` / `invalid` / `error`) |
+| `docs/rest-mode.md` | Config n8n pas-à-pas avec tous les pièges rencontrés (workflows GET, POST, GENERATE, OCC-GENERATE, OCC-VALIDATE) |

@@ -10,8 +10,9 @@ Les widgets EMILE fonctionnent normalement dans un **iframe Grist** (mode plugin
 |--------|-------------|-------|
 | `fiche-candidat` | `/widgets/emile/fiche-candidat?token=ID.HMAC` | Consultation/édition d'un dossier candidat via magic link signé |
 | `ajout-etablissement` | `/widgets/emile/ajout-etablissement` | Formulaire d'ajout d'un établissement |
-| `creation-compte-orienteur` | `/widgets/emile/creation-compte-orienteur` | Formulaire de création d'un compte orienteur |
-| `inscription-candidat` | `/widgets/emile/inscription-candidat` | Formulaire d'inscription candidat — AddRecord + génération automatique du magic link |
+| `creation-compte-orienteur` | `/widgets/emile/creation-compte-orienteur` | Formulaire de création d'un compte orienteur — AddRecord + génération automatique du magic link OCC |
+| `inscription-candidat` | `/widgets/emile/inscription-candidat` | Formulaire d'inscription candidat — AddRecord + génération automatique du magic link fiche-candidat |
+| `validation-compte` | `/widgets/emile/validation-compte?token=ID.HMAC` | Activation d'un compte orienteur via magic link OCC |
 
 ---
 
@@ -53,7 +54,9 @@ Contrôlé par la variable d'environnement `NEXT_PUBLIC_GRIST_PROXY_URL` (baked 
 | Variable | Valeur | Obligatoire |
 |----------|--------|------------|
 | `NEXT_PUBLIC_GRIST_PROXY_URL` | `https://n8n.incubateur.dnum.din.developpement-durable.gouv.fr/webhook/grist` | ✅ — active le mode REST |
-| `NEXT_PUBLIC_GRIST_GENERATE_URL` | `https://n8n.incubateur.dnum.din.developpement-durable.gouv.fr/webhook/grist-generate` | ✅ — génération du magic link dans `inscription-candidat` |
+| `NEXT_PUBLIC_GRIST_GENERATE_URL` | `https://n8n.incubateur.dnum.din.developpement-durable.gouv.fr/webhook/grist-generate` | ✅ — génération du magic link fiche-candidat dans `inscription-candidat` |
+| `NEXT_PUBLIC_OCC_GENERATE_URL` | `https://n8n.incubateur.dnum.din.developpement-durable.gouv.fr/webhook/occ-generate` | ✅ — génération du magic link orienteur dans `creation-compte-orienteur` et `inscription-candidat` |
+| `NEXT_PUBLIC_OCC_VALIDATE_URL` | `https://n8n.incubateur.dnum.din.developpement-durable.gouv.fr/webhook/occ-validate` | ✅ — vérification et activation du compte orienteur dans `validation-compte` |
 | `NEXT_PUBLIC_GRIST_GENERATE_AUTH` | *(non utilisée)* | ❌ — legacy, supprimable |
 
 > ℹ️ `NEXT_PUBLIC_GRIST_GENERATE_AUTH` a été ajoutée quand le webhook GENERATE était en `POST + Basic Auth`. Depuis la migration vers `GET` sans authentification, cette variable n'est plus lue par le code. Le secret GitHub correspondant peut rester vide ou être supprimé.
@@ -63,6 +66,8 @@ Déclarées dans `.github/workflows/deploy.yml` :
 env:
   NEXT_PUBLIC_GRIST_PROXY_URL:    ${{ secrets.NEXT_PUBLIC_GRIST_PROXY_URL }}
   NEXT_PUBLIC_GRIST_GENERATE_URL: ${{ secrets.NEXT_PUBLIC_GRIST_GENERATE_URL }}
+  NEXT_PUBLIC_OCC_GENERATE_URL:   ${{ secrets.NEXT_PUBLIC_OCC_GENERATE_URL }}
+  NEXT_PUBLIC_OCC_VALIDATE_URL:   ${{ secrets.NEXT_PUBLIC_OCC_VALIDATE_URL }}
   # NEXT_PUBLIC_GRIST_GENERATE_AUTH — non utilisée (legacy POST+BasicAuth, supprimable)
 ```
 
@@ -105,13 +110,15 @@ Ces deux tables sont accessibles via le proxy n8n comme n'importe quelle table n
 
 ## Configuration n8n
 
-### Trois workflows
+### Cinq workflows
 
 | Workflow | Méthode | Path | Usage |
 |----------|---------|------|-------|
-| GET | GET | `/webhook/grist` | Lecture records, métadonnées, téléchargement PJ, vérification magic link |
-| POST | POST | `/webhook/grist` | Upload pièces jointes |
-| GENERATE | GET | `/webhook/grist-generate` | Génération de magic links signés |
+| GET | GET | `/webhook/grist` | Lecture records, métadonnées, téléchargement PJ, vérification magic link fiche-candidat |
+| POST | POST | `/webhook/grist` | Écritures Grist (AddRecord/UpdateRecord), upload pièces jointes |
+| GENERATE | GET | `/webhook/grist-generate` | Génération de magic links signés pour fiche-candidat |
+| OCC-GENERATE | GET | `/webhook/occ-generate` | Génération de magic links signés pour validation de compte orienteur |
+| OCC-VALIDATE | GET | `/webhook/occ-validate` | Vérification du token OCC + activation du compte orienteur (Compte_valide → "Oui") |
 
 ---
 
@@ -538,12 +545,309 @@ return [{ json: { rowId, token, url } }];
 
 Retourne `{ rowId, token, url }`. Le header `Access-Control-Allow-Origin: *` est ajouté automatiquement par n8n sur les webhooks GET.
 
+### Nœud 6 — Code (construire body PATCH pour Lien_acces)
+
+```javascript
+// Sauvegarde du lien dans la table CANDIDATS — exécuté APRÈS Respond to Webhook
+// n8n continue son exécution après avoir répondu au browser
+const rowId = $json.rowId;
+const url   = $json.url;
+const body  = JSON.stringify({ records: [{ id: rowId, fields: { Lien_acces: url } }] });
+return [{ json: { ...$json, patchBody: body } }];
+```
+
+### Nœud 7 — HTTP Request (PATCH Grist — sauvegarde Lien_acces)
+
+| Paramètre | Valeur |
+|-----------|--------|
+| Method | **PATCH** |
+| URL | `https://grist.incubateur.dnum.din.developpement-durable.gouv.fr/api/docs/75GHATRaKvHSmx3FRqCi4f/tables/CANDIDATS/records` |
+| Authentication | Generic Credential Type → Bearer Auth → **Bearer Auth Grist** |
+| Body Content Type | **Raw** |
+| Content Type | `application/json` |
+| Body | `{{ $json.patchBody }}` |
+
+> ℹ️ Ce nœud s'exécute **après** le Respond to Webhook (Nœud 5). n8n continue l'exécution du workflow après avoir répondu au browser — le frontend reçoit immédiatement `{rowId, token, url}` sans attendre la mise à jour Grist. La sauvegarde du lien dans Grist est donc non bloquante du point de vue du browser.
+>
+> ℹ️ Le frontend (`inscription-candidat`) sauvegarde également `Lien_acces` via `UpdateRecord` après réception de la réponse — il y a donc deux tentatives de sauvegarde (n8n en background + frontend via proxy POST). Les deux sont non bloquantes et idempotentes.
+
 ### Exemple d'appel manuel
 
 ```bash
 curl "https://n8n.incubateur.dnum.din.developpement-durable.gouv.fr/webhook/grist-generate?rowId=42"
 # → { "rowId": 42, "token": "42.a3f9b2...", "url": "https://stiiig.github.io/...?token=42.a3f9b2..." }
 ```
+
+---
+
+## Workflow OCC-GENERATE — génération de magic links orienteur
+
+**URL (production) :**
+```
+https://n8n.incubateur.dnum.din.developpement-durable.gouv.fr/webhook/occ-generate
+```
+
+OCC = **Orienteur Compte Créer**. Ce workflow génère un lien signé envoyé par email à l'orienteur pour valider son compte. Il est appelé automatiquement par le formulaire `creation-compte-orienteur` après la création du compte (AddRecord dans `ACCOMPAGNANTS`).
+
+> ℹ️ Ce workflow est **indépendant** du workflow GENERATE (fiche-candidat). Il utilise le même mécanisme HMAC-SHA256 et le même credential secret, mais pointe vers une URL de destination différente (`validation-compte` au lieu de `fiche-candidat`).
+
+**Pas d'authentification** — GET sans header custom = simple CORS request. La sécurité repose sur l'obscurité de l'URL et l'impossibilité de forger un token HMAC sans le secret.
+
+### Nœud 1 — Webhook (GET)
+
+| Paramètre | Valeur |
+|-----------|--------|
+| HTTP Method | **GET** |
+| Path | `occ-generate` |
+| Authentication | **None** |
+| Respond | **Using Respond to Webhook Node** |
+
+### Nœud 2 — Code (extraire rowId)
+
+```javascript
+const rowId = parseInt($json.query.rowId);
+if (!rowId || isNaN(rowId)) throw new Error("rowId requis");
+return [{ json: { rowId, rowIdStr: rowId.toString() } }];
+```
+
+### Nœud 3 — Crypto (HMAC-SHA256)
+
+| Paramètre | Valeur |
+|-----------|--------|
+| Action | **HMAC** |
+| Type | **SHA256** |
+| Value | `{{ $json.rowIdStr }}` |
+| Credential | **EMILE HMAC Secret** (même credential que GENERATE et OCC-VALIDATE !) |
+| Encoding | **HEX** |
+| Property Name | `data` |
+
+### Nœud 4 — Code (construire token + URL)
+
+```javascript
+const rowId = $json.rowId;
+const sig   = $json.data;
+const token = `${rowId}.${sig}`;
+const url   = `https://stiiig.github.io/grist-widgets/widgets/emile/validation-compte?token=${token}`;
+return [{ json: { rowId, token, url } }];
+```
+
+> ℹ️ La seule différence avec GENERATE est l'URL de destination : `validation-compte` au lieu de `fiche-candidat`.
+
+### Nœud 5 — Respond to Webhook
+
+| Paramètre | Valeur |
+|-----------|--------|
+| Respond With | **First Incoming Item** |
+
+Retourne `{ rowId, token, url }`.
+
+### Nœud 6 — Code (construire body PATCH pour Lien_validation)
+
+```javascript
+// Sauvegarde du lien dans la table ACCOMPAGNANTS — exécuté APRÈS Respond to Webhook
+const rowId = $json.rowId;
+const url   = $json.url;
+const body  = JSON.stringify({ records: [{ id: rowId, fields: { Lien_validation: url } }] });
+return [{ json: { ...$json, patchBody: body } }];
+```
+
+### Nœud 7 — HTTP Request (PATCH Grist — sauvegarde Lien_validation)
+
+| Paramètre | Valeur |
+|-----------|--------|
+| Method | **PATCH** |
+| URL | `https://grist.incubateur.dnum.din.developpement-durable.gouv.fr/api/docs/75GHATRaKvHSmx3FRqCi4f/tables/ACCOMPAGNANTS/records` |
+| Authentication | Generic Credential Type → Bearer Auth → **Bearer Auth Grist** |
+| Body Content Type | **Raw** |
+| Content Type | `application/json` |
+| Body | `{{ $json.patchBody }}` |
+
+> ℹ️ Même pattern que dans GENERATE : Respond to Webhook d'abord, PATCH Grist ensuite en background. Le frontend reçoit immédiatement `{rowId, token, url}` sans attendre la mise à jour Grist.
+>
+> ⚠️ La colonne `Lien_validation` doit exister dans la table `ACCOMPAGNANTS` de Grist. La créer manuellement si elle n'existe pas (type Texte).
+
+### Exemple d'appel manuel
+
+```bash
+curl "https://n8n.incubateur.dnum.din.developpement-durable.gouv.fr/webhook/occ-generate?rowId=6"
+# → { "rowId": 6, "token": "6.d4f8a2...", "url": "https://stiiig.github.io/.../validation-compte?token=6.d4f8a2..." }
+```
+
+---
+
+## Workflow OCC-VALIDATE — vérification et activation du compte orienteur
+
+**URL (production) :**
+```
+https://n8n.incubateur.dnum.din.developpement-durable.gouv.fr/webhook/occ-validate
+```
+
+Ce workflow est appelé par la page `validation-compte` quand un orienteur clique sur son lien de validation. Il :
+1. Vérifie la signature HMAC du token
+2. Lit le compte dans `ACCOMPAGNANTS` (via son rowId)
+3. Vérifie le champ `Compte_valide` (valeurs : `"En attente"` / `"Oui"`)
+4. Si pas encore validé : met à jour `Compte_valide → "Oui"` via PATCH
+5. Retourne un JSON de statut à la page frontend
+
+**Pas d'authentification** — GET sans header custom = simple CORS request.
+
+### Nœud 1 — Webhook (GET)
+
+| Paramètre | Valeur |
+|-----------|--------|
+| HTTP Method | **GET** |
+| Path | `occ-validate` |
+| Authentication | **None** |
+| Respond | **Using Respond to Webhook Node** |
+
+### Nœud 2 — Code (extraire rowId + sig du token)
+
+```javascript
+const token = $json.query.token;
+if (!token) throw new Error("Token manquant");
+const parts = token.split(".");
+const rowId = parseInt(parts[0]);
+const sig   = parts[1];
+if (!rowId || isNaN(rowId) || !sig) throw new Error("Token malformé");
+return [{ json: { rowId, sig, rowIdStr: rowId.toString() } }];
+```
+
+### Nœud 3 — Crypto (HMAC-SHA256)
+
+| Paramètre | Valeur |
+|-----------|--------|
+| Action | **HMAC** |
+| Type | **SHA256** |
+| Value | `{{ $json.rowIdStr }}` |
+| Credential | **EMILE HMAC Secret** (même credential que OCC-GENERATE !) |
+| Encoding | **HEX** |
+| Property Name | `data` |
+
+### Nœud 4 — IF signature valide
+
+| Paramètre | Valeur |
+|-----------|--------|
+| Value 1 | `{{ $json.data }}` (HMAC calculé) |
+| Operation | **equals** |
+| Value 2 | `{{ $json.sig }}` (sig extrait du token) |
+| True → | HTTP GET Grist (lire le compte) |
+| False → | Respond 200 `{ "status": "invalid" }` |
+
+> ℹ️ On retourne 200 même en cas de token invalide (pas de 403) — la page frontend distingue les cas via le champ `status` dans le JSON, pas via le code HTTP.
+
+### Nœud 5 (True) — HTTP Request (GET Grist — lire ACCOMPAGNANTS)
+
+| Paramètre | Valeur |
+|-----------|--------|
+| Method | **GET** |
+| URL | `https://grist.incubateur.dnum.din.developpement-durable.gouv.fr/api/docs/75GHATRaKvHSmx3FRqCi4f/tables/ACCOMPAGNANTS/records?filter={"id":[{{ $json.rowId }}]}` |
+| Authentication | Generic Credential Type → Bearer Auth → **Bearer Auth Grist** |
+
+### Nœud 6 — Code (extraire le compte + détecter déjà validé)
+
+```javascript
+const records = $json.records ?? [];
+if (!records.length) return [{ json: { status: "invalid" } }];
+
+const record        = records[0];
+const compteValide  = record.fields?.Compte_valide ?? "";
+const nom           = record.fields?.Nom_de_famille ?? record.fields?.Nom ?? "";
+const rowId         = record.id;
+
+if (compteValide === "Oui") {
+  return [{ json: { status: "already_validated", rowId, nom } }];
+}
+return [{ json: { status: "pending", rowId, nom } }];
+```
+
+### Nœud 7 — IF déjà validé
+
+| Paramètre | Valeur |
+|-----------|--------|
+| Condition | `{{ $json.status }}` **equals** `already_validated` |
+| True → | Respond 200 `{ "status": "already_validated" }` |
+| False → | Code (construire body PATCH) |
+
+### Nœud 8 (False) — Code (construire body PATCH Compte_valide)
+
+```javascript
+const rowId = $json.rowId;
+const nom   = $json.nom;
+const body  = JSON.stringify({ records: [{ id: rowId, fields: { Compte_valide: "Oui" } }] });
+return [{ json: { rowId, nom, patchBody: body } }];
+```
+
+### Nœud 9 — HTTP Request (PATCH Grist — activer le compte)
+
+| Paramètre | Valeur |
+|-----------|--------|
+| Method | **PATCH** |
+| URL | `https://grist.incubateur.dnum.din.developpement-durable.gouv.fr/api/docs/75GHATRaKvHSmx3FRqCi4f/tables/ACCOMPAGNANTS/records` |
+| Authentication | Generic Credential Type → Bearer Auth → **Bearer Auth Grist** |
+| Body Content Type | **Raw** |
+| Content Type | `application/json` |
+| Body | `{{ $json.patchBody }}` |
+
+### Nœud 10 — Respond to Webhook (activation réussie)
+
+| Paramètre | Valeur |
+|-----------|--------|
+| Respond With | **JSON** |
+| Response Body | `{ "status": "ok", "nom": "{{ $json.nom }}" }` |
+| Response Code | 200 |
+| Header | `Access-Control-Allow-Origin: *` |
+
+### Schéma complet — Workflow OCC-VALIDATE
+
+```
+Webhook GET (path: occ-validate)
+    │
+    ▼
+Code (extrait rowId + sig du token)
+    │
+    ▼
+Crypto HMAC-SHA256 (credential EMILE HMAC Secret)
+    │
+    ▼
+IF data === sig
+    │
+    ├─ False ──► Respond 200 { "status": "invalid" }
+    │
+    └─ True  ──► HTTP GET /tables/ACCOMPAGNANTS/records?filter={"id":[rowId]}
+                  │
+                  ▼
+                Code (extrait enregistrement + détecte already_validated)
+                  │
+                  ▼
+                IF status === "already_validated"
+                  │
+                  ├─ True  ──► Respond 200 { "status": "already_validated" }
+                  │
+                  └─ False ──► Code (build PATCH body)
+                                │
+                                ▼
+                               HTTP PATCH /tables/ACCOMPAGNANTS/records
+                                │
+                                ▼
+                               Respond 200 { "status": "ok", "nom": "..." }
+```
+
+### Réponses JSON possibles
+
+| `status` | Signification | Action côté frontend |
+|----------|---------------|---------------------|
+| `"ok"` | Compte activé avec succès | Affiche "Compte activé !" + bouton inscription candidat |
+| `"already_validated"` | Compte déjà activé | Affiche "Compte déjà activé" + bouton inscription candidat |
+| `"invalid"` | Token invalide ou expiré | Affiche "Lien invalide" |
+
+### Champs Grist concernés (table ACCOMPAGNANTS)
+
+| Champ | Type | Valeurs | Description |
+|-------|------|---------|-------------|
+| `Compte_valide` | Texte (choix) | `"En attente"` / `"Oui"` | Statut du compte. Initialisé à `"En attente"` à la création, passé à `"Oui"` par OCC-VALIDATE. |
+| `Lien_validation` | Texte | URL complète | Magic link envoyé par email à l'orienteur. Sauvegardé par OCC-GENERATE (background PATCH). |
+
+> ⚠️ Ces deux colonnes doivent exister dans la table `ACCOMPAGNANTS` de Grist. Les créer manuellement si elles n'existent pas (type Texte).
 
 ---
 
@@ -597,6 +901,16 @@ Grist renvoie `[42]` (tableau JSON). n8n transforme cette réponse de manière n
 
 Le code `uploadAttachmentsRest` dans `rest.ts` gère tous ces formats — **ne pas simplifier**.
 
+### n8n — OCC-VALIDATE
+
+| Problème | Cause | Solution |
+|----------|-------|----------|
+| `rowId: null` dans le Code PATCH (token valide mais Grist renvoie des records vides) | Branches True/False du nœud IF signature inversées — le flux valide allait vers "Respond invalid" et le flux invalide vers la requête GET | Vérifier le sens des branches IF (True = valide → GET Grist, False = invalide → Respond invalid) |
+| `"JSON parameter needs to be valid JSON"` dans le nœud HTTP PATCH | `{{ $json.url }}` interpolé dans un template JSON n8n — les URLs avec `://` et `?` brisent le parser | Passer par un nœud Code qui fait `JSON.stringify({ records: [...] })`, puis HTTP Request en mode **Raw body** avec `{{ $json.patchBody }}` |
+| `"Invalid column Lien_validation"` dans le PATCH Grist | La colonne n'existait pas encore dans `ACCOMPAGNANTS` | Créer manuellement la colonne `Lien_validation` (type Texte) dans la table `ACCOMPAGNANTS` via l'interface Grist |
+| La page frontend reçoit une réponse vide ou la réponse Grist au lieu de `{status, nom}` | `Respond to Webhook` placé **après** le HTTP PATCH — n8n répond avec la réponse du PATCH Grist, pas avec `{status: "ok"}` | Mettre le `Respond to Webhook` **avant** le HTTP PATCH. n8n continue l'exécution après avoir répondu. |
+| `Content-Type:` avec deux-points dans le nom de l'en-tête du HTTP Request | Faute de frappe — le nom du header était `Content-Type:` au lieu de `Content-Type` | Corriger le nom du header (sans le `:` final) |
+
 ### Code — React
 
 | Problème | Cause | Solution |
@@ -605,11 +919,13 @@ Le code `uploadAttachmentsRest` dans `rest.ts` gère tous ces formats — **ne p
 
 ---
 
-## Générer un magic link (fiche candidat)
+## Générer un magic link fiche-candidat
 
 ### Automatiquement (depuis le formulaire d'inscription)
 
-Le formulaire `inscription-candidat` génère le magic link automatiquement après la soumission réussie. Le lien s'affiche avec un bouton "Copier" pour être partagé par email ou SMS.
+Le formulaire `inscription-candidat` génère le magic link automatiquement après la soumission réussie (`NEXT_PUBLIC_GRIST_GENERATE_URL`). Le lien s'affiche avec un bouton "Copier" pour être partagé par email ou SMS.
+
+En parallèle, le workflow GENERATE sauvegarde le lien dans le champ `Lien_acces` de la table `CANDIDATS` via un HTTP PATCH Grist (après le Respond to Webhook, en background).
 
 Il suffit de déployer le formulaire avec `NEXT_PUBLIC_GRIST_GENERATE_URL` configurée — aucune action manuelle nécessaire.
 
@@ -635,20 +951,83 @@ Partager le champ `url` par email ou SMS au candidat.
 
 ---
 
+## Générer un magic link orienteur (OCC)
+
+### Automatiquement (depuis le formulaire de création de compte)
+
+Le formulaire `creation-compte-orienteur` génère le magic link OCC automatiquement après la création du compte (`NEXT_PUBLIC_OCC_GENERATE_URL`). Le lien de validation est visible dans l'interface de confirmation.
+
+En parallèle, le workflow OCC-GENERATE sauvegarde le lien dans le champ `Lien_validation` de la table `ACCOMPAGNANTS` via un HTTP PATCH Grist (en background).
+
+Le formulaire `inscription-candidat` peut aussi regénérer un lien OCC pour un orienteur existant si son compte n'est pas encore validé (`Compte_valide !== "Oui"`).
+
+### Manuellement (curl)
+
+```bash
+# Générer un token OCC pour l'orienteur rowId 6
+curl "https://n8n.incubateur.dnum.din.developpement-durable.gouv.fr/webhook/occ-generate?rowId=6"
+```
+
+Réponse :
+```json
+{
+  "rowId": 6,
+  "token": "6.d4f8a2...",
+  "url": "https://stiiig.github.io/grist-widgets/widgets/emile/validation-compte?token=6.d4f8a2..."
+}
+```
+
+Envoyer le champ `url` par email à l'orienteur. Quand il clique, la page `validation-compte` appelle OCC-VALIDATE qui passe `Compte_valide → "Oui"`.
+
+### Flux complet OCC
+
+```
+creation-compte-orienteur (frontend)
+    │
+    │  AddRecord ACCOMPAGNANTS → Compte_valide = "En attente"
+    ▼
+Proxy n8n POST → Grist (nouveau rowId)
+    │
+    │  GET /webhook/occ-generate?rowId=X
+    ▼
+Workflow OCC-GENERATE
+    │  Génère token = rowId.HMAC
+    │  Respond { rowId, token, url }  ← frontend affiche le lien
+    │  PATCH ACCOMPAGNANTS.Lien_validation = url  (background)
+    ▼
+Email envoyé à l'orienteur avec le lien validation-compte?token=X.HMAC
+    │
+    │  (orienteur clique sur le lien)
+    ▼
+Page validation-compte (frontend)
+    │
+    │  GET /webhook/occ-validate?token=X.HMAC
+    ▼
+Workflow OCC-VALIDATE
+    │  Vérifie HMAC
+    │  GET ACCOMPAGNANTS record (vérifie Compte_valide)
+    │  PATCH Compte_valide = "Oui"
+    │  Respond { status: "ok", nom: "..." }
+    ▼
+Page affiche "Compte activé !" + bouton "Inscrire un·e candidat·e"
+```
+
+---
+
 ## Table IDs Grist
 
 > ⚠️ Le **Table ID** Grist (utilisé dans l'API et dans le code) est différent du **nom d'affichage** visible dans l'onglet. En cas de renommage d'une table, le Table ID ne change pas automatiquement.
 
 Tables utilisées par les widgets EMILE :
 
-| Table ID (API) | Utilisée par |
-|----------------|-------------|
-| `CANDIDATS` | `fiche-candidat`, `inscription-candidat` |
-| `ETABLISSEMENTS` | `ajout-etablissement`, `creation-compte-orienteur` |
-| `ACCOMPAGNANTS` | `creation-compte-orienteur` |
-| `DPTS_REGIONS` | `ajout-etablissement` |
-| `_grist_Tables` | `loadColumnsMetaFor` (méta interne) |
-| `_grist_Tables_column` | `loadColumnsMetaFor` (méta interne) |
+| Table ID (API) | Champs clés | Utilisée par |
+|----------------|-------------|-------------|
+| `CANDIDATS` | `Lien_acces` (texte — magic link fiche-candidat) | `fiche-candidat`, `inscription-candidat` |
+| `ETABLISSEMENTS` | — | `ajout-etablissement`, `creation-compte-orienteur` |
+| `ACCOMPAGNANTS` | `Compte_valide` (`"En attente"` / `"Oui"`), `Lien_validation` (texte — magic link OCC) | `creation-compte-orienteur`, `inscription-candidat` |
+| `DPTS_REGIONS` | — | `ajout-etablissement` |
+| `_grist_Tables` | — | `loadColumnsMetaFor` (méta interne) |
+| `_grist_Tables_column` | — | `loadColumnsMetaFor` (méta interne) |
 
 ---
 
