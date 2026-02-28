@@ -19,7 +19,7 @@ import { DIAL_CODES, PINNED_PAYS, TYPE_TAG, FALLBACK_COLS } from "@/lib/emile/co
 import { EMAIL_REGEX, validatePhone } from "@/lib/emile/validators";
 
 const TABLE_ID    = "CANDIDATS";
-const TOTAL_STEPS = 4;
+const TOTAL_STEPS = 5;
 const ORIENTEUR_WIDGET_URL = "/widgets/emile/creation-compte-orienteur/";
 
 /* ─── Types ─────────────────────────────────────────────────── */
@@ -2074,7 +2074,7 @@ export default function InscriptionPage() {
               </div>
             ))}
             <div className="ins-progress__bar">
-              <div className="ins-progress__fill" style={{ width: `${((step - 1) / 4) * 100}%` }} />
+              <div className="ins-progress__fill" style={{ width: `${((step - 1) / (TOTAL_STEPS - 1)) * 100}%` }} />
             </div>
           </div>
 
