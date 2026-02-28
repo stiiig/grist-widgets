@@ -91,3 +91,22 @@
   margin: 0;
   line-height: 1.6;
 }
+
+/* ── Bouton ─────────────────────────────────────────────────── */
+.vc-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 1.25rem;
+  background: #000091;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-family: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.vc-btn:hover { background: #1212ff; }

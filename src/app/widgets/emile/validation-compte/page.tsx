@@ -78,6 +78,9 @@ export default function ValidationComptePage() {
                 Votre compte orienteur·ice EMILE est maintenant actif.<br />
                 Vous pouvez dès à présent inscrire des candidat·e·s.
               </p>
+              <a href="/widgets/emile/inscription-candidat/" className="vc-btn">
+                Inscrire un·e candidat·e <i className="fa-solid fa-arrow-right" />
+              </a>
             </>
           )}
 
@@ -90,6 +93,9 @@ export default function ValidationComptePage() {
                 Ce compte a déjà été validé.<br />
                 Vous pouvez inscrire des candidat·e·s.
               </p>
+              <a href="/widgets/emile/inscription-candidat/" className="vc-btn">
+                Inscrire un·e candidat·e <i className="fa-solid fa-arrow-right" />
+              </a>
             </>
           )}
 
