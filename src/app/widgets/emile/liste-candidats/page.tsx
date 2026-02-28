@@ -11,13 +11,14 @@ interface Candidat {
   prenom: string;
   nom: string;
   email: string;
-  lienAcces: string | null;
 }
 
 export default function ListeCandidatsPage() {
   const [status,        setStatus]        = useState<Status>("loading");
   const [orienteurNom,  setOrienteurNom]  = useState("");
   const [candidats,     setCandidats]     = useState<Candidat[]>([]);
+  const [occToken,      setOccToken]      = useState<string | null>(null);
+  const [ficheBase,     setFicheBase]     = useState("");
 
   useEffect(() => {
     const p     = new URLSearchParams(window.location.search);
@@ -27,6 +28,14 @@ export default function ListeCandidatsPage() {
       setStatus("no_token");
       return;
     }
+
+    setOccToken(token);
+
+    // Calcule l'URL de base vers fiche-candidat (même domaine, même déploiement)
+    const base = window.location.href
+      .split("?")[0]
+      .replace(/\/liste-candidats\/?$/, "/fiche-candidat");
+    setFicheBase(base);
 
     const listUrl = process.env.NEXT_PUBLIC_OCC_LIST_URL;
     if (!listUrl) {
@@ -115,19 +124,13 @@ export default function ListeCandidatsPage() {
                       )}
                     </div>
                     <div className="lc-item__actions">
-                      {c.lienAcces ? (
-                        <a
-                          href={c.lienAcces}
-                          className="lc-btn lc-btn--sm"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <i className="fa-solid fa-folder-open" />
-                          Voir la fiche
-                        </a>
-                      ) : (
-                        <span className="lc-item__no-link">Fiche non disponible</span>
-                      )}
+                      <a
+                        href={`${ficheBase}?token=${occToken}&id=${c.id}`}
+                        className="lc-btn lc-btn--sm"
+                      >
+                        <i className="fa-solid fa-folder-open" />
+                        Voir la fiche
+                      </a>
                     </div>
                   </li>
                 ))}

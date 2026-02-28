@@ -971,14 +971,35 @@ export default function Page() {
   const { mode, docApi } = useGristInit({ requiredAccess: "full" });
 
   // ── Magic link : ?token=rowId.HMAC (prod) ou ?rowId=123 (dev fallback) ──
-  const [rowIdFromUrl, setRowIdFromUrl] = useState<number | null>(null);
-  const [tokenFromUrl, setTokenFromUrl] = useState<string | null>(null);
+  // ── Mode orienteur  : ?token=<OCC>&id=<candidatRowId> ──────────────────
+  const [rowIdFromUrl,        setRowIdFromUrl]        = useState<number | null>(null);
+  const [tokenFromUrl,        setTokenFromUrl]        = useState<string | null>(null);
+  const [isOrienteurMode,     setIsOrienteurMode]     = useState(false);
+  const [candidatRowIdFromUrl,setCandidatRowIdFromUrl]= useState<number | null>(null);
+  const [occTokenForOrienteur,setOccTokenForOrienteur]= useState<string | null>(null);
+  const [orienteurListUrl,    setOrienteurListUrl]    = useState<string | null>(null);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const p = new URLSearchParams(window.location.search);
+    const p     = new URLSearchParams(window.location.search);
     const token = p.get("token");
-    if (token) {
-      // Format : "rowId.HMAC" — rowId extrait localement pour le state
+    const id    = p.get("id");
+
+    if (token && id) {
+      // Mode orienteur : ?token=<OCC>&id=<candidatRowId>
+      const candidatId = parseInt(id, 10);
+      if (!isNaN(candidatId)) {
+        setIsOrienteurMode(true);
+        setOccTokenForOrienteur(token);
+        setCandidatRowIdFromUrl(candidatId);
+        // URL de retour vers la liste de l'orienteur
+        const listBase = window.location.href
+          .split("?")[0]
+          .replace(/\/fiche-candidat\/?$/, "/liste-candidats");
+        setOrienteurListUrl(`${listBase}?token=${token}`);
+      }
+    } else if (token) {
+      // Mode candidat : ?token=rowId.HMAC
       const rowId = parseInt(token.split(".")[0], 10);
       if (!isNaN(rowId)) {
         setTokenFromUrl(token);
@@ -1050,9 +1071,33 @@ export default function Page() {
     grist.ready({ requiredAccess: "full" });
   }, [docApi, mode]);
 
+  // ── Mode orienteur : fetch via occ-get-candidat ──────────────────
+  useEffect(() => {
+    if (!isOrienteurMode || !occTokenForOrienteur || !candidatRowIdFromUrl) return;
+    setLoadingRest(true);
+    const getUrl = process.env.NEXT_PUBLIC_OCC_GET_CANDIDAT_URL;
+    if (!getUrl) {
+      setStatus("Configuration manquante (OCC_GET_CANDIDAT_URL).");
+      setLoadingRest(false);
+      return;
+    }
+    const url = `${getUrl.replace(/\/$/, "")}?token=${encodeURIComponent(occTokenForOrienteur)}&id=${candidatRowIdFromUrl}`;
+    fetch(url)
+      .then((res) => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
+      .then((data) => {
+        if (data?.status === "ok" && data.candidat) {
+          setSelected({ id: data.candidat.id, ...data.candidat });
+        } else {
+          setStatus("Dossier introuvable ou accès refusé.");
+        }
+      })
+      .catch((e) => setStatus("Erreur: " + (e?.message ?? String(e))))
+      .finally(() => setLoadingRest(false));
+  }, [isOrienteurMode, occTokenForOrienteur, candidatRowIdFromUrl]);
+
   // ── Mode REST (standalone magic link) : fetch par token ou rowId ─
   useEffect(() => {
-    if (!docApi || mode !== "rest" || !rowIdFromUrl) return;
+    if (!docApi || mode !== "rest" || !rowIdFromUrl || isOrienteurMode) return;
     setLoadingRest(true);
     (async () => {
       try {
@@ -1150,7 +1195,21 @@ export default function Page() {
 
       {/* ===== HEADER ===== */}
       <header className="emile-header">
-        <img src={logoEmile.src} alt="EMILE" style={{ height: "1.8rem", width: "auto" }} />
+        {isOrienteurMode && orienteurListUrl ? (
+          <a
+            href={orienteurListUrl}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: "0.35rem",
+              color: "#fff", textDecoration: "none", fontSize: "0.82rem",
+              fontWeight: 600, opacity: 0.92,
+            }}
+          >
+            <i className="fa-solid fa-arrow-left" />
+            Mes candidat·e·s
+          </a>
+        ) : (
+          <img src={logoEmile.src} alt="EMILE" style={{ height: "1.8rem", width: "auto" }} />
+        )}
         {selectedName && (
           <>
             <span className="emile-header__sep">›</span>
@@ -1199,15 +1258,17 @@ export default function Page() {
               </button>
             </>
           )}
-          <button
-            type="button"
-            className="emile-save-btn"
-            onClick={save}
-            disabled={!selected?.id || !docApi || saving}
-          >
-            <i className="fa-solid fa-floppy-disk" aria-hidden="true" />
-            {saving ? "…" : "Enregistrer"}
-          </button>
+          {!isOrienteurMode && (
+            <button
+              type="button"
+              className="emile-save-btn"
+              onClick={save}
+              disabled={!selected?.id || !docApi || saving}
+            >
+              <i className="fa-solid fa-floppy-disk" aria-hidden="true" />
+              {saving ? "…" : "Enregistrer"}
+            </button>
+          )}
         </div>
       </header>
 

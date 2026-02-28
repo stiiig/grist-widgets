@@ -1,0 +1,177 @@
+@import url("https://cdn.jsdelivr.net/npm/@gouvfr/dsfr@1.11.2/dist/dsfr/dsfr.min.css");
+@import url("https://cdn.jsdelivr.net/npm/@gouvfr/dsfr@1.11.2/dist/utility/icons/icons.min.css");
+@import url("https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css");
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body { font-family: Marianne, arial, sans-serif; background: #f6f6f6; color: #1e1e1e; }
+
+/* ── Shell ── */
+.rlc-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Header ── */
+.rlc-header {
+  background: #000091;
+  color: #fff;
+  padding: 0 1.5rem;
+  height: 3.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+.rlc-header__appname {
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+/* ── Body ── */
+.rlc-body {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 2.5rem 1rem;
+}
+
+/* ── Card ── */
+.rlc-card {
+  background: #fff;
+  border-radius: 6px;
+  box-shadow: 0 2px 12px rgba(0, 0, 145, 0.08);
+  padding: 2rem 2rem 2.25rem;
+  width: 100%;
+  max-width: 480px;
+}
+
+/* ── Titre ── */
+.rlc-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #000091;
+  margin-bottom: 0.4rem;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+.rlc-subtitle {
+  font-size: 0.88rem;
+  color: #555;
+  margin-bottom: 1.75rem;
+  line-height: 1.55;
+}
+
+/* ── Form ── */
+.rlc-label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 0.4rem;
+  color: #333;
+}
+.rlc-input {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: 1.5px solid #c1c1c1;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  color: #1e1e1e;
+  background: #fafafa;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.rlc-input:focus { border-color: #000091; background: #fff; }
+.rlc-input:disabled { background: #f3f3f3; color: #999; }
+
+/* ── Bouton principal ── */
+.rlc-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.6rem 1.5rem;
+  background: #000091;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  margin-top: 1.25rem;
+  width: 100%;
+  justify-content: center;
+  transition: background 0.15s;
+}
+.rlc-btn:hover:not(:disabled) { background: #1212ff; }
+.rlc-btn:disabled { background: #c1c1c1; cursor: not-allowed; }
+
+/* ── Encart magic link ── */
+.rlc-encart {
+  margin-top: 1.5rem;
+  background: #f0f0ff;
+  border: 1.5px solid #c8c8e8;
+  border-radius: 6px;
+  padding: 1.1rem 1.25rem;
+}
+.rlc-encart__title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #000091;
+  margin-bottom: 0.55rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.rlc-encart__url {
+  word-break: break-all;
+  font-size: 0.78rem;
+  color: #333;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.75rem;
+  font-family: monospace;
+}
+.rlc-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 1rem;
+  border: 1.5px solid #000091;
+  border-radius: 4px;
+  background: #fff;
+  color: #000091;
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.rlc-copy-btn:hover { background: #f0f0ff; }
+.rlc-copy-btn--copied { border-color: #068038; color: #068038; }
+
+/* ── Messages d'état ── */
+.rlc-alert {
+  margin-top: 1.25rem;
+  padding: 0.75rem 1rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+}
+.rlc-alert--error   { background: #fff0f0; border: 1px solid #f8b4b4; color: #c0392b; }
+.rlc-alert--warning { background: #fff8e1; border: 1px solid #ffe082; color: #7a5c00; }
+
+/* ── Responsive ── */
+@media (max-width: 520px) {
+  .rlc-body { padding: 1.25rem 0.75rem; align-items: flex-start; }
+  .rlc-card { padding: 1.5rem 1.25rem; }
+}
