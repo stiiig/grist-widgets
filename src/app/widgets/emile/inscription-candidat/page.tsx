@@ -531,10 +531,10 @@ function MultiChoiceField({
 
 
 function TelField({
-  value, onValueChange, code, onCodeChange, required = false,
+  value, onValueChange, code, onCodeChange, required = false, placeholder = "",
 }: {
   value: string; onValueChange: (v: string) => void;
-  code: string; onCodeChange: (c: string) => void; required?: boolean;
+  code: string; onCodeChange: (c: string) => void; required?: boolean; placeholder?: string;
 }) {
   const [open, setOpen]               = useState(false);
   const [hoveredName, setHoveredName] = useState<string | null>(null);
@@ -633,6 +633,7 @@ function TelField({
           value={value}
           onChange={(e) => onValueChange(e.target.value.replace(/\D/g, ""))}
           style={{ flex: 1 }}
+          placeholder={placeholder}
         />
       </div>
     </div>
@@ -2199,13 +2200,14 @@ export default function InscriptionPage() {
 
 
                 <SectionTitle title="Coordonnées du / de la candidat·e" />
-                <TextField label="Email" value={form.Email} onChange={(v) => set("Email", v)} type="email" required />
+                <TextField label="Email" value={form.Email} onChange={(v) => set("Email", v)} type="email" required placeholder="Email du / de la candidat·e" />
                 <TelField
                   value={form.Tel}
                   onValueChange={(v) => set("Tel", v)}
                   code={form.TelCode}
                   onCodeChange={(c) => set("TelCode", c)}
                   required
+                  placeholder="Téléphone du / de la candidat·e"
                 />
               </>
             )}
