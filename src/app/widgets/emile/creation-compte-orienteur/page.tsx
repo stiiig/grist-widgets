@@ -40,7 +40,8 @@ export default function OrienteurPage() {
   const { mode, docApi } = useGristInit();
   const [step, setStep]             = useState(1);
   const [form, setForm]             = useState<FormData>(INITIAL);
-  const [done, setDone]             = useState(false);
+  const [validationLink, setValidationLink] = useState<string | null>(null);
+  const [copied, setCopied]         = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError]           = useState<string | null>(null);
 
@@ -126,17 +127,41 @@ export default function OrienteurPage() {
 
     setSubmitting(true);
     try {
-      await docApi.applyUserActions([
+      const result = await docApi.applyUserActions([
         ["AddRecord", TABLE_ID, null, {
           Etablissement:  form.Etablissement,
-          Fonction: form.Fonction,
-          Prenom:   form.Prenom.trim(),
-          Nom:      form.Nom.trim(),
-          Tel:      form.Tel.trim(),
-          Email:    form.Email.trim(),
+          Fonction:       form.Fonction,
+          Prenom:         form.Prenom.trim(),
+          Nom:            form.Nom.trim(),
+          Tel:            form.Tel.trim(),
+          Email:          form.Email.trim(),
+          Compte_valide:  "En attente",
         }],
       ]);
-      setDone(true);
+      const newRowId = result?.retValues?.[0] as number | undefined;
+
+      // Génération du lien de validation orienteur (non bloquant)
+      if (newRowId) {
+        try {
+          const occUrl = process.env.NEXT_PUBLIC_OCC_GENERATE_URL;
+          if (occUrl) {
+            const url = `${occUrl.replace(/\/$/, "")}?rowId=${newRowId}`;
+            const genRes = await fetch(url);
+            if (genRes.ok) {
+              const genData = await genRes.json();
+              if (genData?.url) {
+                const link = genData.url as string;
+                setValidationLink(link);
+                try {
+                  await docApi.applyUserActions([["UpdateRecord", TABLE_ID, newRowId, { Lien_validation: link }]]);
+                } catch { /* non bloquant */ }
+              }
+            }
+          }
+        } catch { /* non bloquant */ }
+      }
+
+      setStep(3);
     } catch {
       setError("Une erreur est survenue lors de l'enregistrement. Veuillez réessayer.");
     } finally {
@@ -179,8 +204,8 @@ export default function OrienteurPage() {
     );
   }
 
-  /* ── Écran de confirmation ──────────────────────────────────── */
-  if (done) {
+  /* ── Étape 3 — Confirmation ─────────────────────────────────── */
+  if (step === 3) {
     return (
       <div className="occ-shell">
         <header className="occ-header">
@@ -188,27 +213,123 @@ export default function OrienteurPage() {
           <img src={logoEmile.src} alt="EMILE" style={{ height: "2rem", width: "auto" }} />
           <span className="occ-header__appname">Création compte orienteur·ice</span>
         </header>
-        <main className="occ-body occ-body--center">
-          <div className="occ-done">
-            <i className="fa-solid fa-circle-check" style={{ fontSize: "2.5rem", color: "#18753c" }} />
-            <h1 className="occ-done__title">Votre compte EMILE est créé&nbsp;!</h1>
+        <main className="occ-body">
+
+          {/* Barre de progression — toutes les étapes complètes */}
+          <div className="occ-progress">
+            <div className="occ-progress__bar">
+              <div className="occ-progress__fill" style={{ width: "100%" }} />
+            </div>
+            {[
+              { num: 1, label: "Établissement" },
+              { num: 2, label: "Profil" },
+              { num: 3, label: "Confirmation" },
+            ].map(({ num, label }) => (
+              <div key={num} className="occ-progress__step done">
+                <div className="occ-progress__dot">
+                  <i className="fa-solid fa-check" />
+                </div>
+                <span className="occ-progress__label">{label}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Carte de confirmation */}
+          <div className="occ-form">
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+              <i className="fa-solid fa-circle-check" style={{ fontSize: "2rem", color: "#18753c", flexShrink: 0 }} />
+              <h1 className="occ-step-title" style={{ margin: 0 }}>Compte créé — validation en attente</h1>
+            </div>
+
             <ul className="occ-done__list">
-              <li>
-                Un email de confirmation vient d&apos;être envoyé à{" "}
-                <strong>{form.Email}</strong>
-              </li>
-              <li>
-                En cas de problème, contactez votre équipe via l&apos;adresse indiquée dans l&apos;email
-              </li>
+              <li>Un email de validation a été envoyé à <strong>{form.Email}</strong></li>
+              <li>Cliquez sur le lien dans cet email pour activer le compte</li>
+              <li>Sans validation, le compte restera en statut <em>En attente</em></li>
             </ul>
+
+            {/* Lien de validation */}
+            {validationLink && (
+              <div style={{
+                background: "#fafafa", border: "1px dashed #c8c8e8",
+                borderRadius: "0.5rem", padding: "0.7rem 1rem",
+              }}>
+                <div style={{
+                  fontSize: "0.65rem", fontWeight: 700, color: "#888",
+                  textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "0.45rem",
+                  display: "flex", alignItems: "center", gap: "0.35rem",
+                }}>
+                  <i className="fa-solid fa-link" style={{ fontSize: "0.7rem" }} />
+                  Lien de validation (test)
+                </div>
+                <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                  <input
+                    readOnly
+                    value={validationLink}
+                    onClick={(e) => (e.target as HTMLInputElement).select()}
+                    style={{
+                      flex: 1, fontSize: "0.72rem", fontFamily: "monospace",
+                      border: "1px solid #d0d0d0", borderRadius: 4,
+                      padding: "0.3rem 0.5rem", background: "#fff",
+                      color: "#333", overflow: "hidden", textOverflow: "ellipsis",
+                      whiteSpace: "nowrap", cursor: "text", outline: "none",
+                      height: "1.9rem", boxSizing: "border-box",
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(validationLink).then(() => {
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                      });
+                    }}
+                    style={{
+                      flexShrink: 0, height: "1.9rem", padding: "0 0.75rem",
+                      border: "1px solid",
+                      borderColor: copied ? "#16a34a" : "#000091",
+                      borderRadius: 4,
+                      background: copied ? "#f0fdf4" : "#000091",
+                      color: copied ? "#15803d" : "#fff",
+                      cursor: "pointer", fontSize: "0.75rem", fontFamily: "inherit", fontWeight: 600,
+                      display: "flex", alignItems: "center", gap: "0.3rem",
+                      transition: "all 0.15s",
+                    }}
+                  >
+                    {copied
+                      ? <><i className="fa-solid fa-check" /> Copié !</>
+                      : <><i className="fa-solid fa-copy" /> Copier</>
+                    }
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="occ-done__warning">
               <i className="fa-solid fa-triangle-exclamation" />
               <span>
-                Vérifiez votre dossier <strong>spam</strong> si vous ne recevez pas l&apos;email de confirmation.
+                Vérifiez le dossier <strong>spam</strong> si l&apos;email n&apos;arrive pas dans quelques minutes.
               </span>
             </div>
-            <p className="occ-done__thanks">🙏 Merci de rejoindre le réseau EMILE</p>
+
+            <div className="occ-nav-row" style={{ justifyContent: "flex-start" }}>
+              <button
+                type="button"
+                className="occ-btn occ-btn--secondary"
+                style={{ marginLeft: 0 }}
+                onClick={() => {
+                  setForm(INITIAL);
+                  setStep(1);
+                  setValidationLink(null);
+                  setCopied(false);
+                  setError(null);
+                }}
+              >
+                <i className="fa-solid fa-plus" />
+                Ajouter un autre compte
+              </button>
+            </div>
           </div>
+
         </main>
       </div>
     );
@@ -230,11 +351,12 @@ export default function OrienteurPage() {
         {/* Barre de progression */}
         <div className="occ-progress">
           <div className="occ-progress__bar">
-            <div className="occ-progress__fill" style={{ width: step === 1 ? "0%" : "100%" }} />
+            <div className="occ-progress__fill" style={{ width: step === 1 ? "0%" : step === 2 ? "50%" : "100%" }} />
           </div>
           {[
             { num: 1, label: "Établissement" },
             { num: 2, label: "Profil" },
+            { num: 3, label: "Confirmation" },
           ].map(({ num, label }) => (
             <div
               key={num}
@@ -258,7 +380,7 @@ export default function OrienteurPage() {
             <>
               <div className="occ-step-header">
                 <h2 className="occ-step-title">Mon établissement</h2>
-                <span className="occ-step-badge">Étape 1 sur 2</span>
+                <span className="occ-step-badge">Étape 1 sur 3</span>
               </div>
 
               <div className="occ-field">
@@ -301,7 +423,7 @@ export default function OrienteurPage() {
             <>
               <div className="occ-step-header">
                 <h2 className="occ-step-title">Mon contexte professionnel</h2>
-                <span className="occ-step-badge">Étape 2 sur 2</span>
+                <span className="occ-step-badge">Étape 2 sur 3</span>
               </div>
 
               {/* Recap établissement */}

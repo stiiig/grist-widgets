@@ -1648,7 +1648,9 @@ export default function InscriptionPage() {
   const [orienteurEmail, setOrienteurEmail]         = useState("");
   const [orienteurChecking, setOrienteurChecking]   = useState(false);
   const [orienteurError, setOrienteurError]         = useState("");
-  const [orienteurFound, setOrienteurFound]         = useState<{ id: number; nom: string; email: string } | null>(null);
+  const [orienteurFound, setOrienteurFound]         = useState<{ id: number; nom: string; email: string; compteValide: string } | null>(null);
+  const [orienteurResending, setOrienteurResending] = useState(false);
+  const [orienteurResent,    setOrienteurResent]    = useState(false);
 
   /* ── Choix dynamiques depuis métadonnées Grist ── */
   const choicesMap = useMemo(() => {
@@ -1772,14 +1774,15 @@ export default function InscriptionPage() {
     try {
       const table: any = await docApi.fetchTable("ACCOMPAGNANTS");
       const ids = table.id as number[];
-      let found: { id: number; nom: string; email: string } | null = null;
+      let found: { id: number; nom: string; email: string; compteValide: string } | null = null;
       for (let i = 0; i < ids.length; i++) {
         const rowEmail = String(table["Email"]?.[i] ?? "").trim().toLowerCase();
         if (rowEmail === email) {
           const prenom = String(table["Prenom"]?.[i] ?? "").trim();
           const nom    = String(table["Nom_de_famille"]?.[i] ?? table["Nom"]?.[i] ?? "").trim();
           const fullName = [prenom, nom].filter(Boolean).join(" ") || email;
-          found = { id: ids[i], nom: fullName, email };
+          const compteValide = String(table["Compte_valide"]?.[i] ?? "").trim();
+          found = { id: ids[i], nom: fullName, email, compteValide };
           break;
         }
       }
@@ -1792,6 +1795,26 @@ export default function InscriptionPage() {
       setOrienteurError("Erreur lors de la vérification. Veuillez réessayer.");
     } finally {
       setOrienteurChecking(false);
+    }
+  }
+
+  /* ── Renvoi du lien de validation orienteur ── */
+  async function resendOrienteurValidation() {
+    if (!orienteurFound) return;
+    setOrienteurResending(true);
+    try {
+      const occUrl = process.env.NEXT_PUBLIC_OCC_GENERATE_URL;
+      if (occUrl) {
+        const url = `${occUrl.replace(/\/$/, "")}?rowId=${orienteurFound.id}`;
+        const res = await fetch(url);
+        if (res.ok) {
+          setOrienteurResent(true);
+          setTimeout(() => setOrienteurResent(false), 3000);
+        }
+      }
+    } catch { /* non bloquant */ }
+    finally {
+      setOrienteurResending(false);
     }
   }
 
@@ -1955,7 +1978,7 @@ export default function InscriptionPage() {
             magicLink={submittedMagicLink}
             orienteurNom={orienteurFound?.nom ?? null}
             orienteurEmail={orienteurFound?.email ?? null}
-            onNew={() => { setForm(INITIAL); setDone(false); setShowSummary(false); setStep(1); setValidError(""); setSubmitError(""); setSubmittedId2(null); setSubmittedMagicLink(null); setOrienteurEmail(""); setOrienteurFound(null); setOrienteurError(""); }}
+            onNew={() => { setForm(INITIAL); setDone(false); setShowSummary(false); setStep(1); setValidError(""); setSubmitError(""); setSubmittedId2(null); setSubmittedMagicLink(null); setOrienteurEmail(""); setOrienteurFound(null); setOrienteurError(""); setOrienteurResending(false); setOrienteurResent(false); }}
           />
         </div>
       </div>
@@ -2097,22 +2120,63 @@ export default function InscriptionPage() {
 
                   {/* Résultat trouvé */}
                   {orienteurFound && (
-                    <div style={{
-                      marginTop: "0.75rem", display: "flex", alignItems: "center",
-                      gap: "0.6rem", padding: "0.6rem 0.9rem",
-                      background: "#f0fdf4", border: "1px solid #bbf7d0",
-                      borderRadius: "0.5rem",
-                    }}>
-                      <i className="fa-solid fa-circle-check" style={{ color: "#16a34a", fontSize: "1.1rem", flexShrink: 0 }} />
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: "0.87rem", color: "#15803d" }}>
-                          Compte trouvé : {orienteurFound.nom}
-                        </div>
-                        <div style={{ fontSize: "0.75rem", color: "#166534", marginTop: "0.1rem" }}>
-                          Vous pouvez poursuivre l&apos;inscription du candidat·e.
+                    orienteurFound.compteValide === "Oui" ? (
+                      <div style={{
+                        marginTop: "0.75rem", display: "flex", alignItems: "center",
+                        gap: "0.6rem", padding: "0.6rem 0.9rem",
+                        background: "#f0fdf4", border: "1px solid #bbf7d0",
+                        borderRadius: "0.5rem",
+                      }}>
+                        <i className="fa-solid fa-circle-check" style={{ color: "#16a34a", fontSize: "1.1rem", flexShrink: 0 }} />
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: "0.87rem", color: "#15803d" }}>
+                            Compte trouvé : {orienteurFound.nom}
+                          </div>
+                          <div style={{ fontSize: "0.75rem", color: "#166534", marginTop: "0.1rem" }}>
+                            Vous pouvez poursuivre l&apos;inscription du candidat·e.
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div style={{
+                        marginTop: "0.75rem", padding: "0.6rem 0.9rem",
+                        background: "#fff7ed", border: "1px solid #fed7aa",
+                        borderRadius: "0.5rem",
+                      }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.35rem" }}>
+                          <i className="fa-solid fa-triangle-exclamation" style={{ color: "#d97706", flexShrink: 0, fontSize: "1.1rem" }} />
+                          <div style={{ fontWeight: 700, fontSize: "0.87rem", color: "#92400e" }}>
+                            Compte en attente de validation : {orienteurFound.nom}
+                          </div>
+                        </div>
+                        <div style={{ fontSize: "0.75rem", color: "#78350f", marginBottom: "0.4rem" }}>
+                          Ce compte n&apos;est pas encore actif. L&apos;orienteur·se doit valider son compte avant de pouvoir inscrire un·e candidat·e.
+                        </div>
+                        {orienteurResent ? (
+                          <span style={{ fontSize: "0.8rem", color: "#15803d", fontWeight: 600 }}>
+                            <i className="fa-solid fa-check" /> Email envoyé !
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            style={{
+                              background: "none", border: "none", padding: 0,
+                              cursor: orienteurResending ? "not-allowed" : "pointer",
+                              fontSize: "0.8rem", color: "#000091", fontWeight: 600,
+                              textDecoration: "none", borderBottom: "1px solid #000091",
+                              paddingBottom: "1px",
+                            }}
+                            disabled={orienteurResending}
+                            onClick={resendOrienteurValidation}
+                          >
+                            {orienteurResending
+                              ? <><i className="fa-solid fa-spinner fa-spin" aria-hidden="true" /> Envoi en cours…</>
+                              : <>Renvoyer l&apos;email de validation</>
+                            }
+                          </button>
+                        )}
+                      </div>
+                    )
                   )}
 
                   {/* Erreur */}
@@ -2165,6 +2229,7 @@ export default function InscriptionPage() {
                     <button
                       type="button"
                       className="ins-btn ins-btn--primary"
+                      disabled={orienteurFound.compteValide !== "Oui"}
                       onClick={() => { setValidError(""); setStep(2); window.scrollTo(0, 0); }}
                     >
                       Continuer <i className="fa-solid fa-arrow-right" aria-hidden="true" />
