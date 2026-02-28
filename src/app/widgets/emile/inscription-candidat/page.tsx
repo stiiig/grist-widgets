@@ -2111,10 +2111,11 @@ export default function InscriptionPage() {
                         style={{
                           display: "inline-flex", alignItems: "center", gap: "0.35rem",
                           fontSize: "0.8rem", color: "#000091", fontWeight: 600,
-                          textDecoration: "underline", textUnderlineOffset: "2px",
+                          textDecoration: "none",
                         }}
                       >
-                        Créer un compte orienteur <i className="fa-solid fa-arrow-up-right-from-square" style={{ fontSize: "0.7rem" }} />
+                        <span style={{ textDecoration: "underline", textUnderlineOffset: "2px" }}>Créer un compte orienteur</span>
+                        <i className="fa-solid fa-arrow-up-right-from-square" style={{ fontSize: "0.7rem" }} />
                       </a>
                     </div>
                   )}
@@ -2128,13 +2129,14 @@ export default function InscriptionPage() {
                       target="_blank"
                       rel="noreferrer"
                       style={{
-                        fontSize: "0.8rem", color: "#000091",
-                        textDecoration: "underline", textUnderlineOffset: "2px",
                         display: "inline-flex", alignItems: "center", gap: "0.35rem",
+                        fontSize: "0.8rem", color: "#000091", textDecoration: "none",
                       }}
                     >
                       <i className="fa-solid fa-user-plus" style={{ fontSize: "0.72rem" }} />
-                      Vous n&apos;avez pas encore de compte orienteur ? Créez-en un
+                      <span style={{ textDecoration: "underline", textUnderlineOffset: "2px" }}>
+                        Vous n&apos;avez pas encore de compte orienteur ? Créez-en un
+                      </span>
                     </a>
                   </div>
                 )}
